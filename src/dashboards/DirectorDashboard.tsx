@@ -15,19 +15,232 @@ import {
   Download,
   Calendar,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Search,
+  X
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { AttendanceRecord, ScheduledJobLog, NotificationLog } from '../types';
+import { AttendanceRecord, ScheduledJobLog, NotificationLog, Student } from '../types';
 import { HostelAttendanceBarChart } from '../components/dashboard/HostelAttendanceBarChart';
 import { WarningTicketsTable } from '../components/dashboard/WarningTicketsTable';
 import { DefaultersRoster } from '../components/dashboard/DefaultersRoster';
 import { LatePunchesRoster } from '../components/dashboard/LatePunchesRoster';
 
+type AttendanceDrilldownCategory = 'all' | 'present' | 'late' | 'approved_leave' | 'defaulters' | 'compliant';
+
+interface AttendanceDrilldownProps {
+  category: AttendanceDrilldownCategory;
+  date: string;
+  onClose: () => void;
+}
+
+const attendanceCategoryLabels: Record<AttendanceDrilldownCategory, string> = {
+  all: 'Active Residents',
+  present: 'Present On-Time',
+  late: 'Late Punches',
+  approved_leave: 'Approved Leave',
+  defaulters: 'Defaulters',
+  compliant: 'Compliant Residents'
+};
+
+const getAttendanceStatusLabel = (record?: AttendanceRecord) => {
+  if (!record) return 'No attendance recorded';
+  if (record.isDefaulter || record.status === 'absent') return 'Defaulter';
+  if (record.status === 'approved_leave') return 'Approved Leave';
+  if (record.status === 'late') return 'Late Punch';
+  return 'Present On-Time';
+};
+
+const getAttendanceStatusClass = (record?: AttendanceRecord) => {
+  if (!record) return 'bg-slate-100 text-slate-700';
+  if (record.isDefaulter || record.status === 'absent') return 'bg-rose-100 text-rose-800';
+  if (record.status === 'approved_leave') return 'bg-blue-100 text-blue-800';
+  if (record.status === 'late') return 'bg-amber-100 text-amber-800';
+  return 'bg-emerald-100 text-emerald-800';
+};
+
+const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ category, date, onClose }) => {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [search, setSearch] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+    setIsLoading(true);
+    setError(null);
+
+    Promise.all([
+      apiService.getStudents(),
+      apiService.getAttendanceHistory({ startDate: date, endDate: date })
+    ])
+      .then(([studentResponse, attendanceResponse]) => {
+        if (!studentResponse.success || !attendanceResponse.success) {
+          throw new Error('The student or attendance data could not be loaded.');
+        }
+        if (isCurrentRequest) {
+          setStudents(studentResponse.students);
+          setAttendance(attendanceResponse.records);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (isCurrentRequest) {
+          setError(loadError instanceof Error ? loadError.message : 'Unable to load student attendance details.');
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setIsLoading(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [category, date]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const attendanceByStudentId = new Map(attendance.map((record) => [record.studentId, record]));
+  const filteredStudents = students
+    .filter((student) => student.checkoutStatus === 'active' && student.verificationStatus === 'verified')
+    .map((student) => ({ student, record: attendanceByStudentId.get(student.id) }))
+    .filter(({ record }) => {
+      if (category === 'all') return true;
+      if (category === 'defaulters') return Boolean(record && (record.isDefaulter || record.status === 'absent'));
+      if (category === 'compliant') return Boolean(record && ['present', 'late', 'approved_leave'].includes(record.status));
+      return record?.status === category;
+    })
+    .filter(({ student, record }) => {
+      const query = search.trim().toLowerCase();
+      if (!query) return true;
+      return [
+        student.name,
+        student.enrollmentNo,
+        student.hostelId,
+        student.block,
+        student.roomNumber,
+        record?.status
+      ].some((value) => value?.toLowerCase().includes(query));
+    })
+    .sort((a, b) => a.student.name.localeCompare(b.student.name));
+
+  const hostelNames: Record<string, string> = {
+    'h-shivalik': 'Boys Hostel 1',
+    'h-mandakini': 'Girls Hostel',
+    'h-nilgiri': 'Boys Hostel 2'
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+      onClick={onClose}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="attendance-drilldown-title"
+        className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+          <div>
+            <h2 id="attendance-drilldown-title" className="text-lg font-bold text-slate-900">
+              {attendanceCategoryLabels[category]}
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">Student details for {date}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close student details"
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="border-b border-slate-200 p-4">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search name, enrollment, hostel, room..."
+              aria-label="Search student details"
+              className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-hidden"
+            />
+          </div>
+        </div>
+
+        <div className="min-h-48 overflow-auto">
+          {isLoading ? (
+            <p className="p-8 text-center text-sm text-slate-500">Loading student details...</p>
+          ) : error ? (
+            <p role="alert" className="p-8 text-center text-sm text-rose-700">{error}</p>
+          ) : (
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="sticky top-0 bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Student</th>
+                  <th className="px-4 py-3">Enrollment No.</th>
+                  <th className="px-4 py-3">Hostel / Block</th>
+                  <th className="px-4 py-3">Room</th>
+                  <th className="px-4 py-3">Attendance</th>
+                  <th className="px-4 py-3">Punch Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                      No students found for this category and date.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStudents.map(({ student, record }) => (
+                    <tr key={student.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-900">{student.name}</td>
+                      <td className="px-4 py-3 font-mono text-slate-700">{student.enrollmentNo}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {hostelNames[student.hostelId] || student.hostelId} / {student.block}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{student.roomNumber}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${getAttendanceStatusClass(record)}`}>
+                          {getAttendanceStatusLabel(record)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-700">{record?.punchTime || '—'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {!isLoading && !error && (
+          <div className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500">
+            Showing {filteredStudents.length} student{filteredStudents.length === 1 ? '' : 's'}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+};
+
 export const DirectorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>('2026-10-27');
+  const [drilldownCategory, setDrilldownCategory] = useState<AttendanceDrilldownCategory | null>(null);
   const [reportData, setReportData] = useState<any>(null);
   const [schedulerStatus, setSchedulerStatus] = useState<any>(null);
   const [defaulters, setDefaulters] = useState<AttendanceRecord[]>([]);
@@ -178,41 +391,77 @@ export const DirectorDashboard: React.FC = () => {
 
       {/* High-level Director KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setDrilldownCategory('all')}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+          aria-label="View all active residents"
+        >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Active Residents</div>
           <div className="text-2xl font-bold text-slate-900 mt-1">{consolidated?.totalEnrolled || 0}</div>
           <div className="text-[10px] text-slate-500 mt-0.5">3 Hostels Active</div>
-        </div>
+          <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
+        </button>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setDrilldownCategory('present')}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+          aria-label="View students present on time"
+        >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Present Rate</div>
           <div className="text-2xl font-bold text-emerald-600 mt-1">{consolidated?.totalPresent || 0}</div>
           <div className="text-[10px] text-slate-400 mt-0.5">On-time biometric</div>
-        </div>
+          <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
+        </button>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setDrilldownCategory('late')}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+          aria-label="View students with late punches"
+        >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Late Punches</div>
           <div className="text-2xl font-bold text-amber-600 mt-1">{consolidated?.totalLate || 0}</div>
           <div className="text-[10px] text-slate-400 mt-0.5">Pre-cutoff entry</div>
-        </div>
+          <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
+        </button>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setDrilldownCategory('approved_leave')}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+          aria-label="View students on approved leave"
+        >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Approved Leave</div>
           <div className="text-2xl font-bold text-blue-600 mt-1">{consolidated?.totalLeave || 0}</div>
           <div className="text-[10px] text-blue-600 mt-0.5">Alerts suppressed</div>
-        </div>
+          <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
+        </button>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setDrilldownCategory('defaulters')}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+          aria-label="View defaulters"
+        >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Defaulters (9:00 PM)</div>
           <div className="text-2xl font-bold text-rose-600 mt-1">{consolidated?.totalDefaulters || 0}</div>
           <div className="text-[10px] text-rose-600 font-semibold mt-0.5">Missing students</div>
-        </div>
+          <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
+        </button>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setDrilldownCategory('compliant')}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+          aria-label="View compliant residents"
+        >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Institutional Compliance</div>
           <div className="text-2xl font-bold text-indigo-600 mt-1">{consolidated?.overallComplianceRate || 0}%</div>
           <div className="text-[10px] text-emerald-600 font-medium mt-0.5">Selected Date: {selectedDate}</div>
-        </div>
+          <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view compliant students</div>
+        </button>
       </div>
 
       {/* Hostel & Block Strategic Breakdown */}
@@ -477,6 +726,14 @@ export const DirectorDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {drilldownCategory && (
+        <DirectorAttendanceDrilldown
+          category={drilldownCategory}
+          date={selectedDate}
+          onClose={() => setDrilldownCategory(null)}
+        />
+      )}
     </div>
   );
 };
