@@ -1,0 +1,8 @@
+{
+  "name": "Remix Hostel Attendance Management System",
+  "description": "Institutional Hostel Attendance Management System with role-based dashboards, 7:00 PM IST attendance cutoff, sequential email alert hierarchy, and leave approval workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
