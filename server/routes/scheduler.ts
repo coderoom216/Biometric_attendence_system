@@ -40,7 +40,7 @@ router.post(
 
     return res.json({
       success: true,
-      message: 'Attendance cutoff & grace window evaluated successfully. Defaulters at 9:00 PM flagged and 6-tier alerts queued.',
+      message: 'Attendance cutoff evaluated successfully. Students with no punch by 10:00 PM flagged and 6-tier alerts queued.',
       jobLog
     });
   }
@@ -55,8 +55,8 @@ router.post(
     const user = req.user!;
     const { time, date } = req.body;
 
-    if (!time) {
-      return res.status(400).json({ success: false, message: 'Time string (HH:mm:ss) required' });
+    if (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) {
+      return res.status(400).json({ success: false, message: 'Time must use HH:mm or HH:mm:ss format.' });
     }
 
     store.setVirtualTime(time, date);

@@ -26,6 +26,20 @@ import {
   todayDate
 } from './seed';
 
+const clockTimeToSeconds = (time: string): number => {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(time);
+  if (!match) {
+    throw new Error(`Invalid clock time "${time}". Expected HH:mm or HH:mm:ss.`);
+  }
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3] || 0);
+};
+
+const readClockSetting = (name: string, defaultValue: string): string => {
+  const value = process.env[name] || defaultValue;
+  clockTimeToSeconds(value);
+  return value;
+};
+
 class DataStore {
   users = [...initialUsers];
   hostels = [...initialHostels];
@@ -40,15 +54,22 @@ class DataStore {
   auditLogs = [...initialAuditLogs];
   warningTickets: WarningTicket[] = [];
 
-  virtualTime: string = '19:32:00';
+  virtualTime: string = '19:15:00';
   virtualDate: string = todayDate;
-  cutoffTime: string = '19:00'; // Standard biometric attendance cut-off: 7:00 PM IST
-  graceEndTime: string = '21:00'; // Grace window runs until 9:00 PM; entries after 7:00 PM are Late
-  defaulterFlagTime: string = '21:00'; // At 9:00 PM, unpunched students are categorized as Defaulters
+  cutoffTime: string = readClockSetting('ATTENDANCE_CUTOFF_TIME', '19:00');
+  graceEndTime: string = readClockSetting('ATTENDANCE_GRACE_END_TIME', '22:00');
+  defaulterFlagTime: string = readClockSetting('DEFAULTER_FLAG_TIME', '22:00');
 
   sessions = new Map<string, User>();
 
   constructor() {
+    if (clockTimeToSeconds(this.graceEndTime) <= clockTimeToSeconds(this.cutoffTime)) {
+      throw new Error('ATTENDANCE_GRACE_END_TIME must be later than ATTENDANCE_CUTOFF_TIME.');
+    }
+    if (clockTimeToSeconds(this.defaulterFlagTime) !== clockTimeToSeconds(this.graceEndTime)) {
+      throw new Error('DEFAULTER_FLAG_TIME must match ATTENDANCE_GRACE_END_TIME.');
+    }
+
     for (const u of this.users) {
       this.sessions.set(`token-${u.id}`, {
         id: u.id,
@@ -106,7 +127,7 @@ class DataStore {
       } else {
         severity = 'strike_1';
         status = 'active';
-        reason = `Strike 1 Notice: First attendance violation (${counts.late} late punch or missed 9:00 PM grace window). Notice recorded.`;
+        reason = `Strike 1 Notice: First attendance violation (${counts.late} late punch or missed 10:00 PM check-in deadline). Notice recorded.`;
       }
 
       tickets.push({
@@ -127,7 +148,7 @@ class DataStore {
         totalViolations,
         severity,
         status,
-        issuedAt: `${counts.latestDate} 21:00:00 IST`,
+        issuedAt: `${counts.latestDate} 22:00:00 IST`,
         latestViolationDate: counts.latestDate,
         reason
       });
@@ -166,25 +187,39 @@ class DataStore {
   }
 
   isPastCutoff(): boolean {
-    const [ch, cm] = this.cutoffTime.split(':').map(Number);
-    const [vh, vm] = this.virtualTime.split(':').map(Number);
-    return vh > ch || (vh === ch && vm >= cm);
+    return clockTimeToSeconds(this.virtualTime) >= clockTimeToSeconds(this.cutoffTime);
   }
 
   isWithinGraceWindow(): boolean {
-    const [vh, vm, vs = 0] = this.virtualTime.split(':').map(Number);
-    const seconds = vh * 3600 + vm * 60 + vs;
-    const [cutoffHour, cutoffMinute] = this.cutoffTime.split(':').map(Number);
-    const [graceHour, graceMinute] = this.graceEndTime.split(':').map(Number);
-    const cutoffSeconds = cutoffHour * 3600 + cutoffMinute * 60;
-    const graceSeconds = graceHour * 3600 + graceMinute * 60;
-    return seconds > cutoffSeconds && seconds <= graceSeconds;
+    const seconds = clockTimeToSeconds(this.virtualTime);
+    return seconds > clockTimeToSeconds(this.cutoffTime) && seconds <= clockTimeToSeconds(this.graceEndTime);
   }
 
   isPastDefaulterTime(): boolean {
-    const [dh, dm] = this.defaulterFlagTime.split(':').map(Number);
-    const [vh, vm, vs = 0] = this.virtualTime.split(':').map(Number);
-    return vh * 3600 + vm * 60 + vs >= dh * 3600 + dm * 60;
+    return clockTimeToSeconds(this.virtualTime) >= clockTimeToSeconds(this.defaulterFlagTime);
+  }
+
+  classifyPunch(punchTime: string) {
+    const seconds = clockTimeToSeconds(punchTime);
+    if (seconds <= clockTimeToSeconds(this.cutoffTime)) {
+      return {
+        status: 'present' as const,
+        isDefaulter: false,
+        remarks: `On-time biometric check-in prior to ${this.cutoffTime} IST cut-off.`
+      };
+    }
+    if (seconds <= clockTimeToSeconds(this.graceEndTime)) {
+      return {
+        status: 'late' as const,
+        isDefaulter: false,
+        remarks: `Late punch after the ${this.cutoffTime} IST cutoff through ${this.graceEndTime} IST.`
+      };
+    }
+    return {
+      status: 'absent' as const,
+      isDefaulter: true,
+      remarks: `Punch recorded after ${this.defaulterFlagTime} IST. Categorized as Defaulter.`
+    };
   }
 
   logAudit(
@@ -211,7 +246,7 @@ class DataStore {
 
   evaluateCutoff(executedBy: { id: string; name: string; role: string } = { id: 'system', name: 'Scheduler Engine', role: 'system' }) {
     if (!this.isPastDefaulterTime()) {
-      throw new Error('Defaulter evaluation is available at 9:00 PM IST, after the grace window ends.');
+      throw new Error(`Defaulter evaluation is available at ${this.defaulterFlagTime} IST.`);
     }
     const jobStartTime = `${this.virtualDate} ${this.virtualTime} IST`;
     const targetDate = this.virtualDate;
@@ -284,14 +319,14 @@ class DataStore {
             status: 'absent',
             isDefaulter: true,
             evaluatedAt: `${this.virtualDate} ${this.virtualTime} IST`,
-            remarks: 'No biometric punch recorded by 9:00 PM IST grace cutoff. Categorized as Defaulter.'
+            remarks: `No biometric punch recorded by ${this.defaulterFlagTime} IST. Categorized as Defaulter.`
           };
           this.attendance.push(record);
         } else {
           record.status = 'absent';
           record.isDefaulter = true;
           record.evaluatedAt = `${this.virtualDate} ${this.virtualTime} IST`;
-          record.remarks = 'No biometric punch recorded by 9:00 PM IST grace cutoff. Categorized as Defaulter.';
+          record.remarks = `No biometric punch recorded by ${this.defaulterFlagTime} IST. Categorized as Defaulter.`;
         }
         defaultersCount++;
         this.triggerSequentialNotifications(student, targetDate);
@@ -300,8 +335,8 @@ class DataStore {
 
     const jobLog: ScheduledJobLog = {
       id: `job-${Date.now()}`,
-      jobName: 'Daily 7:00 PM IST Cutoff & 9:00 PM Defaulter Evaluation',
-      scheduledTime: '21:00 IST',
+      jobName: `Daily ${this.cutoffTime} IST Cutoff & ${this.defaulterFlagTime} Defaulter Evaluation`,
+      scheduledTime: `${this.defaulterFlagTime} IST`,
       executedAt: jobStartTime,
       completedAt: `${this.virtualDate} ${this.virtualTime} IST`,
       status: 'completed',
@@ -346,7 +381,7 @@ class DataStore {
       recipientName: hostel ? hostel.residentialWarden : 'Residential Warden',
       recipientEmail: `rw.${hostel ? hostel.code.toLowerCase() : 'hostel'}@university.edu.in`,
       status: 'delivered',
-      timestamp: `${this.virtualDate} 21:00:10 IST`,
+      timestamp: `${this.virtualDate} ${this.virtualTime} IST`,
       retryCount: 0
     };
 
@@ -362,7 +397,7 @@ class DataStore {
       recipientName: `${hostel ? hostel.name : 'Hostel'} Warden`,
       recipientEmail: `warden.${hostel ? hostel.code.toLowerCase() : 'hostel'}@university.edu.in`,
       status: 'delivered',
-      timestamp: `${this.virtualDate} 21:00:25 IST`,
+      timestamp: `${this.virtualDate} ${this.virtualTime} IST`,
       retryCount: 0
     };
 
@@ -378,7 +413,7 @@ class DataStore {
       recipientName: 'Prof. Sameer Varma',
       recipientEmail: 'chiefwarden@university.edu.in',
       status: 'delivered',
-      timestamp: `${this.virtualDate} 21:00:40 IST`,
+      timestamp: `${this.virtualDate} ${this.virtualTime} IST`,
       retryCount: 0
     };
 
@@ -394,7 +429,7 @@ class DataStore {
       recipientName: 'Dr. S.K. Pradhan',
       recipientEmail: 'director@university.edu.in',
       status: 'delivered',
-      timestamp: `${this.virtualDate} 19:31:00 IST`,
+      timestamp: `${this.virtualDate} ${this.virtualTime} IST`,
       retryCount: 0
     };
 
@@ -412,7 +447,7 @@ class DataStore {
       recipientEmail: parentEmail || '',
       status: parentEmail ? 'delivered' : 'failed',
       failureReason: parentEmail ? undefined : 'Missing parent email address in verified master profile (FR-12 exception)',
-      timestamp: `${this.virtualDate} 19:31:15 IST`,
+      timestamp: `${this.virtualDate} ${this.virtualTime} IST`,
       retryCount: parentEmail ? 0 : 2
     };
 
@@ -428,7 +463,7 @@ class DataStore {
       recipientName: student.name,
       recipientEmail: student.studentEmail,
       status: 'delivered',
-      timestamp: `${this.virtualDate} 19:31:30 IST`,
+      timestamp: `${this.virtualDate} ${this.virtualTime} IST`,
       retryCount: 0
     };
 

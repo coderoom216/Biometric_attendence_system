@@ -118,7 +118,7 @@ export const WarningTicketsTable: React.FC<WarningTicketsTableProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Tracking repeated late grace entries (7:00-9:00 PM) &amp; missed check-ins (past 9:00 PM). Accumulating multiple violations automatically flags them for Administrative Review.
+              Tracking late punches after 7:00 PM through 10:00 PM, punches after 10:00 PM, and missed check-ins evaluated at 10:00 PM. Accumulating multiple violations automatically flags them for Administrative Review.
             </p>
           </div>
         </div>

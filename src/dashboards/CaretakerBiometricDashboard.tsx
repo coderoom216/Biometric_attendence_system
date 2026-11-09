@@ -183,7 +183,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
             <div className="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] space-y-1">
               <div className="text-slate-400"># Authorized Terminal Ingestion CLI</div>
               <div className="text-emerald-400">$ fetch-local-biometric --device={selectedDevice} --format=raw_log</div>
-              <div className="text-slate-300">Ready to ingest batch punch logs through the 9:00 PM IST grace cutoff</div>
+              <div className="text-slate-300">Punches after 7:00 PM through 10:00 PM IST are late; punches after 10:00 PM are defaulters. Students without a punch are evaluated at 10:00 PM.</div>
             </div>
 
             <button

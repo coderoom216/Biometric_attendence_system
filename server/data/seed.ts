@@ -283,9 +283,9 @@ export const todayDate = '2026-10-27';
 // For EACH hostel on EACH date:
 // 100 students total:
 // - 80 Present on-time (punch 17:15 - 18:28 IST)
-// - 10 Late punch (after 7:00 PM through 9:00 PM IST)
+// - 10 sample Late punches (after 7:00 PM through 10:00 PM IST)
 // - 5 Approved leave (FR-11 suppressed)
-// - 5 Defaulters (no punch by 9:00 PM IST)
+// - 5 Defaulters (no punch by the 10:00 PM IST evaluation)
 export const initialAttendance: AttendanceRecord[] = [];
 const historyDates = [
   '2026-10-22',
@@ -366,12 +366,14 @@ historyDates.forEach((date) => {
           punchTime: `${hour}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`,
           biometricDeviceId: device?.id || 'bdev-main',
           isDefaulter: false,
-          evaluatedAt: `${date} 21:00:05 IST`
+          evaluatedAt: `${date} 22:00:05 IST`
         });
       }
-      // Late Punch (after 7:00 PM through 9:00 PM)
+      // Late punch (after 7:00 PM through 10:00 PM)
       else if (idx < limitLate) {
-        const min = 1 + ((idx - limitPresent) * 2) % 59;
+        const minutesAfterCutoff = 1 + ((idx - limitPresent) * 13) % 180;
+        const hour = 19 + Math.floor(minutesAfterCutoff / 60);
+        const min = minutesAfterCutoff % 60;
         initialAttendance.push({
           id: `att-${student.id}-${date.replace(/-/g, '')}`,
           studentId: student.id,
@@ -382,11 +384,11 @@ historyDates.forEach((date) => {
           roomNumber: student.roomNumber,
           date,
           status: 'late',
-          punchTime: `19:${String(min).padStart(2, '0')}:24`,
+          punchTime: `${hour}:${String(min).padStart(2, '0')}:24`,
           biometricDeviceId: device?.id || 'bdev-main',
           isDefaulter: false,
-          evaluatedAt: `${date} 21:00:05 IST`,
-          remarks: 'Late entry during the grace window between 7:00 PM and 9:00 PM IST'
+          evaluatedAt: `${date} 22:00:05 IST`,
+          remarks: 'Late entry after 7:00 PM and by the 10:00 PM IST cutoff.'
         });
       }
       // Approved Leave
@@ -402,11 +404,11 @@ historyDates.forEach((date) => {
           date,
           status: 'approved_leave',
           isDefaulter: false,
-          evaluatedAt: `${date} 21:00:05 IST`,
+          evaluatedAt: `${date} 22:00:05 IST`,
           remarks: `Approved leave authorized by ${hConfig.warden}. Email alerts suppressed (FR-11).`
         });
       }
-      // Defaulter / absent at the 9:00 PM IST grace cutoff
+      // Defaulter / absent at the 10:00 PM IST evaluation
       else {
         initialAttendance.push({
           id: `att-${student.id}-${date.replace(/-/g, '')}`,
@@ -419,8 +421,8 @@ historyDates.forEach((date) => {
           date,
           status: 'absent',
           isDefaulter: true,
-          evaluatedAt: `${date} 21:00:05 IST`,
-          remarks: 'No biometric punch recorded by the 9:00 PM IST grace cutoff. Flagged by scheduler.'
+          evaluatedAt: `${date} 22:00:05 IST`,
+          remarks: 'No biometric punch recorded by the 10:00 PM IST evaluation. Flagged by scheduler.'
         });
       }
     });
@@ -447,7 +449,7 @@ hostelConfigs.forEach((hConfig) => {
       recipientName: hConfig.warden,
       recipientEmail: `${hConfig.code.toLowerCase()}.warden@university.edu.in`,
       status: 'delivered',
-      timestamp: '2026-10-27 21:00:05 IST',
+      timestamp: '2026-10-27 22:00:05 IST',
       retryCount: 0
     });
     // Tier 2: Warden
@@ -463,7 +465,7 @@ hostelConfigs.forEach((hConfig) => {
       recipientName: hConfig.warden,
       recipientEmail: `${hConfig.code.toLowerCase()}.warden@university.edu.in`,
       status: 'delivered',
-      timestamp: '2026-10-27 21:00:30 IST',
+      timestamp: '2026-10-27 22:00:30 IST',
       retryCount: 0
     });
     // Tier 3: Chief Warden (Prof. Sameer Varma)
@@ -479,7 +481,7 @@ hostelConfigs.forEach((hConfig) => {
       recipientName: 'Prof. Sameer Varma',
       recipientEmail: 'chiefwarden@university.edu.in',
       status: 'delivered',
-      timestamp: '2026-10-27 21:01:00 IST',
+      timestamp: '2026-10-27 22:01:00 IST',
       retryCount: 0
     });
     // Tier 4: Director Sir
@@ -495,7 +497,7 @@ hostelConfigs.forEach((hConfig) => {
       recipientName: 'Prof. R. K. Agrawal',
       recipientEmail: 'director@university.edu.in',
       status: 'delivered',
-      timestamp: '2026-10-27 21:01:30 IST',
+      timestamp: '2026-10-27 22:01:30 IST',
       retryCount: 0
     });
     // Tier 5: Parent
@@ -512,7 +514,7 @@ hostelConfigs.forEach((hConfig) => {
       recipientEmail: student.parentEmail,
       status: idx === 4 ? 'failed' : 'delivered',
       failureReason: idx === 4 ? 'Parent email bounced: Mailbox temporarily unavailable' : undefined,
-      timestamp: '2026-10-27 21:02:00 IST',
+      timestamp: '2026-10-27 22:02:00 IST',
       retryCount: idx === 4 ? 2 : 0
     });
     // Tier 6: Student
@@ -528,7 +530,7 @@ hostelConfigs.forEach((hConfig) => {
       recipientName: student.name,
       recipientEmail: student.studentEmail,
       status: 'delivered',
-      timestamp: '2026-10-27 21:02:30 IST',
+      timestamp: '2026-10-27 22:02:30 IST',
       retryCount: 0
     });
   });
@@ -559,14 +561,14 @@ export const initialAuditLogs: AuditLog[] = [
   },
   {
     id: 'audit-003',
-    timestamp: '2026-10-27 21:00:05 IST',
+    timestamp: '2026-10-27 22:00:05 IST',
     action: 'SCHEDULED_CUTOFF_EXECUTION',
     performedByUserId: 'system',
-    performedByUserName: 'Automated 9:00 PM Scheduler',
+    performedByUserName: 'Automated 10:00 PM Scheduler',
     performedByUserRole: 'system',
     targetEntity: 'AttendanceRecord',
     targetId: 'all-hostels',
-    details: 'Grace window closed at 9:00 PM IST. Flagged 5 defaulters in Boys Hostel 1, 5 in Girls Hostel, and 5 in Boys Hostel 2.'
+    details: 'No-punch evaluation ran at 10:00 PM IST. Flagged 5 defaulters in Boys Hostel 1, 5 in Girls Hostel, and 5 in Boys Hostel 2.'
   }
 ];
 
@@ -588,10 +590,10 @@ export const initialScheduledJobs: ScheduledJobLog[] = [
   },
   {
     id: 'job-defaulter-20261027',
-    jobName: '9:00 PM IST Automated Defaulter Escalation',
-    scheduledTime: '21:00 IST',
-    executedAt: '2026-10-27 21:00:00 IST',
-    completedAt: '2026-10-27 21:01:30 IST',
+    jobName: '10:00 PM IST Automated Defaulter Escalation',
+    scheduledTime: '22:00 IST',
+    executedAt: '2026-10-27 22:00:00 IST',
+    completedAt: '2026-10-27 22:01:30 IST',
     dateEvaluated: '2026-10-27',
     status: 'completed',
     totalStudents: 300,

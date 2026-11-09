@@ -302,14 +302,13 @@ export const DirectorDashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Director Header with Integrated Date Filter */}
       <div className="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
                 Director's Office
               </span>
-              <span className="text-xs text-slate-400 font-mono">Cutoff: 19:00 IST Strictly</span>
-              <span className="text-xs text-indigo-300 font-semibold bg-indigo-900/50 px-2 py-0.5 rounded border border-indigo-700/50">
+              <span className="whitespace-nowrap text-xs text-indigo-300 font-semibold bg-indigo-900/50 px-2 py-0.5 rounded border border-indigo-700/50">
                 Director: {user?.name}
               </span>
             </div>
@@ -321,7 +320,7 @@ export const DirectorDashboard: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 self-start">
             <a
               href={`/api/reports/export-attendance-csv?date=${selectedDate}`}
               download
@@ -453,7 +452,7 @@ export const DirectorDashboard: React.FC = () => {
           className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
           aria-label="View defaulters"
         >
-          <div className="text-[10px] font-bold text-slate-400 uppercase">Defaulters (9:00 PM)</div>
+          <div className="text-[10px] font-bold text-slate-400 uppercase">Defaulters (After 10:00 PM / No-Punch Check)</div>
           <div className="text-2xl font-bold text-rose-600 mt-1">{consolidated?.totalDefaulters || 0}</div>
           <div className="text-[10px] text-rose-600 font-semibold mt-0.5">Missing students</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
@@ -521,7 +520,7 @@ export const DirectorDashboard: React.FC = () => {
               { category: 'present', label: 'Present:', value: h.present ?? 0, className: 'text-emerald-700 bg-emerald-50/70 border-emerald-100' },
               { category: 'late', label: 'Late Punch:', value: h.late ?? 0, className: 'text-amber-700 bg-amber-50/70 border-amber-100' },
               { category: 'approved_leave', label: 'Approved Leave:', value: h.leave ?? 0, className: 'text-blue-700 bg-blue-50/70 border-blue-100' },
-              { category: 'defaulters', label: '9:00 PM Defaulters:', value: h.defaulters ?? 0, className: 'text-rose-700 bg-rose-50/70 border-rose-100' },
+              { category: 'defaulters', label: 'Defaulters:', value: h.defaulters ?? 0, className: 'text-rose-700 bg-rose-50/70 border-rose-100' },
               { category: 'compliant', label: 'Compliance:', value: `${h.complianceRate ?? 0}%`, className: 'text-indigo-700 bg-indigo-50/70 border-indigo-100' }
             ];
 
@@ -596,7 +595,7 @@ export const DirectorDashboard: React.FC = () => {
         onDateChange={handleDateChange}
       />
 
-      {/* Institution-Wide Late Punches Roster (Grace Window: 7:00 PM - 9:00 PM) */}
+      {/* Institution-Wide Late Punches Roster (Late window: after 7:00 PM through 10:00 PM) */}
       <LatePunchesRoster
         records={latePunches}
         targetDate={selectedDate}
@@ -678,7 +677,7 @@ export const DirectorDashboard: React.FC = () => {
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center space-x-2 font-bold text-slate-800 text-sm">
               <Clock className="w-4 h-4 text-indigo-600" />
-              <span>7:00 PM IST Scheduler Execution Logs (FR-06)</span>
+              <span>10:00 PM IST Defaulter Evaluation Logs (FR-06)</span>
             </div>
             <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded">
               Active Job

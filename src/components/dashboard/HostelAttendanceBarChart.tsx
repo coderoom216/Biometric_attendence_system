@@ -143,9 +143,9 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
   // Metrics colors and metadata
   const metricConfigs = [
     { key: 'present', label: 'Present On-Time (<= 7:00 PM)', color: 'bg-emerald-500', barHex: '#10b981', textColor: 'text-emerald-700', badgeBg: 'bg-emerald-50' },
-    { key: 'late', label: 'Late Grace Punch (7:00 - 9:00 PM)', color: 'bg-amber-500', barHex: '#f59e0b', textColor: 'text-amber-700', badgeBg: 'bg-amber-50' },
+    { key: 'late', label: 'Late Punch (after 7:00 PM through 10:00 PM)', color: 'bg-amber-500', barHex: '#f59e0b', textColor: 'text-amber-700', badgeBg: 'bg-amber-50' },
     { key: 'leave', label: 'Approved Leave (FR-11)', color: 'bg-sky-500', barHex: '#0ea5e9', textColor: 'text-sky-700', badgeBg: 'bg-sky-50' },
-    { key: 'defaulters', label: 'Defaulters (> 9:00 PM Alert)', color: 'bg-red-500', barHex: '#ef4444', textColor: 'text-red-700', badgeBg: 'bg-red-50' }
+    { key: 'defaulters', label: 'Defaulters (after 10:00 PM / no punch by 10:00 PM)', color: 'bg-red-500', barHex: '#ef4444', textColor: 'text-red-700', badgeBg: 'bg-red-50' }
   ];
 
   // Max value for bar scaling (enrolled is 100 per hostel or 300 for consolidated)
@@ -168,7 +168,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Strict 7:00 PM cut-off & 9:00 PM grace window metrics. Replaced overlapping line charts with readable comparative bars.
+                7:00 PM on-time cutoff, late punches through 10:00 PM, and 10:00 PM no-punch evaluation.
               </p>
             </div>
           </div>
@@ -289,7 +289,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
 
         <div className="text-slate-500 flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 text-slate-400" />
-          <span>Cut-off: <strong>7:00 PM</strong> | Grace: <strong>9:00 PM</strong></span>
+          <span>On-time cutoff: <strong>7:00 PM</strong> | Late through: <strong>10:00 PM</strong></span>
         </div>
       </div>
 
@@ -542,10 +542,10 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
           <span>Standard Biometric Cut-Off: <strong>7:00 PM IST</strong></span>
           <span className="text-slate-300">|</span>
           <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-          <span>Grace Window: <strong>7:00 PM - 9:00 PM (Marked Late)</strong></span>
+          <span>Late window: <strong>after 7:00 PM through 10:00 PM</strong></span>
           <span className="text-slate-300">|</span>
           <span className="w-2 h-2 rounded-full bg-red-500"></span>
-          <span>Past 9:00 PM: <strong>Automatic Defaulter Categorization & Alerts</strong></span>
+          <span>After 10:00 PM: <strong>Defaulter; no-punch evaluation at 10:00 PM</strong></span>
         </div>
         <div className="text-slate-500">
           Supervised by <strong>Dr. S.K. Pradhan</strong> (Director) & <strong>Prof. Sameer Varma</strong> (Chief Warden)

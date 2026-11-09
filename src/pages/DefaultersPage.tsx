@@ -22,8 +22,8 @@ export const DefaultersPage: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationLog[]>([]);
   const [search, setSearch] = useState('');
   const [selectedHostel, setSelectedHostel] = useState('all');
-  const [virtualTime, setVirtualTime] = useState('19:02:00');
-  const [isPastDefaulter, setIsPastDefaulter] = useState(true);
+  const [virtualTime, setVirtualTime] = useState('19:15:00');
+  const [isPastDefaulter, setIsPastDefaulter] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
@@ -66,13 +66,13 @@ export const DefaultersPage: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <h1 className="text-xl font-bold text-slate-900">9:00 PM IST Defaulter Roster</h1>
+            <h1 className="text-xl font-bold text-slate-900">10:00 PM IST Defaulter Roster</h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">
               FR-07 Defaulter Identification
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Defaulters are identified after the 9:00 PM IST grace window, with sequential 6-tier alerts.
+            Punches after 10:00 PM IST and students without a punch at the 10:00 PM IST evaluation are defaulters, with sequential 6-tier alerts.
           </p>
         </div>
 
@@ -102,17 +102,17 @@ export const DefaultersPage: React.FC = () => {
           <div>
             <div className="font-bold">
               {isPastDefaulter
-                ? `Simulated Time: ${virtualTime} IST — Active Defaulter State (9:00 PM onward)`
-                : `Simulated Time: ${virtualTime} IST — Grace Window ends at 9:00 PM`}
+                ? `Simulated Time: ${virtualTime} IST — 10:00 PM Defaulter Evaluation Time`
+                : `Simulated Time: ${virtualTime} IST — Late punches accepted through 10:00 PM`}
             </div>
             <div className="text-[11px] opacity-80 mt-0.5">
-              Punches through 9:00 PM IST are accepted as late; students without a punch are flagged at 9:00 PM IST.
+              Punches after 7:00 PM through 10:00 PM IST are late. Punches after 10:00 PM are defaulters; students without a punch are flagged at 10:00 PM.
             </div>
           </div>
         </div>
 
         <span className="font-mono text-xs font-bold px-2.5 py-1 rounded bg-white border border-slate-200 text-slate-800">
-          Cutoff: 19:00 IST
+          Cutoff: 19:00 IST • Late through 22:00
         </span>
       </div>
 
@@ -186,7 +186,7 @@ export const DefaultersPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                        Defaulter at 9:00 PM
+                        {d.punchTime ? 'Punch after 10:00 PM' : 'No punch by 10:00 PM'}
                         </span>
                         <div className="text-[10px] text-slate-400 mt-0.5">{d.evaluatedAt}</div>
                       </td>
@@ -212,7 +212,7 @@ export const DefaultersPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-slate-600 text-[11px]">
-                        {d.remarks || 'No biometric punch recorded by the 9:00 PM IST grace cutoff.'}
+                        {d.remarks || (d.punchTime ? 'Punch recorded after 10:00 PM IST.' : 'No biometric punch recorded by the 10:00 PM IST evaluation.')}
                       </td>
                     </tr>
                   );

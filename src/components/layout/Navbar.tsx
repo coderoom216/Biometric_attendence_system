@@ -23,10 +23,11 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }) => {
   const { user, logout, quickLoginAsRole, quickLoginAsAccount } = useAuth();
-  const [virtualTime, setVirtualTime] = useState<string>('19:02:00');
+  const [virtualTime, setVirtualTime] = useState<string>('19:15:00');
   const [virtualDate, setVirtualDate] = useState<string>('2026-10-27');
   const [isPastCutoff, setIsPastCutoff] = useState<boolean>(true);
-  const [isPastDefaulter, setIsPastDefaulter] = useState<boolean>(true);
+  const [isWithinGraceWindow, setIsWithinGraceWindow] = useState<boolean>(true);
+  const [isPastDefaulter, setIsPastDefaulter] = useState<boolean>(false);
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
@@ -37,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
         setVirtualTime(data.virtualTime);
         setVirtualDate(data.virtualDate);
         setIsPastCutoff(data.isPastCutoff);
+        setIsWithinGraceWindow(data.isWithinGraceWindow);
         setIsPastDefaulter(data.isPastDefaulterTime);
       }
     } catch {
@@ -109,18 +111,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
               <button
                 onClick={() => setIsClockModalOpen(true)}
                 className="flex items-center space-x-2 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-mono transition shadow-xs hover:border-slate-300 bg-slate-50 border-slate-200 text-slate-700"
-                title="Adjust the simulated clock or run 9:00 PM defaulter evaluation"
+                title="Adjust the simulated clock or run 10:00 PM defaulter evaluation"
               >
                 <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span className="font-bold hidden sm:inline">{virtualTime} IST</span>
                 <span className="sm:hidden font-bold">{virtualTime.slice(0, 5)}</span>
                 {isPastDefaulter ? (
                   <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-100 text-rose-800">
-                    9:00 PM Defaulters
+                    10:00 PM Defaulter Check
+                  </span>
+                ) : isWithinGraceWindow ? (
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                    Late Grace Window
                   </span>
                 ) : isPastCutoff ? (
                   <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
-                    Late Grace Window
+                    Awaiting 10:00 PM Check
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">

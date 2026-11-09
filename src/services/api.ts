@@ -261,8 +261,10 @@ export const apiService = {
       virtualDate: string;
       virtualTime: string;
       cutoffTime: string;
+      graceEndTime: string;
       defaulterFlagTime: string;
       isPastCutoff: boolean;
+      isWithinGraceWindow: boolean;
       isPastDefaulterTime: boolean;
       scheduledJobs: ScheduledJobLog[];
     }>('/scheduler/status');

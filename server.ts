@@ -1,6 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { store } from './server/data/store';
 import authRoutes from './server/routes/auth';
 import attendanceRoutes from './server/routes/attendance';
 import leavesRoutes from './server/routes/leaves';
@@ -40,9 +42,9 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     system: 'Hostel Attendance Management System API',
     timezone: 'Asia/Kolkata',
-    cutoff: '19:00 IST',
-    graceEnd: '21:00 IST',
-    defaulterEvaluation: '21:00 IST'
+    cutoff: `${store.cutoffTime} IST`,
+    graceEnd: `${store.graceEndTime} IST`,
+    defaulterEvaluation: `${store.defaulterFlagTime} IST`
   });
 });
 

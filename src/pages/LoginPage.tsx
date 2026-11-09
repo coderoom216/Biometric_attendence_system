@@ -186,7 +186,7 @@ export const LoginPage: React.FC = () => {
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center space-x-2 text-[11px] text-slate-500">
             <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span>On-time cutoff is 7:00 PM IST; late punches are accepted through 9:00 PM.</span>
+            <span>On-time cutoff is 7:00 PM IST; punches after 7:00 PM through 10:00 PM are late, and punches after 10:00 PM are defaulters. No-punch evaluation runs at 10:00 PM.</span>
           </div>
         </div>
       </div>

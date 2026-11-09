@@ -91,7 +91,7 @@ export const WardenDashboard: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Warden: <strong className="text-slate-800">{wardenName}</strong> • Chief Warden: <strong>Prof. Sameer Varma</strong> • Standard 7:00 PM cutoff & 9:00 PM grace window compliance
+            Warden: <strong className="text-slate-800">{wardenName}</strong> • Chief Warden: <strong>Prof. Sameer Varma</strong> • 7:00 PM on-time cutoff, late through 10:00 PM, after-10:00 PM defaulter/no-punch evaluation
           </p>
         </div>
 
@@ -118,7 +118,7 @@ export const WardenDashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-xs font-semibold text-slate-500 uppercase">Late Grace Punches</div>
           <div className="text-2xl font-bold text-amber-600 mt-1">{late || 10}</div>
-          <div className="text-[11px] text-slate-400 mt-1">7:00 - 9:00 PM grace</div>
+          <div className="text-[11px] text-slate-400 mt-1">After 7:00 PM through 10:00 PM late window</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -128,9 +128,9 @@ export const WardenDashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-xs font-semibold text-slate-500 uppercase">9:00 PM Defaulters</div>
+          <div className="text-xs font-semibold text-slate-500 uppercase">Defaulters (10:00 PM Check)</div>
           <div className="text-2xl font-bold text-rose-600 mt-1">{defaulters.length || 5}</div>
-          <div className="text-[11px] text-rose-600 font-medium mt-1">Past grace cutoff</div>
+          <div className="text-[11px] text-rose-600 font-medium mt-1">After 10:00 PM / no punch by 10:00 PM</div>
         </div>
       </div>
 
@@ -153,7 +153,7 @@ export const WardenDashboard: React.FC = () => {
         hostelId={effectiveHostelId}
       />
 
-      {/* Late Grace Punches Roster (Grace Window: 7:00 PM - 9:00 PM) */}
+      {/* Late Punches Roster (Late window: after 7:00 PM through 10:00 PM) */}
       <LatePunchesRoster
         records={latePunches}
         targetDate="2026-10-27"

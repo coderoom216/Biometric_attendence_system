@@ -156,7 +156,7 @@ export const ChiefWardenDashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-[10px] font-bold text-slate-400 uppercase">Late Punches</div>
           <div className="text-2xl font-bold text-amber-600 mt-1">{consolidated?.totalLate || 0}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Pre-7:00 PM</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">After 7:00 PM - 10:00 PM</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -166,7 +166,7 @@ export const ChiefWardenDashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase">9:00 PM Defaulters</div>
+          <div className="text-[10px] font-bold text-slate-400 uppercase">Defaulters (10:00 PM Check)</div>
           <div className="text-2xl font-bold text-rose-600 mt-1">{consolidated?.totalDefaulters || 0}</div>
           <div className="text-[10px] text-rose-600 font-semibold mt-0.5">6-Tier Alert Active</div>
         </div>
@@ -248,7 +248,7 @@ export const ChiefWardenDashboard: React.FC = () => {
         onDateChange={handleDateChange}
       />
 
-      {/* Institution-Wide Late Punches Roster (Grace Window: 7:00 PM - 9:00 PM) */}
+      {/* Institution-Wide Late Punches Roster (Late window: after 7:00 PM through 10:00 PM) */}
       <LatePunchesRoster
         records={latePunches}
         targetDate={selectedDate}

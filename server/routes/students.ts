@@ -164,7 +164,9 @@ router.get(
           ? 'Late Grace Punch'
           : att.status === 'approved_leave'
           ? 'Approved Leave'
-          : 'Defaulter (No punch by 9:00 PM)'
+          : att.punchTime
+          ? 'Defaulter (Punch after 10:00 PM)'
+          : 'Defaulter (No punch by 10:00 PM)'
         : 'Pending Evaluation';
 
       return [

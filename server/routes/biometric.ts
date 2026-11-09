@@ -37,6 +37,17 @@ router.post(
       return res.status(400).json({ success: false, message: 'Invalid payload: Array of biometric punches required' });
     }
 
+    const invalidPunch = punches.find(
+      (punch) =>
+        !punch ||
+        typeof punch !== 'object' ||
+        (punch.punchTime !== undefined &&
+          (typeof punch.punchTime !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(punch.punchTime)))
+    );
+    if (invalidPunch) {
+      return res.status(400).json({ success: false, message: 'Punch time must use HH:mm or HH:mm:ss format.' });
+    }
+
     let processedCount = 0;
     let duplicateCount = 0;
     let unrecognizedCount = 0;
@@ -77,29 +88,8 @@ router.post(
         continue;
       }
 
-      // Process new punch based on standard 7:00 PM cutoff & 9:00 PM grace window
-      const [hh, mm, ss = 0] = (punch.punchTime || '18:15').split(':').map(Number);
-      const totalSeconds = hh * 3600 + (mm || 0) * 60 + ss;
-      const cutoffSeconds = 19 * 60 * 60; // 7:00 PM
-      const graceEndSeconds = 21 * 60 * 60; // 9:00 PM
-
-      let punchStatus: 'present' | 'late' | 'absent' = 'present';
-      let isDefaulter = false;
-      let punchRemarks = 'On-time biometric check-in prior to 7:00 PM cut-off.';
-
-      if (totalSeconds <= cutoffSeconds) {
-        punchStatus = 'present';
-        isDefaulter = false;
-        punchRemarks = 'On-time biometric check-in prior to 7:00 PM cut-off.';
-      } else if (totalSeconds <= graceEndSeconds) {
-        punchStatus = 'late';
-        isDefaulter = false;
-        punchRemarks = 'Late punch within grace window (7:00 PM - 9:00 PM IST). Recorded late entry.';
-      } else {
-        punchStatus = 'absent';
-        isDefaulter = true;
-        punchRemarks = 'Punch attempted after 9:00 PM grace cutoff. Automatically categorized as Defaulter.';
-      }
+      const punchTime = punch.punchTime || '18:15';
+      const punchClassification = store.classifyPunch(punchTime);
 
       let att = store.attendance.find(
         (a) => a.studentId === student.id && a.date === store.virtualDate
@@ -115,23 +105,23 @@ router.post(
           block: student.block,
           roomNumber: student.roomNumber,
           date: store.virtualDate,
-          status: punchStatus,
-          punchTime: punch.punchTime || `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`,
+          status: punchClassification.status,
+          punchTime,
           biometricDeviceId: device.id,
-          isDefaulter,
-          remarks: punchRemarks,
+          isDefaulter: punchClassification.isDefaulter,
+          remarks: punchClassification.remarks,
           evaluatedAt: `${store.virtualDate} ${store.virtualTime} IST`
         };
         store.attendance.push(att);
       } else if (att.status !== 'approved_leave') {
-        att.status = punchStatus;
-        att.punchTime = punch.punchTime || `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+        att.status = punchClassification.status;
+        att.punchTime = punchTime;
         att.biometricDeviceId = device.id;
-        att.isDefaulter = isDefaulter;
-        att.remarks = punchRemarks;
+        att.isDefaulter = punchClassification.isDefaulter;
+        att.remarks = punchClassification.remarks;
       }
 
-      if (isDefaulter && att.status !== 'approved_leave') {
+      if (punchClassification.isDefaulter && att.status !== 'approved_leave') {
         store.triggerSequentialNotifications(student, store.virtualDate);
       }
 

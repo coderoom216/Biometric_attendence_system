@@ -47,7 +47,7 @@ router.get('/today', authenticate, (req: AuthenticatedRequest, res: Response) =>
   });
 });
 
-// GET /api/attendance/defaulters (9:00 PM IST post-grace defaulters list)
+// GET /api/attendance/defaulters (after-10 PM punches and no-punch-at-10 PM list)
 router.get(
   '/defaulters',
   authenticate,
@@ -78,7 +78,7 @@ router.get(
   }
 );
 
-// GET /api/attendance/late-punches (Grace window 7:00 PM - 9:00 PM late entries list)
+// GET /api/attendance/late-punches (late entries after 7:00 PM through 10:00 PM IST)
 router.get(
   '/late-punches',
   authenticate,
@@ -223,12 +223,10 @@ router.post(
     }
 
     const time = punchTime || store.virtualTime;
-    const [hh, mm, ss = 0] = time.split(':').map(Number);
-    const punchSeconds = hh * 3600 + mm * 60 + ss;
-    const cutoffSeconds = 19 * 3600;
-    const graceEndSeconds = 21 * 3600;
-    const status = punchSeconds <= cutoffSeconds ? 'present' : punchSeconds <= graceEndSeconds ? 'late' : 'absent';
-    const isDefaulter = status === 'absent';
+    if (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) {
+      return res.status(400).json({ success: false, message: 'Punch time must use HH:mm or HH:mm:ss format.' });
+    }
+    const classification = store.classifyPunch(time);
 
     let record = store.attendance.find(
       (a) => a.studentId === student.id && a.date === store.virtualDate
@@ -244,20 +242,22 @@ router.post(
         block: student.block,
         roomNumber: student.roomNumber,
         date: store.virtualDate,
-        status,
+        status: classification.status,
         punchTime: time,
         biometricDeviceId: 'bdev-shiv-01',
-        isDefaulter,
-        evaluatedAt: `${store.virtualDate} ${store.virtualTime} IST`
+        isDefaulter: classification.isDefaulter,
+        evaluatedAt: `${store.virtualDate} ${store.virtualTime} IST`,
+        remarks: classification.remarks
       };
       store.attendance.push(record);
     } else {
-      record.status = status;
+      record.status = classification.status;
       record.punchTime = time;
-      record.isDefaulter = isDefaulter;
+      record.isDefaulter = classification.isDefaulter;
+      record.remarks = classification.remarks;
     }
 
-    if (isDefaulter) store.triggerSequentialNotifications(student, store.virtualDate);
+    if (classification.isDefaulter) store.triggerSequentialNotifications(student, store.virtualDate);
 
     return res.json({
       success: true,

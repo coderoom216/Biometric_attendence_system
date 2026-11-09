@@ -464,7 +464,7 @@ export const HostelAttendanceTrendsChart: React.FC<HostelAttendanceTrendsChartPr
 
               <div className="flex items-center space-x-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-                <span className="text-slate-400">Defaulters (9:00 PM):</span>
+                <span className="text-slate-400">Defaulters (10:00 PM check):</span>
                 <strong className="text-rose-400 font-bold">{activePoint.raw.absent}</strong>
                 <span className="text-[10px] text-slate-400">({Math.round((activePoint.raw.absent / activePoint.raw.totalEnrolled) * 100)}%)</span>
               </div>

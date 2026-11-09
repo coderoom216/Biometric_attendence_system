@@ -43,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           { name: 'Dashboard', path: '/', icon: LayoutDashboard },
           { name: 'Student List', path: '/students', icon: Users },
           { name: 'Verify Registrations', path: '/students/verification', icon: UserCheck },
-          { name: 'Defaulters List (9:00 PM)', path: '/defaulters', icon: AlertOctagon },
+          { name: 'Defaulters List (10:00 PM)', path: '/defaulters', icon: AlertOctagon },
           { name: 'Enter Approved Leave', path: '/leaves', icon: FileText },
           { name: 'Assigned Hostel Rooms', path: '/hostels', icon: Building2 },
           { name: 'Reports & Exports', path: '/reports', icon: BarChart3 }

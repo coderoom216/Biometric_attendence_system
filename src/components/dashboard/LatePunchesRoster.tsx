@@ -24,7 +24,7 @@ interface LatePunchesRosterProps {
 export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
   records,
   targetDate = '2026-10-27',
-  title = 'Institution-Wide Late Punches Roster (Grace Window: 7:00 PM - 9:00 PM)',
+  title = 'Institution-Wide Late Punches Roster (7:00 PM - 10:00 PM)',
   role = 'director',
   hostelId = 'all',
   onDateChange
@@ -108,7 +108,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-amber-900/80 mt-0.5">
-              Entries between 7:00 PM and 9:00 PM IST marked as Late. Tracked for strike warnings and compliance audits.
+              Entries after 7:00 PM through 10:00 PM IST are marked Late. Punches after 10:00 PM become Defaulters; students without a punch are evaluated at 10:00 PM.
             </p>
           </div>
         </div>
@@ -254,7 +254,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
       {/* Footer Info */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
         <span>Displaying {filtered.length} late punches on {targetDate}</span>
-        <span className="font-mono text-[11px]">Grace Window: 7:00 PM - 9:00 PM IST</span>
+        <span className="font-mono text-[11px]">Late: after 7:00 through 10:00 PM IST | Defaulter cutoff and no-punch evaluation: 10:00 PM IST</span>
       </div>
     </div>
   );

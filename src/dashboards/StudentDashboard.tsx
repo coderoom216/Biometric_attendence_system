@@ -104,7 +104,7 @@ export const StudentDashboard: React.FC = () => {
                 </span>
               ) : todayRecord?.isDefaulter ? (
                 <span className="text-rose-700 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1 inline" /> Flagged Defaulter (After 9:00 PM)
+                  <AlertCircle className="w-4 h-4 mr-1 inline" /> Flagged Defaulter
                 </span>
               ) : (
                 <span className="text-slate-600">Pending biometric punch (Cutoff: 7:00 PM IST)</span>
@@ -131,7 +131,7 @@ export const StudentDashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-xs font-semibold text-slate-500 uppercase">Late</div>
           <div className="text-2xl font-bold text-amber-600 mt-1">{lateCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">After 7:00 PM through 9:00 PM IST</div>
+          <div className="text-[11px] text-slate-400 mt-1">After 7:00 PM through 10:00 PM IST</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -143,7 +143,7 @@ export const StudentDashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-xs font-semibold text-slate-500 uppercase">Absences / Defaulters</div>
           <div className="text-2xl font-bold text-rose-600 mt-1">{absentCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">No punch by 9:00 PM IST</div>
+          <div className="text-[11px] text-slate-400 mt-1">After 10:00 PM or no punch by 10:00 PM</div>
         </div>
       </div>
 
@@ -185,7 +185,7 @@ export const StudentDashboard: React.FC = () => {
           </div>
 
           <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-800 leading-snug">
-            <strong>Director's Directive:</strong> Students without a punch by 9:00 PM IST are marked as defaulters, and sequential notifications are dispatched to Residential Warden, Warden, Chief Warden, Director Sir, and your Parents.
+            <strong>Director's Directive:</strong> Punches after 7:00 PM through 10:00 PM IST are marked Late; punches after 10:00 PM are defaulters. Students without a punch are flagged at the 10:00 PM IST evaluation, and sequential notifications are dispatched to Residential Warden, Warden, Chief Warden, Director Sir, and your Parents.
           </div>
         </div>
 

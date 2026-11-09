@@ -187,7 +187,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-xs font-semibold text-slate-500 uppercase">Late arrivals</div>
           <div className="text-2xl font-bold text-amber-600 mt-1">{lateCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">7:00 PM - 9:00 PM IST</div>
+          <div className="text-[11px] text-slate-400 mt-1">After 7:00 PM through 10:00 PM IST</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -213,7 +213,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
       {/* Automated Strike Records & Disciplinary Warning Tickets */}
       <WarningTicketsTable hostelId={user?.hostelId || 'h-shivalik'} role="residential_warden" />
 
-      {/* Real-time 9:00 PM IST Defaulters Section */}
+      {/* Real-time defaulter follow-up section */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 sm:p-5 bg-rose-50/60 border-b border-rose-100 flex items-center justify-between">
           <div className="flex items-center space-x-2">

@@ -24,7 +24,7 @@ interface DefaultersRosterProps {
 export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
   records,
   targetDate = '2026-10-27',
-  title = 'Institution-Wide Post-Grace Cutoff Defaulters Roster',
+  title = 'Institution-Wide After-10:00 PM / No-Punch Defaulters Roster',
   role = 'director',
   hostelId = 'all',
   onDateChange
@@ -60,9 +60,9 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
       `"${r.block || ''}"`,
       `"${r.roomNumber || ''}"`,
       `"${r.date}"`,
-      `"Unpunched past 9:00 PM cutoff"`,
+      `"Punch after 10:00 PM or no punch by 10:00 PM"`,
       `"6-Tier Escalation Active"`,
-      `"${(r.remarks || 'No biometric punch past 9:00 PM grace window').replace(/"/g, '""')}"`
+      `"${(r.remarks || 'Punch after 10:00 PM or no biometric punch by 10:00 PM').replace(/"/g, '""')}"`
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n');
@@ -93,7 +93,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-rose-900 mt-0.5">
-              Residents with no punch recorded past 9:00 PM IST grace window and without approved leaves. 6-tier alerts triggered.
+              Punches after 10:00 PM or no punch by the 10:00 PM IST evaluation are flagged as defaulters. Approved leave is excluded; 6-tier alerts are triggered.
             </p>
           </div>
         </div>
@@ -209,7 +209,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
                   {/* Cutoff Status */}
                   <td className="py-2.5 px-4">
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                      Evaluated 9:00 PM IST
+                      {d.punchTime ? 'Punch after 10:00 PM' : 'No punch by 10:00 PM'}
                     </span>
                   </td>
 
@@ -234,7 +234,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
       {/* Footer Info */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
         <span>Displaying {filtered.length} defaulters on {targetDate}</span>
-        <span className="font-mono text-[11px]">Grace Window Ends at 9:00 PM IST</span>
+        <span className="font-mono text-[11px]">Late through 10:00 PM IST | Defaulter cutoff and no-punch evaluation: 10:00 PM IST</span>
       </div>
     </div>
   );

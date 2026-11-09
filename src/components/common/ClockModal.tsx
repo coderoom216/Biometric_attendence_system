@@ -46,7 +46,7 @@ export const ClockModal: React.FC<ClockModalProps> = ({
     try {
       const res = await apiService.triggerCutoffEvaluation();
       if (res.success) {
-        setFeedback('9:00 PM IST defaulter evaluation completed. Defaulters locked & 6-tier alerts queued.');
+        setFeedback('10:00 PM IST defaulter evaluation completed. Defaulters locked & 6-tier alerts queued.');
         onClockUpdated();
       }
     } catch (err: any) {
@@ -74,7 +74,7 @@ export const ClockModal: React.FC<ClockModalProps> = ({
 
         <div className="p-6 space-y-6">
           <p className="text-sm text-slate-600 leading-relaxed">
-                The on-time cutoff is <strong className="text-slate-900">7:00 PM IST</strong>. Entries after that and through <strong className="text-slate-900">9:00 PM IST</strong> are marked Late. Students without a punch by 9:00 PM are categorized as Defaulters. Use the presets below to simulate any phase.
+                Punches through <strong className="text-slate-900">7:00 PM IST</strong> are on time; punches after 7:00 PM through <strong className="text-slate-900">10:00 PM IST</strong> are late. Punches after 10:00 PM are categorized as Defaulters. Students without a punch are flagged by the <strong className="text-slate-900">10:00 PM IST</strong> evaluation.
           </p>
 
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -108,17 +108,31 @@ export const ClockModal: React.FC<ClockModalProps> = ({
               </button>
               <button
                 disabled={isExecuting}
-                onClick={() => handleSetTime('21:00:00')}
+                onClick={() => handleSetTime('19:30:00')}
                 className="flex items-center justify-center space-x-2 p-2.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-medium transition cursor-pointer"
               >
-                <span>9:00 PM (Grace Expiry)</span>
+                <span>7:30 PM (Late Punch)</span>
               </button>
               <button
                 disabled={isExecuting}
-                onClick={() => handleSetTime('21:01:00')}
+                onClick={() => handleSetTime('21:59:00')}
                 className="flex items-center justify-center space-x-2 p-2.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 text-xs font-medium transition cursor-pointer"
               >
-                <span>7:31 PM (Defaulters Escalated)</span>
+                <span>9:59 PM (Late Punch)</span>
+              </button>
+              <button
+                disabled={isExecuting}
+                onClick={() => handleSetTime('22:01:00')}
+                className="flex items-center justify-center space-x-2 p-2.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-medium transition cursor-pointer"
+              >
+                <span>10:01 PM (Punch Becomes Defaulter)</span>
+              </button>
+              <button
+                disabled={isExecuting}
+                onClick={() => handleSetTime('22:00:00')}
+                className="flex items-center justify-center space-x-2 p-2.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 text-xs font-medium transition cursor-pointer"
+              >
+                <span>10:00 PM (Defaulter Evaluation)</span>
               </button>
             </div>
           </div>
@@ -130,7 +144,7 @@ export const ClockModal: React.FC<ClockModalProps> = ({
               className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm transition shadow-xs disabled:opacity-50 cursor-pointer"
             >
               <Play className="w-4 h-4" />
-              <span>Execute 9:00 PM Defaulter Evaluation & Notification Job</span>
+              <span>Execute 10:00 PM Defaulter Evaluation & Notification Job</span>
             </button>
           </div>
 
