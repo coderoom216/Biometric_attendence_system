@@ -31,6 +31,7 @@ type AttendanceDrilldownCategory = 'all' | 'present' | 'late' | 'approved_leave'
 
 interface AttendanceDrilldownProps {
   category: AttendanceDrilldownCategory;
+  hostelId?: string;
   date: string;
   onClose: () => void;
 }
@@ -60,7 +61,7 @@ const getAttendanceStatusClass = (record?: AttendanceRecord) => {
   return 'bg-emerald-100 text-emerald-800';
 };
 
-const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ category, date, onClose }) => {
+const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ category, hostelId, date, onClose }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [search, setSearch] = useState('');
@@ -97,7 +98,7 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
     return () => {
       isCurrentRequest = false;
     };
-  }, [category, date]);
+  }, [category, date, hostelId]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -109,7 +110,11 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
 
   const attendanceByStudentId = new Map(attendance.map((record) => [record.studentId, record]));
   const filteredStudents = students
-    .filter((student) => student.checkoutStatus === 'active' && student.verificationStatus === 'verified')
+    .filter((student) =>
+      student.checkoutStatus === 'active' &&
+      student.verificationStatus === 'verified' &&
+      (!hostelId || student.hostelId === hostelId)
+    )
     .map((student) => ({ student, record: attendanceByStudentId.get(student.id) }))
     .filter(({ record }) => {
       if (category === 'all') return true;
@@ -152,7 +157,7 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
           <div>
             <h2 id="attendance-drilldown-title" className="text-lg font-bold text-slate-900">
-              {attendanceCategoryLabels[category]}
+              {hostelId ? `${hostelNames[hostelId] || hostelId} — ` : ''}{attendanceCategoryLabels[category]}
             </h2>
             <p className="mt-1 text-xs text-slate-500">Student details for {date}</p>
           </div>
@@ -240,7 +245,10 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
 export const DirectorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>('2026-10-27');
-  const [drilldownCategory, setDrilldownCategory] = useState<AttendanceDrilldownCategory | null>(null);
+  const [drilldownSelection, setDrilldownSelection] = useState<{
+    category: AttendanceDrilldownCategory;
+    hostelId?: string;
+  } | null>(null);
   const [reportData, setReportData] = useState<any>(null);
   const [schedulerStatus, setSchedulerStatus] = useState<any>(null);
   const [defaulters, setDefaulters] = useState<AttendanceRecord[]>([]);
@@ -393,7 +401,7 @@ export const DirectorDashboard: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <button
           type="button"
-          onClick={() => setDrilldownCategory('all')}
+          onClick={() => setDrilldownSelection({ category: 'all' })}
           className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
           aria-label="View all active residents"
         >
@@ -405,7 +413,7 @@ export const DirectorDashboard: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setDrilldownCategory('present')}
+          onClick={() => setDrilldownSelection({ category: 'present' })}
           className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
           aria-label="View students present on time"
         >
@@ -417,7 +425,7 @@ export const DirectorDashboard: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setDrilldownCategory('late')}
+          onClick={() => setDrilldownSelection({ category: 'late' })}
           className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
           aria-label="View students with late punches"
         >
@@ -429,7 +437,7 @@ export const DirectorDashboard: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setDrilldownCategory('approved_leave')}
+          onClick={() => setDrilldownSelection({ category: 'approved_leave' })}
           className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
           aria-label="View students on approved leave"
         >
@@ -441,7 +449,7 @@ export const DirectorDashboard: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setDrilldownCategory('defaulters')}
+          onClick={() => setDrilldownSelection({ category: 'defaulters' })}
           className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
           aria-label="View defaulters"
         >
@@ -453,7 +461,7 @@ export const DirectorDashboard: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setDrilldownCategory('compliant')}
+          onClick={() => setDrilldownSelection({ category: 'compliant' })}
           className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
           aria-label="View compliant residents"
         >
@@ -503,6 +511,19 @@ export const DirectorDashboard: React.FC = () => {
                 : h.hostelId === 'h-mandakini'
                 ? 110
                 : 120;
+            const hostelMetrics: {
+              category: AttendanceDrilldownCategory;
+              label: string;
+              value: number | string;
+              className: string;
+            }[] = [
+              { category: 'all', label: 'Active Residents:', value: h.totalEnrolled ?? 0, className: 'text-slate-600 bg-white border-slate-100' },
+              { category: 'present', label: 'Present:', value: h.present ?? 0, className: 'text-emerald-700 bg-emerald-50/70 border-emerald-100' },
+              { category: 'late', label: 'Late Punch:', value: h.late ?? 0, className: 'text-amber-700 bg-amber-50/70 border-amber-100' },
+              { category: 'approved_leave', label: 'Approved Leave:', value: h.leave ?? 0, className: 'text-blue-700 bg-blue-50/70 border-blue-100' },
+              { category: 'defaulters', label: '9:00 PM Defaulters:', value: h.defaulters ?? 0, className: 'text-rose-700 bg-rose-50/70 border-rose-100' },
+              { category: 'compliant', label: 'Compliance:', value: `${h.complianceRate ?? 0}%`, className: 'text-indigo-700 bg-indigo-50/70 border-indigo-100' }
+            ];
 
             return (
               <div key={h.hostelId} className="border border-slate-200 rounded-lg p-4 bg-slate-50/60 space-y-3 text-xs">
@@ -531,30 +552,18 @@ export const DirectorDashboard: React.FC = () => {
 
                 {/* Metric pill strip */}
                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/80 text-[11px] font-mono">
-                  <div className="flex justify-between text-slate-600 bg-white px-2 py-1 rounded border border-slate-100">
-                    <span>Active Residents:</span>
-                    <strong className="text-slate-900">{h.totalEnrolled || 100}</strong>
-                  </div>
-                  <div className="flex justify-between text-emerald-700 bg-emerald-50/70 px-2 py-1 rounded border border-emerald-100">
-                    <span>Present:</span>
-                    <strong className="font-bold">{h.present || 80}</strong>
-                  </div>
-                  <div className="flex justify-between text-amber-700 bg-amber-50/70 px-2 py-1 rounded border border-amber-100">
-                    <span>Late Punch:</span>
-                    <strong className="font-bold">{h.late || 10}</strong>
-                  </div>
-                  <div className="flex justify-between text-blue-700 bg-blue-50/70 px-2 py-1 rounded border border-blue-100">
-                    <span>Approved Leave:</span>
-                    <strong className="font-bold">{h.leave || 5}</strong>
-                  </div>
-                  <div className="flex justify-between text-rose-700 bg-rose-50/70 px-2 py-1 rounded border border-rose-100">
-                    <span>9:00 PM Defaulters:</span>
-                    <strong className="font-bold">{h.defaulters || 5}</strong>
-                  </div>
-                  <div className="flex justify-between text-indigo-700 bg-indigo-50/70 px-2 py-1 rounded border border-indigo-100">
-                    <span>Compliance:</span>
-                    <strong className="font-bold">{h.complianceRate || 95}%</strong>
-                  </div>
+                  {hostelMetrics.map((metric) => (
+                    <button
+                      key={metric.category}
+                      type="button"
+                      onClick={() => setDrilldownSelection({ category: metric.category, hostelId: h.hostelId })}
+                      aria-label={`View ${metric.label.replace(':', '')} students for ${h.hostelName}`}
+                      className={`flex cursor-pointer items-center justify-between rounded border px-2 py-1 text-left transition hover:border-indigo-300 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-1 ${metric.className}`}
+                    >
+                      <span>{metric.label}</span>
+                      <strong className="font-bold">{metric.value}</strong>
+                    </button>
+                  ))}
                 </div>
 
                 <div className="space-y-1 pt-1 text-[11px]">
@@ -727,11 +736,12 @@ export const DirectorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {drilldownCategory && (
+      {drilldownSelection && (
         <DirectorAttendanceDrilldown
-          category={drilldownCategory}
+          category={drilldownSelection.category}
+          hostelId={drilldownSelection.hostelId}
           date={selectedDate}
-          onClose={() => setDrilldownCategory(null)}
+          onClose={() => setDrilldownSelection(null)}
         />
       )}
     </div>
