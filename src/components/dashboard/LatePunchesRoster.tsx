@@ -6,6 +6,7 @@ import {
   Search,
   Filter,
   Download,
+  Calendar,
   CheckCircle2,
   ChevronRight
 } from 'lucide-react';
@@ -17,6 +18,7 @@ interface LatePunchesRosterProps {
   title?: string;
   role?: string; // 'director' | 'chief_warden' | 'warden'
   hostelId?: string;
+  onDateChange?: (date: string) => void;
 }
 
 export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
@@ -24,7 +26,8 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
   targetDate = '2026-10-27',
   title = 'Institution-Wide Late Punches Roster (Grace Window: 7:00 PM - 9:00 PM)',
   role = 'director',
-  hostelId = 'all'
+  hostelId = 'all',
+  onDateChange
 }) => {
   const [search, setSearch] = useState('');
   const [selectedHostel, setSelectedHostel] = useState<string>(hostelId);
@@ -110,17 +113,37 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-          <span className="text-xs font-bold bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-xs">
-            {filtered.length} Late Punches
-          </span>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-xs">
+              {filtered.length} Late Punches
+            </span>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>Export CSV</span>
+            </button>
+          </div>
+          {onDateChange && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5">
+              <Calendar className="h-3.5 w-3.5 text-amber-600" />
+              <label htmlFor={`late-punches-roster-date-${role}`} className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                Select Date:
+              </label>
+              <input
+                id={`late-punches-roster-date-${role}`}
+                type="date"
+                value={targetDate}
+                onChange={(event) => {
+                  if (event.target.value) onDateChange(event.target.value);
+                }}
+                aria-label="Select late punches roster date"
+                className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-amber-500 focus:outline-hidden"
+              />
+            </div>
+          )}
         </div>
       </div>
 

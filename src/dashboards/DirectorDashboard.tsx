@@ -601,6 +601,7 @@ export const DirectorDashboard: React.FC = () => {
         records={latePunches}
         targetDate={selectedDate}
         role="director"
+        onDateChange={handleDateChange}
       />
 
       {/* 6-Tier Notification Hierarchy Execution Monitor (FR-08) for Selected Date */}

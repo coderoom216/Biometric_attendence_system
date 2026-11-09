@@ -253,6 +253,7 @@ export const ChiefWardenDashboard: React.FC = () => {
         records={latePunches}
         targetDate={selectedDate}
         role="chief_warden"
+        onDateChange={handleDateChange}
       />
 
       {/* Automated Strike Records & Disciplinary Warning Tickets */}
