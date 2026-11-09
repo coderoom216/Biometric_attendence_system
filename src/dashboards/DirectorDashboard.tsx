@@ -217,14 +217,26 @@ export const DirectorDashboard: React.FC = () => {
 
       {/* Hostel & Block Strategic Breakdown */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center space-x-2">
             <Building2 className="w-5 h-5 text-indigo-600" />
             <h2 className="font-bold text-slate-800 text-sm">
               Hostel Breakdown — Boys Hostel 1 (120), Girls Hostel (110), Boys Hostel 2 (120)
             </h2>
           </div>
-          <span className="text-xs text-slate-500 font-mono">Date: {selectedDate}</span>
+          <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+            <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
+            <label htmlFor="director-hostel-breakdown-date" className="text-xs text-slate-600 font-medium whitespace-nowrap">
+              Select Date:
+            </label>
+            <input
+              id="director-hostel-breakdown-date"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="bg-white text-slate-900 text-xs font-mono px-2 py-1 rounded border border-slate-300 focus:outline-hidden focus:border-indigo-500"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
