@@ -354,8 +354,14 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({
   );
 };
 
-export const DirectorDashboard: React.FC = () => {
+interface DirectorDashboardProps {
+  officeRole?: 'director' | 'chief_warden';
+}
+
+export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole = 'director' }) => {
   const { user } = useAuth();
+  const officeTitle = officeRole === 'chief_warden' ? 'Chief Warden' : 'Director';
+  const officePossessive = officeRole === 'chief_warden' ? 'Chief Warden’s' : 'Director Sir’s';
   const [selectedDate, setSelectedDate] = useState<string>('2026-10-27');
   const [drilldownSelection, setDrilldownSelection] = useState<{
     category: AttendanceDrilldownCategory;
@@ -368,6 +374,8 @@ export const DirectorDashboard: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationLog[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedNotificationHostels, setExpandedNotificationHostels] = useState<Set<string>>(new Set());
+  const [expandedNotificationStudent, setExpandedNotificationStudent] = useState<string | null>(null);
 
   const loadDataForDate = async (date: string) => {
     setIsLoading(true);
@@ -409,9 +417,6 @@ export const DirectorDashboard: React.FC = () => {
   const scheduledJobs: ScheduledJobLog[] = (schedulerStatus?.scheduledJobs || []).filter(
     (j: ScheduledJobLog) => !selectedDate || j.dateEvaluated === selectedDate
   );
-  const [expandedNotificationHostels, setExpandedNotificationHostels] = useState<Set<string>>(new Set());
-  const [expandedNotificationStudent, setExpandedNotificationStudent] = useState<string | null>(null);
-
   const hostelNotificationGroups = new Map<string, { hostelName: string; students: Map<string, NotificationLog[]> }>();
   hostelReports.forEach((hostel: { hostelId: string; hostelName: string }) => {
     hostelNotificationGroups.set(hostel.hostelId, { hostelName: hostel.hostelName, students: new Map() });
@@ -449,26 +454,25 @@ export const DirectorDashboard: React.FC = () => {
         .sort((a, b) => a.studentName.localeCompare(b.studentName))
     }))
     .sort((a, b) => a.hostelName.localeCompare(b.hostelName));
-
   return (
     <div className="space-y-6">
-      {/* Director Header with Integrated Date Filter */}
+      {/* Office Header with Integrated Date Filter */}
       <div className="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                Director's Office
+                {officeTitle}'s Office
               </span>
               <span className="whitespace-nowrap text-xs text-indigo-300 font-semibold bg-indigo-900/50 px-2 py-0.5 rounded border border-indigo-700/50">
-                Director: {user?.name}
+                {officeTitle}: {user?.name}
               </span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight mt-1.5">
               Hostel Attendance Strategic Overview
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Director Sir's Administrative Oversight • Campus-wide Defaulter & Sequential Notification Monitoring
+              {officePossessive} Administrative Oversight • Campus-wide Defaulter & Sequential Notification Monitoring
             </p>
           </div>
 
@@ -743,7 +747,7 @@ export const DirectorDashboard: React.FC = () => {
       <DefaultersRoster
         records={defaulters}
         targetDate={selectedDate}
-        role="director"
+        role={officeRole}
         onDateChange={handleDateChange}
       />
 
@@ -751,7 +755,7 @@ export const DirectorDashboard: React.FC = () => {
       <LatePunchesRoster
         records={latePunches}
         targetDate={selectedDate}
-        role="director"
+        role={officeRole}
         onDateChange={handleDateChange}
       />
 
@@ -766,7 +770,7 @@ export const DirectorDashboard: React.FC = () => {
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
             <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-medium">
-              Sequential Protocol: RW → Warden → CW (Prof. Sameer Varma) → Director → Parents → Student
+              Sequential Protocol: RW → Warden → CW ({user?.name || 'Chief Warden'}) → Director → Parents → Student
             </span>
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
               <Calendar className="h-3.5 w-3.5 text-indigo-600" />
@@ -928,7 +932,7 @@ export const DirectorDashboard: React.FC = () => {
       </div>
 
       {/* Automated Strike Records & Disciplinary Warning Tickets */}
-      <WarningTicketsTable role="director" />
+      <WarningTicketsTable role={officeRole} />
 
       {/* Scheduler Execution & Audit Trail */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
