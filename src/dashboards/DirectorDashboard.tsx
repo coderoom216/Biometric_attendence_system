@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Building2,
   Users,
-  AlertOctagon,
   CalendarCheck,
-  CheckCircle2,
   Clock,
   ShieldCheck,
   BarChart3,
@@ -33,6 +31,7 @@ interface AttendanceDrilldownProps {
   category: AttendanceDrilldownCategory;
   hostelId?: string;
   date: string;
+  notifications: NotificationLog[];
   onClose: () => void;
 }
 
@@ -61,12 +60,19 @@ const getAttendanceStatusClass = (record?: AttendanceRecord) => {
   return 'bg-emerald-100 text-emerald-800';
 };
 
-const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ category, hostelId, date, onClose }) => {
+const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({
+  category,
+  hostelId,
+  date,
+  notifications,
+  onClose
+}) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAlertStudent, setSelectedAlertStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -102,11 +108,14 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        if (selectedAlertStudent) setSelectedAlertStudent(null);
+        else onClose();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, selectedAlertStudent]);
 
   const attendanceByStudentId = new Map(attendance.map((record) => [record.studentId, record]));
   const filteredStudents = students
@@ -143,6 +152,7 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
   };
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
       onClick={onClose}
@@ -212,7 +222,20 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
                 ) : (
                   filteredStudents.map(({ student, record }) => (
                     <tr key={student.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-medium text-slate-900">{student.name}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAlertStudent(student)}
+                          aria-label={`View six-tier alerts for ${student.name}`}
+                          className="text-left font-medium text-indigo-700 hover:text-indigo-900 hover:underline focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+                        >
+                          {student.name}
+                          <span className="ml-1 inline-flex items-center gap-1 text-[10px] font-normal text-slate-500">
+                            <Mail className="h-3 w-3" />
+                            6-tier alerts
+                          </span>
+                        </button>
+                      </td>
                       <td className="px-4 py-3 font-mono text-slate-700">{student.enrollmentNo}</td>
                       <td className="px-4 py-3 text-slate-700">
                         {hostelNames[student.hostelId] || student.hostelId} / {student.block}
@@ -239,6 +262,95 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({ categ
         )}
       </section>
     </div>
+    {selectedAlertStudent && (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4"
+        onClick={() => setSelectedAlertStudent(null)}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="student-alerts-title"
+          className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+            <div>
+              <h2 id="student-alerts-title" className="text-lg font-bold text-slate-900">
+                Six-Tier Alert History
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {selectedAlertStudent.name} · {selectedAlertStudent.enrollmentNo} · {hostelNames[selectedAlertStudent.hostelId] || selectedAlertStudent.hostelId}, {selectedAlertStudent.block}, Room {selectedAlertStudent.roomNumber} · {date}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedAlertStudent(null)}
+              aria-label="Close six-tier alert history"
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="max-h-[65vh] overflow-auto p-5">
+            <ol className="space-y-3">
+              {[
+                'Residential Warden',
+                'Warden',
+                'Chief Warden',
+                'Director',
+                "Parent / Guardian",
+                'Student'
+              ].map((recipientRole, index) => {
+                const notification = notifications.find(
+                  (entry) => entry.studentId === selectedAlertStudent.id && entry.tier === index + 1
+                );
+                const statusClass = notification
+                  ? notification.status === 'delivered'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : notification.status === 'failed'
+                    ? 'bg-rose-100 text-rose-800'
+                    : 'bg-amber-100 text-amber-800'
+                  : 'bg-slate-100 text-slate-600';
+
+                return (
+                  <li key={recipientRole} className="rounded-lg border border-slate-200 p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Tier {index + 1} · {recipientRole}
+                        </div>
+                        <div className="mt-1 font-semibold text-slate-900">
+                          {notification?.recipientName || recipientRole}
+                        </div>
+                        <div className="mt-0.5 break-all text-xs text-slate-600">
+                          {notification?.recipientEmail || 'Recipient contact not available'}
+                        </div>
+                      </div>
+                      <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}>
+                        {notification
+                          ? notification.status.charAt(0).toUpperCase() + notification.status.slice(1)
+                          : 'Not triggered'}
+                      </span>
+                    </div>
+                    {notification?.timestamp && (
+                      <div className="mt-2 text-[11px] text-slate-500">Dispatched: {notification.timestamp}</div>
+                    )}
+                    {notification?.failureReason && (
+                      <div className="mt-2 text-xs text-rose-700">{notification.failureReason}</div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+          <div className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500">
+            Alerts are shown for the selected attendance date.
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 };
 
@@ -297,6 +409,46 @@ export const DirectorDashboard: React.FC = () => {
   const scheduledJobs: ScheduledJobLog[] = (schedulerStatus?.scheduledJobs || []).filter(
     (j: ScheduledJobLog) => !selectedDate || j.dateEvaluated === selectedDate
   );
+  const [expandedNotificationHostels, setExpandedNotificationHostels] = useState<Set<string>>(new Set());
+  const [expandedNotificationStudent, setExpandedNotificationStudent] = useState<string | null>(null);
+
+  const hostelNotificationGroups = new Map<string, { hostelName: string; students: Map<string, NotificationLog[]> }>();
+  hostelReports.forEach((hostel: { hostelId: string; hostelName: string }) => {
+    hostelNotificationGroups.set(hostel.hostelId, { hostelName: hostel.hostelName, students: new Map() });
+  });
+  notifications.forEach((notification) => {
+    let group = hostelNotificationGroups.get(notification.hostelId);
+    if (!group) {
+      const hostelNameById: Record<string, string> = {
+        'h-shivalik': 'Boys Hostel 1',
+        'h-mandakini': 'Girls Hostel',
+        'h-nilgiri': 'Boys Hostel 2'
+      };
+      group = {
+        hostelName: hostelNameById[notification.hostelId] || notification.hostelId,
+        students: new Map()
+      };
+      hostelNotificationGroups.set(notification.hostelId, group);
+    }
+
+    const studentNotifications = group.students.get(notification.studentId) || [];
+    studentNotifications.push(notification);
+    group.students.set(notification.studentId, studentNotifications);
+  });
+  const sortedHostelNotificationGroups = Array.from(hostelNotificationGroups.entries())
+    .map(([hostelId, group]) => ({
+      hostelId,
+      hostelName: group.hostelName,
+      students: Array.from(group.students.entries())
+        .map(([studentId, logs]) => ({
+          studentId,
+          studentName: logs[0].studentName,
+          enrollmentNo: logs[0].enrollmentNo,
+          logs
+        }))
+        .sort((a, b) => a.studentName.localeCompare(b.studentName))
+    }))
+    .sort((a, b) => a.hostelName.localeCompare(b.hostelName));
 
   return (
     <div className="space-y-6">
@@ -605,65 +757,173 @@ export const DirectorDashboard: React.FC = () => {
 
       {/* 6-Tier Notification Hierarchy Execution Monitor (FR-08) for Selected Date */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 mb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center space-x-2">
             <Mail className="w-5 h-5 text-indigo-600" />
             <h2 className="font-bold text-slate-800 text-sm">
               6-Tier Absence Alert Escalation Hierarchy (FR-08) — {selectedDate}
             </h2>
           </div>
-          <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-medium">
-            Sequential Protocol: RW → Warden → CW (Prof. Sameer Varma) → Director → Parents → Student
-          </span>
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-medium">
+              Sequential Protocol: RW → Warden → CW (Prof. Sameer Varma) → Director → Parents → Student
+            </span>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+              <label htmlFor="director-six-tier-date" className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                Select Date:
+              </label>
+              <input
+                id="director-six-tier-date"
+                type="date"
+                value={selectedDate}
+                onChange={(event) => {
+                  if (event.target.value) handleDateChange(event.target.value);
+                }}
+                aria-label="Select six-tier alert date"
+                className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-              <tr>
-                <th className="py-2.5 px-3">Escalation Tier</th>
-                <th className="py-2.5 px-3">Recipient Role</th>
-                <th className="py-2.5 px-3">Target Student</th>
-                <th className="py-2.5 px-3">Recipient Contact</th>
-                <th className="py-2.5 px-3">Delivery Status</th>
-                <th className="py-2.5 px-3">Dispatched Time</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {notifications.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-slate-400">
-                    No notification escalation records logged for {selectedDate}.
-                  </td>
-                </tr>
-              ) : (
-                notifications.slice(0, 8).map((n) => (
-                  <tr key={n.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-[10px]">
-                        Tier {n.tier}
+        <div className="space-y-3">
+          {sortedHostelNotificationGroups.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">
+              No notification escalation records logged for {selectedDate}.
+            </p>
+          ) : (
+            sortedHostelNotificationGroups.map((hostel) => {
+              const isHostelExpanded = expandedNotificationHostels.has(hostel.hostelId);
+              return (
+                <section key={hostel.hostelId} className="overflow-hidden rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    aria-expanded={isHostelExpanded}
+                    onClick={() => {
+                      setExpandedNotificationHostels((current) => {
+                        const next = new Set(current);
+                        if (next.has(hostel.hostelId)) next.delete(hostel.hostelId);
+                        else next.add(hostel.hostelId);
+                        return next;
+                      });
+                    }}
+                    className="flex w-full items-center justify-between gap-3 bg-slate-50 px-4 py-3 text-left transition hover:bg-indigo-50 focus-visible:outline-2 focus-visible:outline-indigo-600"
+                  >
+                    <span className="flex items-center gap-2 font-semibold text-slate-900">
+                      <Building2 className="h-4 w-4 text-indigo-600" />
+                      {hostel.hostelName}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-800">
+                        {hostel.students.length} {hostel.students.length === 1 ? 'student' : 'students'} with alerts
                       </span>
-                    </td>
-                    <td className="py-2.5 px-3 font-medium text-slate-800">{n.recipientRole}</td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">{n.studentName} ({n.enrollmentNo})</td>
-                    <td className="py-2.5 px-3 font-mono text-slate-600 text-[11px]">{n.recipientEmail || <span className="text-rose-500 font-bold">Missing Email</span>}</td>
-                    <td className="py-2.5 px-3">
-                      {n.status === 'delivered' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 flex items-center w-fit">
-                          <CheckCircle2 className="w-3 h-3 mr-1" /> Delivered
-                        </span>
+                      <span aria-hidden="true" className="w-4 text-center text-lg text-slate-500">
+                        {isHostelExpanded ? '−' : '+'}
+                      </span>
+                    </span>
+                  </button>
+
+                  {isHostelExpanded && (
+                    <div className="divide-y divide-slate-100">
+                      {hostel.students.length === 0 ? (
+                        <p className="px-5 py-4 text-sm text-slate-500">
+                          No six-tier alerts recorded for this hostel on {selectedDate}.
+                        </p>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800 flex items-center w-fit" title={n.failureReason}>
-                          <AlertOctagon className="w-3 h-3 mr-1" /> Failed ({n.failureReason?.slice(0, 25)}...)
-                        </span>
+                        hostel.students.map((student) => {
+                          const isStudentExpanded = expandedNotificationStudent === student.studentId;
+                          return (
+                            <div key={student.studentId}>
+                              <button
+                                type="button"
+                                aria-expanded={isStudentExpanded}
+                                onClick={() => setExpandedNotificationStudent(
+                                  isStudentExpanded ? null : student.studentId
+                                )}
+                                className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left transition hover:bg-indigo-50/60 focus-visible:outline-2 focus-visible:outline-indigo-600"
+                              >
+                                <span>
+                                  <span className="block font-medium text-indigo-700">{student.studentName}</span>
+                                  <span className="text-xs text-slate-500">{student.enrollmentNo}</span>
+                                </span>
+                                <span className="text-xs font-medium text-indigo-700">
+                                  {isStudentExpanded ? 'Hide 6 tiers' : 'View 6 tiers'}
+                                </span>
+                              </button>
+
+                              {isStudentExpanded && (
+                                <div className="overflow-x-auto border-t border-slate-100 bg-white px-4 py-3">
+                                  <table className="w-full min-w-[720px] text-left text-xs">
+                                    <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                                      <tr>
+                                        <th className="px-3 py-2">Tier</th>
+                                        <th className="px-3 py-2">Recipient</th>
+                                        <th className="px-3 py-2">Contact</th>
+                                        <th className="px-3 py-2">Status</th>
+                                        <th className="px-3 py-2">Dispatched</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {[
+                                        'Residential Warden',
+                                        'Warden',
+                                        'Chief Warden',
+                                        'Director',
+                                        "Student's Parent",
+                                        'Student'
+                                      ].map((recipientRole, index) => {
+                                        const notification = student.logs.find((log) => log.tier === index + 1);
+                                        const statusClass = notification
+                                          ? notification.status === 'delivered'
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : notification.status === 'failed'
+                                            ? 'bg-rose-100 text-rose-800'
+                                            : 'bg-amber-100 text-amber-800'
+                                          : 'bg-slate-100 text-slate-600';
+                                        const statusLabel = notification
+                                          ? notification.status.charAt(0).toUpperCase() + notification.status.slice(1)
+                                          : 'Not triggered';
+
+                                        return (
+                                          <tr key={index}>
+                                            <td className="px-3 py-2 font-mono font-semibold text-slate-800">Tier {index + 1}</td>
+                                            <td className="px-3 py-2">
+                                              <div className="font-medium text-slate-800">
+                                                {notification?.recipientName || recipientRole}
+                                              </div>
+                                              {notification?.failureReason && (
+                                                <div className="mt-0.5 text-[10px] text-rose-700">{notification.failureReason}</div>
+                                              )}
+                                            </td>
+                                            <td className="px-3 py-2 font-mono text-[11px] text-slate-600">
+                                              {notification?.recipientEmail || 'Contact unavailable'}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${statusClass}`}>
+                                                {statusLabel}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 font-mono text-[10px] text-slate-500">
+                                              {notification?.timestamp || '—'}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
                       )}
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">{n.timestamp}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </div>
+                  )}
+                </section>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -742,6 +1002,7 @@ export const DirectorDashboard: React.FC = () => {
           category={drilldownSelection.category}
           hostelId={drilldownSelection.hostelId}
           date={selectedDate}
+          notifications={notifications}
           onClose={() => setDrilldownSelection(null)}
         />
       )}
