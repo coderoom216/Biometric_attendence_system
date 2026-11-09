@@ -5,6 +5,7 @@ import {
   Search,
   Filter,
   Download,
+  Calendar,
   Mail,
   CheckCircle2,
   Phone
@@ -17,6 +18,7 @@ interface DefaultersRosterProps {
   title?: string;
   role?: string;
   hostelId?: string;
+  onDateChange?: (date: string) => void;
 }
 
 export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
@@ -24,7 +26,8 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
   targetDate = '2026-10-27',
   title = 'Institution-Wide Post-Grace Cutoff Defaulters Roster',
   role = 'director',
-  hostelId = 'all'
+  hostelId = 'all',
+  onDateChange
 }) => {
   const [search, setSearch] = useState('');
   const [selectedHostel, setSelectedHostel] = useState<string>(hostelId);
@@ -95,17 +98,37 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-          <span className="text-xs font-bold bg-rose-600 text-white px-3 py-1.5 rounded-lg shadow-xs">
-            {filtered.length} Total Defaulters
-          </span>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold bg-rose-600 text-white px-3 py-1.5 rounded-lg shadow-xs">
+              {filtered.length} Total Defaulters
+            </span>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>Export CSV</span>
+            </button>
+          </div>
+          {onDateChange && (
+            <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5">
+              <Calendar className="h-3.5 w-3.5 text-rose-600" />
+              <label htmlFor={`defaulters-roster-date-${role}`} className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                Select Date:
+              </label>
+              <input
+                id={`defaulters-roster-date-${role}`}
+                type="date"
+                value={targetDate}
+                onChange={(event) => {
+                  if (event.target.value) onDateChange(event.target.value);
+                }}
+                aria-label="Select defaulters roster date"
+                className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-rose-500 focus:outline-hidden"
+              />
+            </div>
+          )}
         </div>
       </div>
 

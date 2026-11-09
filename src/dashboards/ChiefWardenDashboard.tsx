@@ -245,6 +245,7 @@ export const ChiefWardenDashboard: React.FC = () => {
         records={defaulters}
         targetDate={selectedDate}
         role="chief_warden"
+        onDateChange={handleDateChange}
       />
 
       {/* Institution-Wide Late Punches Roster (Grace Window: 7:00 PM - 9:00 PM) */}
