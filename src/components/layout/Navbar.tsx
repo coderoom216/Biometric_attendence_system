@@ -144,7 +144,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                   title="Switch Role for Verification"
                 >
                   <span className="hidden sm:inline">Switch Role:</span>
-                  <span className="font-semibold">{user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker' ? 'Caretaker' : user?.role?.replace('_', ' ')}</span>
+                  <span className="font-semibold">
+                    {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker'
+                      ? 'Caretaker'
+                      : user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'mehra'
+                        ? 'Mr Mehra Sir'
+                        : user?.role?.replace('_', ' ')}
+                  </span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
 
@@ -216,9 +222,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
               {/* User details & Logout */}
               <div className="flex items-center space-x-2 pl-1 border-l border-slate-200">
                 <div className="hidden lg:block text-right">
-                  <div className="text-xs font-semibold text-slate-800 leading-tight">
-                    {user?.name}
-                  </div>
+                  {user?.role !== 'caretaker_operator' && (
+                    <div className="text-xs font-semibold text-slate-800 leading-tight">
+                      {user?.name}
+                    </div>
+                  )}
                   <div className="mt-0.5">{getRoleBadge(user?.role)}</div>
                 </div>
 
