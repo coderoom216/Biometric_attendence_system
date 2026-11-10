@@ -67,9 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           { name: 'All Students Directory', path: '/students', icon: Users },
           { name: 'Defaulter Summaries', path: '/defaulters', icon: AlertOctagon, highlight: true },
           { name: 'Leave & Correction Audits', path: '/leaves', icon: FileText },
-          { name: 'Biometric Devices Health', path: '/biometrics', icon: Cpu },
           { name: 'Consolidated Reports', path: '/reports', icon: BarChart3 },
-          { name: 'Security Verification', path: '/security-audit', icon: ShieldCheck }
         ];
 
       case 'director':
