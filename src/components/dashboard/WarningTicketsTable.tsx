@@ -11,7 +11,9 @@ import {
   Filter,
   Search,
   ChevronRight,
-  Clock
+  Clock,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { WarningTicket } from '../../types';
 
@@ -30,6 +32,7 @@ export const WarningTicketsTable: React.FC<WarningTicketsTableProps> = ({
   const [severityFilter, setSeverityFilter] = useState<'all' | 'strike_1' | 'strike_2' | 'flagged_for_admin_review'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'under_review' | 'resolved'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [showAllTickets, setShowAllTickets] = useState(false);
 
   const fetchTickets = async () => {
     setIsLoading(true);
@@ -95,6 +98,7 @@ export const WarningTicketsTable: React.FC<WarningTicketsTableProps> = ({
 
     return matchesSearch && matchesSeverity && matchesStatus;
   });
+  const visibleTickets = showAllTickets ? filteredTickets : filteredTickets.slice(0, 5);
 
   const criticalCount = tickets.filter((t) => t.severity === 'flagged_for_admin_review').length;
   const strike2Count = tickets.filter((t) => t.severity === 'strike_2').length;
@@ -194,7 +198,7 @@ export const WarningTicketsTable: React.FC<WarningTicketsTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredTickets.map((ticket) => {
+              {visibleTickets.map((ticket) => {
                 const isCritical = ticket.severity === 'flagged_for_admin_review';
                 const isStrike2 = ticket.severity === 'strike_2';
 
@@ -310,7 +314,31 @@ export const WarningTicketsTable: React.FC<WarningTicketsTableProps> = ({
 
       {/* Footer info */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center justify-between">
-        <span>Showing {filteredTickets.length} of {tickets.length} total disciplinary violation records</span>
+        <div className="flex items-center gap-3">
+          <span>
+            Showing {visibleTickets.length} of {filteredTickets.length} matching tickets ({tickets.length} total disciplinary violation records)
+          </span>
+          {filteredTickets.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAllTickets((isShowingAll) => !isShowingAll)}
+              className="inline-flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+              aria-expanded={showAllTickets}
+            >
+              {showAllTickets ? (
+                <>
+                  Show less
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </>
+              ) : (
+                <>
+                  View more ({filteredTickets.length - 5})
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <span className="font-mono">Enforced per Institute Attendance Statutes</span>
       </div>
     </div>

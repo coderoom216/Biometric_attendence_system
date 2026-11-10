@@ -8,7 +8,9 @@ import {
   Calendar,
   Mail,
   CheckCircle2,
-  Phone
+  Phone,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { AttendanceRecord } from '../../types';
 
@@ -31,6 +33,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [selectedHostel, setSelectedHostel] = useState<string>(hostelId);
+  const [showAll, setShowAll] = useState(false);
 
   const filtered = records.filter((r) => {
     const matchesSearch =
@@ -43,6 +46,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
 
     return matchesSearch && matchesHostel;
   });
+  const visibleRecords = showAll ? filtered : filtered.slice(0, 5);
 
   const getHostelDisplayName = (hId: string) => {
     if (hId === 'h-shivalik') return 'Boys Hostel 1';
@@ -183,7 +187,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
                 </td>
               </tr>
             ) : (
-              filtered.map((d) => (
+              visibleRecords.map((d) => (
                 <tr key={d.id} className="hover:bg-rose-50/20 transition">
                   {/* Student */}
                   <td className="py-2.5 px-4">
@@ -233,7 +237,31 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
 
       {/* Footer Info */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <span>Displaying {filtered.length} defaulters on {targetDate}</span>
+        <div className="flex items-center gap-3">
+          <span>
+            Displaying {visibleRecords.length} of {filtered.length} defaulters on {targetDate}
+          </span>
+          {filtered.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAll((isShowingAll) => !isShowingAll)}
+              className="inline-flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+              aria-expanded={showAll}
+            >
+              {showAll ? (
+                <>
+                  Show less
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </>
+              ) : (
+                <>
+                  View more ({filtered.length - 5})
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <span className="font-mono text-[11px]">Late through 10:00 PM IST | Defaulter cutoff and no-punch evaluation: 10:00 PM IST</span>
       </div>
     </div>
