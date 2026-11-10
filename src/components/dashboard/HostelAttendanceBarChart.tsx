@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   BarChart3,
   Calendar,
@@ -54,9 +54,18 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
   onDateChange
 }) => {
   const [selectedHostel, setSelectedHostel] = useState<string>(hostelId);
+  const [selectedChartDate, setSelectedChartDate] = useState(currentDate);
   const [chartMode, setChartMode] = useState<'comparative' | 'daily_trend'>('comparative');
   const [activeMetricFilter, setActiveMetricFilter] = useState<'all' | 'present' | 'late' | 'leave' | 'defaulters'>('all');
   const [hoveredBar, setHoveredBar] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedChartDate(currentDate);
+  }, [currentDate]);
+
+  useEffect(() => {
+    setSelectedHostel(hostelId);
+  }, [hostelId]);
 
   // High-fidelity multi-day history matching exact specifications
   const multiDayHistory: DayBarData[] = [
@@ -133,7 +142,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
   ];
 
   // Active day data
-  const currentDayData = multiDayHistory.find((d) => d.date === currentDate) || multiDayHistory[5];
+  const currentDayData = multiDayHistory.find((d) => d.date === selectedChartDate) || multiDayHistory[5];
 
   // Effective hostels to display
   const displayedHostels = selectedHostel === 'all'
@@ -173,26 +182,26 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
             </div>
           </div>
 
-          {onDateChange && (
-            <div className="flex items-center gap-2 self-start rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 sm:self-auto">
-              <Calendar className="h-3.5 w-3.5 text-blue-600" />
-              <label htmlFor="hostel-attendance-chart-date" className="font-medium whitespace-nowrap">
-                Select Date:
-              </label>
-              <input
-                id="hostel-attendance-chart-date"
-                type="date"
-                value={currentDate}
-                min={multiDayHistory[0].date}
-                max={multiDayHistory[multiDayHistory.length - 1].date}
-                onChange={(event) => {
-                  if (event.target.value) onDateChange(event.target.value);
-                }}
-                aria-label="Select chart date"
-                className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-blue-500 focus:outline-hidden"
-              />
-            </div>
-          )}
+          <div className="flex items-center gap-2 self-start rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 sm:self-auto">
+            <Calendar className="h-3.5 w-3.5 text-blue-600" />
+            <label htmlFor="hostel-attendance-chart-date" className="font-medium whitespace-nowrap">
+              Select Date:
+            </label>
+            <input
+              id="hostel-attendance-chart-date"
+              type="date"
+              value={selectedChartDate}
+              min={multiDayHistory[0].date}
+              max={multiDayHistory[multiDayHistory.length - 1].date}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                setSelectedChartDate(event.target.value);
+                onDateChange?.(event.target.value);
+              }}
+              aria-label="Select chart date"
+              className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-blue-500 focus:outline-hidden"
+            />
+          </div>
         </div>
 
         {/* View Switchers */}
