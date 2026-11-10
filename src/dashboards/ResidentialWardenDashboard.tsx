@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   Search,
   Building2,
-  Edit3
+  Edit3,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
@@ -19,15 +20,21 @@ import { Student, AttendanceRecord, LeaveRecord } from '../types';
 import { HostelAttendanceBarChart } from '../components/dashboard/HostelAttendanceBarChart';
 import { WarningTicketsTable } from '../components/dashboard/WarningTicketsTable';
 
+type SummaryCategory = 'residents' | 'present' | 'late' | 'leave' | 'follow-up';
+
 export const ResidentialWardenDashboard: React.FC = () => {
   const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
-  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
+  const [attendanceDate, setAttendanceDate] = useState('');
+  const [dateAttendance, setDateAttendance] = useState<AttendanceRecord[]>([]);
   const [defaulters, setDefaulters] = useState<AttendanceRecord[]>([]);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [isPastCutoff, setIsPastCutoff] = useState(true);
   const [isPastDefaulter, setIsPastDefaulter] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [selectedSummary, setSelectedSummary] = useState<SummaryCategory | null>(null);
 
   // Leave Modal State
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -54,7 +61,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
     try {
       const attRes = await apiService.getTodayAttendance();
       if (attRes.success) {
-        setTodayAttendance(attRes.records);
+        setAttendanceDate((currentDate) => currentDate || attRes.date);
         setIsPastCutoff(attRes.isPastCutoff);
         setIsPastDefaulter(attRes.isPastDefaulterTime);
       }
@@ -83,6 +90,35 @@ export const ResidentialWardenDashboard: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [user]);
+
+  useEffect(() => {
+    if (!attendanceDate) return;
+
+    let isCurrentRequest = true;
+    setIsSummaryLoading(true);
+    setSummaryError(null);
+
+    apiService.getAttendanceHistory({ startDate: attendanceDate, endDate: attendanceDate })
+      .then((res) => {
+        if (isCurrentRequest && res.success) {
+          setDateAttendance(res.records);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        if (isCurrentRequest) {
+          setDateAttendance([]);
+          setSummaryError('Unable to load attendance records for this date.');
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setIsSummaryLoading(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [attendanceDate, user]);
 
   // Handle Leave Submission (FR-11)
   const handleLeaveSubmit = async (e: React.FormEvent) => {
@@ -139,10 +175,29 @@ export const ResidentialWardenDashboard: React.FC = () => {
   };
 
   const pendingStudents = students.filter((s) => s.verificationStatus === 'pending_verification');
-  const presentCount = todayAttendance.filter((a) => a.status === 'present').length;
-  const lateCount = todayAttendance.filter((a) => a.status === 'late').length;
-  const onLeaveCount = todayAttendance.filter((a) => a.status === 'approved_leave').length;
   const activeResidents = students.filter((s) => s.verificationStatus === 'verified' && s.checkoutStatus === 'active');
+  const presentRecords = dateAttendance.filter((record) => record.status === 'present');
+  const lateRecords = dateAttendance.filter((record) => record.status === 'late');
+  const leaveRecords = dateAttendance.filter((record) => record.status === 'approved_leave');
+  const followUpRecords = dateAttendance.filter((record) => record.isDefaulter || record.status === 'absent');
+  const selectedSummaryTitle = selectedSummary
+    ? {
+        residents: 'Active residents',
+        present: 'Present records',
+        late: 'Late arrival records',
+        leave: 'Approved leave records',
+        'follow-up': 'Follow-up records'
+      }[selectedSummary]
+    : '';
+  const selectedAttendanceRecords = selectedSummary === 'present'
+    ? presentRecords
+    : selectedSummary === 'late'
+      ? lateRecords
+      : selectedSummary === 'leave'
+        ? leaveRecords
+        : selectedSummary === 'follow-up'
+          ? followUpRecords
+          : [];
 
   return (
     <div className="space-y-6">
@@ -170,36 +225,52 @@ export const ResidentialWardenDashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-xs font-semibold text-slate-500 uppercase">Residents</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{activeResidents.length}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Boys Hostel 1 (Blocks A & B)</div>
+      {/* Date-filtered KPI Stats */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-slate-800">Attendance summary</h2>
+          <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-xs">
+            <Calendar className="h-4 w-4 text-indigo-600" />
+            <span>Attendance date</span>
+            <input
+              type="date"
+              value={attendanceDate}
+              onChange={(event) => setAttendanceDate(event.target.value)}
+              aria-label="Select attendance summary date"
+              className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900"
+            />
+          </label>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-xs font-semibold text-slate-500 uppercase">Present today</div>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">{presentCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">By 7:00 PM IST</div>
-        </div>
+        {summaryError && (
+          <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {summaryError}
+          </div>
+        )}
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-xs font-semibold text-slate-500 uppercase">Late arrivals</div>
-          <div className="text-2xl font-bold text-amber-600 mt-1">{lateCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">After 7:00 PM through 10:00 PM IST</div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-xs font-semibold text-slate-500 uppercase">On approved leave</div>
-          <div className="text-2xl font-bold text-blue-600 mt-1">{onLeaveCount}</div>
-          <div className="text-[11px] text-blue-600 font-medium mt-1">No absence alerts during leave</div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-xs font-semibold text-slate-500 uppercase">Needs follow-up</div>
-          <div className="text-2xl font-bold text-rose-600 mt-1">{defaulters.length}</div>
-          <div className="text-[11px] text-rose-600 font-medium mt-1">Follow-up notifications sent</div>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {([
+            { key: 'residents', label: 'Residents', value: activeResidents.length, note: 'Current active residents', color: 'text-slate-900' },
+            { key: 'present', label: 'Present', value: presentRecords.length, note: 'By 7:00 PM IST', color: 'text-emerald-600' },
+            { key: 'late', label: 'Late arrivals', value: lateRecords.length, note: 'After 7:00 PM through 10:00 PM IST', color: 'text-amber-600' },
+            { key: 'leave', label: 'On approved leave', value: leaveRecords.length, note: 'No absence alerts during leave', color: 'text-blue-600' },
+            { key: 'follow-up', label: 'Needs follow-up', value: followUpRecords.length, note: 'Follow-up notifications sent', color: 'text-rose-600' }
+          ] as const).map((card) => (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => setSelectedSummary(card.key)}
+              aria-label={`View ${card.label.toLowerCase()} records`}
+              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              <div className="text-xs font-semibold uppercase text-slate-500">{card.label}</div>
+              <div className={`mt-1 text-2xl font-bold ${card.color}`}>
+                {card.key !== 'residents' && isSummaryLoading ? '…' : card.value}
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">{card.note}</div>
+              <div className="mt-2 text-[10px] font-semibold text-indigo-600">Click to see records</div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -212,6 +283,100 @@ export const ResidentialWardenDashboard: React.FC = () => {
 
       {/* Automated Strike Records & Disciplinary Warning Tickets */}
       <WarningTicketsTable hostelId={user?.hostelId || 'h-shivalik'} role="residential_warden" />
+
+      {selectedSummary && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedSummary(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="summary-records-title"
+            className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+              <div>
+                <h2 id="summary-records-title" className="text-sm font-bold text-slate-900">{selectedSummaryTitle}</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {selectedSummary === 'residents' ? 'Current active resident list' : `Attendance date: ${attendanceDate}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedSummary(null)}
+                aria-label="Close records"
+                className="rounded px-2 py-1 text-slate-500 hover:bg-slate-200 hover:text-slate-900"
+              >
+                ✕
+              </button>
+            </div>
+
+            {selectedSummary !== 'residents' && isSummaryLoading ? (
+              <div className="p-8 text-center text-sm text-slate-500">Loading records…</div>
+            ) : selectedSummary !== 'residents' && summaryError ? (
+              <div role="alert" className="p-8 text-center text-sm text-rose-700">{summaryError}</div>
+            ) : selectedSummary === 'residents' ? (
+              activeResidents.length === 0 ? (
+                <div className="p-8 text-center text-sm text-slate-500">No active residents found.</div>
+              ) : (
+                <div className="max-h-[65vh] overflow-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-slate-100 text-[10px] uppercase text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Enrollment No</th>
+                        <th className="px-4 py-3">Block / Room</th>
+                        <th className="px-4 py-3">Course</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {activeResidents.map((student) => (
+                        <tr key={student.id}>
+                          <td className="px-4 py-3 font-semibold text-slate-900">{student.name}</td>
+                          <td className="px-4 py-3 font-mono text-slate-600">{student.enrollmentNo}</td>
+                          <td className="px-4 py-3 text-slate-700">{student.block}, Room {student.roomNumber}</td>
+                          <td className="px-4 py-3 text-slate-700">{student.course}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : selectedAttendanceRecords.length === 0 ? (
+              <div className="p-8 text-center text-sm text-slate-500">No records found for this category and date.</div>
+            ) : (
+              <div className="max-h-[65vh] overflow-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-100 text-[10px] uppercase text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Student</th>
+                      <th className="px-4 py-3">Enrollment No</th>
+                      <th className="px-4 py-3">Block / Room</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Punch time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {selectedAttendanceRecords.map((record) => (
+                      <tr key={record.id}>
+                        <td className="px-4 py-3 font-semibold text-slate-900">{record.studentName}</td>
+                        <td className="px-4 py-3 font-mono text-slate-600">{record.enrollmentNo}</td>
+                        <td className="px-4 py-3 text-slate-700">{record.block}, Room {record.roomNumber}</td>
+                        <td className="px-4 py-3 capitalize text-slate-700">{record.status.replace('_', ' ')}</td>
+                        <td className="px-4 py-3 text-slate-700">{record.punchTime || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {/* Real-time defaulter follow-up section */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
