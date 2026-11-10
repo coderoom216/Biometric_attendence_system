@@ -11,6 +11,7 @@ import { WardenDashboard } from './dashboards/WardenDashboard';
 import { ChiefWardenDashboard } from './dashboards/ChiefWardenDashboard';
 import { DirectorDashboard } from './dashboards/DirectorDashboard';
 import { CaretakerBiometricDashboard } from './dashboards/CaretakerBiometricDashboard';
+import { CaretakerDashboard } from './dashboards/CaretakerDashboard';
 
 // Pages
 import { LoginPage } from './pages/LoginPage';
@@ -38,6 +39,7 @@ const DashboardRouter: React.FC = () => {
     case 'director':
       return <DirectorDashboard />;
     case 'caretaker_operator':
+      if (localStorage.getItem('demo_dashboard') === 'caretaker') return <CaretakerDashboard />;
       return <CaretakerBiometricDashboard />;
     default:
       return <StudentDashboard />;

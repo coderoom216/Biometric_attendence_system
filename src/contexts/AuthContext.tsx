@@ -99,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Ignore network errors on logout
     } finally {
       localStorage.removeItem('hostel_auth_token');
+      localStorage.removeItem('demo_dashboard');
       setToken(null);
       setUser(null);
     }

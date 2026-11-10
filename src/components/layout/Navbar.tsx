@@ -144,7 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                   title="Switch Role for Verification"
                 >
                   <span className="hidden sm:inline">Switch Role:</span>
-                  <span className="font-semibold">{user?.role?.replace('_', ' ')}</span>
+                  <span className="font-semibold">{user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker' ? 'Caretaker' : user?.role?.replace('_', ' ')}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
 
@@ -189,11 +189,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                       {user?.email === 'rw.nilgiri@university.edu.in' && <span className="text-teal-600 font-bold">✓</span>}
                     </button>
                     <button
-                      onClick={() => { quickLoginAsRole('caretaker_operator'); setShowRoleDropdown(false); }}
+                      onClick={() => { localStorage.setItem('demo_dashboard', 'caretaker'); quickLoginAsRole('caretaker_operator'); setShowRoleDropdown(false); }}
+                      className="w-full text-left px-3 py-2 hover:bg-orange-50 text-slate-700 hover:text-orange-900 flex items-center justify-between"
+                    >
+                      <span>Caretaker (Attendance Dashboard)</span>
+                      {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker' && <span className="text-orange-600 font-bold">✓</span>}
+                    </button>
+                    <button
+                      onClick={() => { localStorage.setItem('demo_dashboard', 'mehra'); quickLoginAsRole('caretaker_operator'); setShowRoleDropdown(false); }}
                       className="w-full text-left px-3 py-2 hover:bg-amber-50 text-slate-700 hover:text-amber-900 flex items-center justify-between"
                     >
                       <span>Mr. Mehra (Biometric Sync)</span>
-                      {user?.role === 'caretaker_operator' && <span className="text-amber-600 font-bold">✓</span>}
+                      {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') !== 'caretaker' && <span className="text-amber-600 font-bold">✓</span>}
                     </button>
                     <button
                       onClick={() => { quickLoginAsRole('student'); setShowRoleDropdown(false); }}

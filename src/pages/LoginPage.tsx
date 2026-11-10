@@ -29,6 +29,7 @@ export const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    localStorage.removeItem('demo_dashboard');
     setErrorMsg(null);
     try {
       await login(email, password);
@@ -47,14 +48,15 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const demoAccounts = [
+  const demoAccounts: { title: string; email: string; pass: string; badge: string; dashboard?: 'caretaker' | 'mehra' }[] = [
     { title: 'Student', email: 'rahul.sharma@student.edu.in', pass: 'student123', badge: 'Student' },
     { title: 'Residential Warden', email: 'rw.shivalik@university.edu.in', pass: 'rw123', badge: 'BH-1' },
     { title: 'Residential Warden', email: 'rw.nilgiri@university.edu.in', pass: 'pathak123', badge: 'BH-2' },
     { title: 'Residential Warden', email: 'warden.mandakini@university.edu.in', pass: 'warden123', badge: 'GH-1' },
     { title: 'Chief Warden', email: 'chiefwarden@university.edu.in', pass: 'chief123', badge: 'Chief Warden' },
     { title: 'Director Sir', email: 'director@university.edu.in', pass: 'director123', badge: 'Director' },
-    { title: 'Caretaker / Biometrics', email: 'vmehra@university.edu.in', pass: 'mehra123', badge: 'Caretaker' },
+    { title: 'Caretaker', email: 'vmehra@university.edu.in', pass: 'mehra123', badge: 'Caretaker', dashboard: 'caretaker' },
+    { title: 'Mr Mehra Sir', email: 'vmehra@university.edu.in', pass: 'mehra123', badge: 'Mr Mehra', dashboard: 'mehra' },
     
   ];
 
@@ -159,17 +161,23 @@ export const LoginPage: React.FC = () => {
                 1-Click Role Login (Demo & Audit)
               </span>
               <span className="text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded">
-                All 6 Roles
+                8 Demo Logins
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               {demoAccounts.map((acc) => (
                 <button
-                  key={acc.email}
+                  key={acc.dashboard || acc.email}
                   type="button"
                   disabled={isLoading}
-                  onClick={() => login(acc.email, acc.pass)}
+                  onClick={() => {
+                    localStorage.setItem('demo_dashboard', acc.dashboard || '');
+                    login(acc.email, acc.pass).catch((err: any) => {
+                      localStorage.removeItem('demo_dashboard');
+                      setErrorMsg(err.response?.data?.message || 'Authentication failed: Invalid credentials');
+                    });
+                  }}
                   className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 text-left transition group cursor-pointer"
                 >
                   <div className="font-semibold text-slate-800 text-[11px] group-hover:text-indigo-900 truncate">

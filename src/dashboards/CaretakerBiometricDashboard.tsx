@@ -135,9 +135,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold text-slate-900">Biometric Terminal & Caretaker Onboarding Portal</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-              Mr. Vivek Mehra (CSE Dept) Channel
-            </span>
+
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Offline Biometric Device Log Ingestion (FR-01) & Verified Student Master Record Entry (FR-02)
