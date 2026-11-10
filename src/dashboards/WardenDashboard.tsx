@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Users,
   AlertOctagon,
@@ -156,9 +157,18 @@ export const WardenDashboard: React.FC = () => {
           </p>
         </div>
 
-        <div className="text-right">
-          <div className="text-[11px] text-slate-400 font-mono">Cutoff: 19:00 IST</div>
-          <div className="text-xs font-bold text-slate-800">Defaulter Escalation Active</div>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="text-right">
+            <div className="text-[11px] text-slate-400 font-mono">Cutoff: 19:00 IST</div>
+            <div className="text-xs font-bold text-slate-800">Defaulter Escalation Active</div>
+          </div>
+          <Link
+            to="/leaves"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            <span>Record approved leave</span>
+          </Link>
         </div>
       </div>
 

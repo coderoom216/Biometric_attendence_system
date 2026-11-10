@@ -19,6 +19,8 @@ export const LeaveManagementPage: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [leaveForm, setLeaveForm] = useState({
     studentId: '',
     startDate: '2026-10-27',
@@ -30,16 +32,20 @@ export const LeaveManagementPage: React.FC = () => {
   });
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const isRW = user?.role === 'residential_warden' || user?.role === 'chief_warden' || user?.role === 'director';
+  const canEnterLeave = ['residential_warden', 'warden', 'chief_warden', 'director'].includes(user?.role || '');
 
   const loadData = async () => {
     try {
       const lRes = await apiService.getLeaves();
       if (lRes.success) setLeaves(lRes.leaves);
 
-      if (isRW) {
+      if (canEnterLeave) {
         const sRes = await apiService.getStudents();
-        if (sRes.success) setStudents(sRes.students.filter((s) => s.verificationStatus === 'verified'));
+        if (sRes.success) {
+          setStudents(sRes.students.filter(
+            (s) => s.verificationStatus === 'verified' && s.checkoutStatus === 'active'
+          ));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -53,12 +59,19 @@ export const LeaveManagementPage: React.FC = () => {
   const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback(null);
+    if (!leaveForm.studentId) {
+      setFeedback('Search for and select a resident student before saving.');
+      return;
+    }
+
     try {
       const res = await apiService.enterLeave(leaveForm);
       if (res.success) {
         setFeedback('Leave successfully logged. Automated absence notifications are now suppressed for these dates.');
         setTimeout(() => {
           setIsLeaveModalOpen(false);
+          setStudentSearch('');
+          setLeaveForm((form) => ({ ...form, studentId: '', reason: '' }));
           setFeedback(null);
           loadData();
         }, 1200);
@@ -67,6 +80,16 @@ export const LeaveManagementPage: React.FC = () => {
       setFeedback(err.response?.data?.message || 'Error entering leave');
     }
   };
+
+  const matchingStudents = students.filter((student) => {
+    const query = studentSearch.trim().toLowerCase();
+    return !query || [
+      student.name,
+      student.enrollmentNo,
+      student.block,
+      student.roomNumber
+    ].some((value) => value.toLowerCase().includes(query));
+  });
 
   const filteredLeaves = leaves.filter(
     (l) =>
@@ -87,13 +110,19 @@ export const LeaveManagementPage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Formal leave logging by Residential Warden upon verification of physical letter and parent consent.
+            Formal leave logging by an authorized warden upon verification of the application and parent consent.
           </p>
         </div>
 
-        {isRW && (
+        {canEnterLeave && (
           <button
-            onClick={() => setIsLeaveModalOpen(true)}
+            onClick={() => {
+              setLeaveForm((form) => ({ ...form, studentId: '' }));
+              setStudentSearch('');
+              setFeedback(null);
+              setIsStudentDropdownOpen(false);
+              setIsLeaveModalOpen(true);
+            }}
             className="flex items-center space-x-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
           >
             <PlusCircle className="w-4 h-4" />
@@ -106,9 +135,9 @@ export const LeaveManagementPage: React.FC = () => {
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-900 flex items-start space-x-3">
         <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
         <div className="space-y-1">
-          <div className="font-bold">Director Sir's Directive on Leave Approvals:</div>
+          <div className="font-bold">Leave approval procedure:</div>
           <p className="leading-relaxed text-[11px] text-blue-800">
-            Students cannot directly apply for or approve leave in the system on their own. The student submits a formal physical application to the Residential Warden, who verifies parent consent and enters the leave into the system. Once logged by the Residential Warden, automated absence emails are suppressed for those approved dates.
+            Students cannot directly approve leave in the system. An authorized warden records approved leave after verifying the application and parent consent. Once logged, automated absence emails are suppressed for the approved dates.
           </p>
         </div>
       </div>
@@ -191,28 +220,78 @@ export const LeaveManagementPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Enter Approved Leave (Residential Warden Only)</h3>
-              <button onClick={() => setIsLeaveModalOpen(false)}>✕</button>
+              <h3 id="leave-modal-title" className="font-semibold text-sm">Enter Approved Leave</h3>
+              <button
+                type="button"
+                aria-label="Close leave form"
+                onClick={() => {
+                  setIsLeaveModalOpen(false);
+                  setIsStudentDropdownOpen(false);
+                }}
+              >
+                ✕
+              </button>
             </div>
 
-            <form onSubmit={handleLeaveSubmit} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleLeaveSubmit} aria-labelledby="leave-modal-title" className="p-6 space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">
                   Select Resident Student
                 </label>
-                <select
-                  required
-                  value={leaveForm.studentId}
-                  onChange={(e) => setLeaveForm({ ...leaveForm, studentId: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  <option value="">-- Choose Resident --</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.enrollmentNo}) — {s.block}, Room {s.roomNumber}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    role="combobox"
+                    aria-label="Search resident students"
+                    aria-autocomplete="list"
+                    aria-expanded={isStudentDropdownOpen}
+                    aria-controls="leave-student-options"
+                    aria-required="true"
+                    autoComplete="off"
+                    placeholder="Search by name, enrollment, block, or room..."
+                    value={studentSearch}
+                    onFocus={() => setIsStudentDropdownOpen(true)}
+                    onChange={(event) => {
+                      setStudentSearch(event.target.value);
+                      setLeaveForm((form) => ({ ...form, studentId: '' }));
+                      setIsStudentDropdownOpen(true);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') setIsStudentDropdownOpen(false);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-200"
+                  />
+                  {isStudentDropdownOpen && (
+                    <ul
+                      id="leave-student-options"
+                      role="listbox"
+                      className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+                    >
+                      {matchingStudents.length ? matchingStudents.map((student) => (
+                        <li key={student.id} role="option" aria-selected={leaveForm.studentId === student.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setLeaveForm((form) => ({ ...form, studentId: student.id }));
+                              setStudentSearch(`${student.name} (${student.enrollmentNo})`);
+                              setIsStudentDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-hidden"
+                          >
+                            <span className="block font-semibold text-slate-800">{student.name}</span>
+                            <span className="mt-0.5 block text-[11px] text-slate-500">
+                              {student.enrollmentNo} · {student.block}, Room {student.roomNumber}
+                            </span>
+                          </button>
+                        </li>
+                      )) : (
+                        <li className="px-3 py-2 text-slate-500">No matching active students.</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
