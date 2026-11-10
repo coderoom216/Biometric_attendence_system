@@ -8,7 +8,9 @@ import {
   Download,
   Calendar,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { AttendanceRecord } from '../../types';
 
@@ -31,6 +33,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [selectedHostel, setSelectedHostel] = useState<string>(hostelId);
+  const [showAll, setShowAll] = useState(false);
 
   // Filter records
   const filtered = records.filter((r) => {
@@ -44,6 +47,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
 
     return matchesSearch && matchesHostel;
   });
+  const visibleRecords = showAll ? filtered : filtered.slice(0, 5);
 
   const getHostelDisplayName = (hId: string) => {
     if (hId === 'h-shivalik') return 'Boys Hostel 1';
@@ -199,7 +203,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => (
+              visibleRecords.map((r) => (
                 <tr key={r.id} className="hover:bg-amber-50/30 transition">
                   {/* Student Name */}
                   <td className="py-2.5 px-4">
@@ -253,7 +257,31 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
 
       {/* Footer Info */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <span>Displaying {filtered.length} late punches on {targetDate}</span>
+        <div className="flex items-center gap-3">
+          <span>
+            Displaying {visibleRecords.length} of {filtered.length} late punches on {targetDate}
+          </span>
+          {filtered.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAll((isShowingAll) => !isShowingAll)}
+              className="inline-flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+              aria-expanded={showAll}
+            >
+              {showAll ? (
+                <>
+                  Show less
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </>
+              ) : (
+                <>
+                  View more ({filtered.length - 5})
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <span className="font-mono text-[11px]">Late: after 7:00 through 10:00 PM IST | Defaulter cutoff and no-punch evaluation: 10:00 PM IST</span>
       </div>
     </div>
