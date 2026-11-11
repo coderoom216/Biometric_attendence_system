@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
       {/* Sidebar container */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-200 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:flex-shrink-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -130,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Role Scope Notice */}
-        <div className="px-4 py-3 mx-3 my-3 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
+        <div className="sticky top-0 z-10 px-4 py-3 mx-3 my-3 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs backdrop-blur-sm">
           <div className="text-[10px] uppercase font-semibold text-slate-400">Current Scope</div>
           <div className="font-semibold text-white mt-0.5 capitalize">
             {role?.replace('_', ' ')}
