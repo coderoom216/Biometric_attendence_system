@@ -277,7 +277,7 @@ export const HostelManagementPage: React.FC = () => {
       {/* Room Allocation Modal */}
       {isAllocateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
               <h3 className="font-semibold text-sm">Allocate Student to Hostel Room (FR-04)</h3>
               <button onClick={() => setIsAllocateOpen(false)}>✕</button>
@@ -313,7 +313,7 @@ export const HostelManagementPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Block</label>
                   <input
@@ -378,7 +378,7 @@ export const HostelManagementPage: React.FC = () => {
       {/* Hostel Empty / Checkout Modal */}
       {isVacateOpen && vacateTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
               <h3 className="font-semibold text-sm">Formal Hostel Empty / Checkout</h3>
               <button onClick={() => setIsVacateOpen(false)}>✕</button>

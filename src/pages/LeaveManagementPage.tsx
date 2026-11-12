@@ -218,7 +218,7 @@ export const LeaveManagementPage: React.FC = () => {
       {/* Enter Leave Modal */}
       {isLeaveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
               <h3 id="leave-modal-title" className="font-semibold text-sm">Enter Approved Leave</h3>
               <button
@@ -294,7 +294,7 @@ export const LeaveManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Start Date</label>
                   <input

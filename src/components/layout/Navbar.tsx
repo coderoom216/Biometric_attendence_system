@@ -62,9 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
         return <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-200">Residential Warden</span>;
       case 'warden':
         return <span className="bg-teal-100 text-teal-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-teal-200">Warden</span>;
-      case 'caretaker_operator':
-        return <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-amber-200">Mr. Mehra (Biometric)</span>;
-      case 'student':
+      
         return <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">Student</span>;
       default:
         return null;
@@ -74,10 +72,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
   return (
     <>
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-2 h-16 min-w-0">
             {/* Left: Mobile hamburger & institutional brand */}
-            <div className="flex items-center space-x-3">
+            <div className="flex min-w-0 items-center space-x-2 sm:space-x-3">
               <button
                 onClick={onToggleSidebar}
                 className="lg:hidden p-2 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 focus:outline-hidden"
@@ -85,13 +83,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                 {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-lg bg-indigo-700 text-white flex items-center justify-center font-bold shadow-xs">
+              <div className="flex min-w-0 items-center space-x-2 sm:space-x-2.5">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg bg-indigo-700 text-white flex items-center justify-center font-bold shadow-xs">
                   <Building2 className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="hidden sm:block min-w-0">
                   <div className="flex items-center space-x-2">
-                    <span className="font-bold text-slate-900 tracking-tight text-base sm:text-lg">
+              <span className="font-bold text-slate-900 tracking-tight text-base sm:text-lg">
                       Hostel Attendance Portal
                     </span>
                     <span className="hidden sm:inline-flex text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">
@@ -106,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
             </div>
 
             {/* Right: Clock Simulator Pill, Switcher, and User Profile */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex shrink-0 items-center space-x-1 sm:space-x-3">
               {/* Virtual Clock Pill */}
               <button
                 onClick={() => setIsClockModalOpen(true)}
@@ -117,19 +115,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                 <span className="font-bold hidden sm:inline">{virtualTime} IST</span>
                 <span className="sm:hidden font-bold">{virtualTime.slice(0, 5)}</span>
                 {isPastDefaulter ? (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-100 text-rose-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-100 text-rose-800">
                     10:00 PM Defaulter Check
                   </span>
                 ) : isWithinGraceWindow ? (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
                     Late Grace Window
                   </span>
                 ) : isPastCutoff ? (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
                     Awaiting 10:00 PM Check
                   </span>
                 ) : (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                     Entry Open
                   </span>
                 )}
@@ -144,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                   title="Switch Role for Verification"
                 >
                   <span className="hidden sm:inline">Switch Role:</span>
-                  <span className="font-semibold">
+                  <span className="max-w-[84px] truncate font-semibold capitalize sm:max-w-none">
                     {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker'
                       ? 'Caretaker'
                       : user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'mehra'

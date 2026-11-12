@@ -58,11 +58,11 @@ export const ClockModal: React.FC<ClockModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Clock className="w-5 h-5 text-amber-400" />
-            <h3 className="font-semibold text-lg">IST Attendance Clock & Scheduler Simulator</h3>
+            <h3 className="min-w-0 font-semibold text-base sm:text-lg">IST Attendance Clock & Scheduler Simulator</h3>
           </div>
           <button
             onClick={onClose}

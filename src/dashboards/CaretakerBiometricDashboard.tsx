@@ -243,7 +243,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           </div>
 
           <form onSubmit={handleOnboardSubmit} className="space-y-3 text-xs">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Enrollment Number</label>
                 <input
@@ -268,7 +268,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Course</label>
                 <input
@@ -291,7 +291,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Hostel</label>
                 <select
@@ -326,7 +326,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Email</label>
                 <input
