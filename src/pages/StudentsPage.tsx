@@ -136,7 +136,7 @@ export const StudentsPage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Complete records of active residents across Boys Hostel 1 (120 cap), Girls Hostel (110 cap), and Boys Hostel 2 (120 cap).
+            Complete records of active residents across Boys Hostel 1 (180 bed capacity), Girls Hostel (165 bed capacity), and Boys Hostel 2 (180 bed capacity).
           </p>
         </div>
 

@@ -139,9 +139,9 @@ export const DefaultersPage: React.FC = () => {
               className="text-xs border border-slate-300 rounded-lg p-2 bg-white"
             >
               <option value="all">All Hostels</option>
-              <option value="h-shivalik">Boys Hostel 1 (Strength: 120)</option>
-              <option value="h-mandakini">Girls Hostel (Strength: 110)</option>
-              <option value="h-nilgiri">Boys Hostel 2 (Strength: 120)</option>
+              <option value="h-shivalik">Boys Hostel 1 (Capacity: 180 beds)</option>
+              <option value="h-mandakini">Girls Hostel (Capacity: 165 beds)</option>
+              <option value="h-nilgiri">Boys Hostel 2 (Capacity: 180 beds)</option>
             </select>
           </div>
         )}

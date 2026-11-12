@@ -30,7 +30,7 @@ export const HostelManagementPage: React.FC = () => {
     hostelId: 'h-shivalik',
     block: 'Block A',
     roomNumber: '102',
-    bedNumber: 'B'
+    bedNumber: 'C'
   });
   const [allocateMsg, setAllocateMsg] = useState<string | null>(null);
 
@@ -243,6 +243,7 @@ export const HostelManagementPage: React.FC = () => {
                       <div className="flex items-center space-x-1.5">
                         <Bed className="w-3.5 h-3.5 text-slate-400" />
                         <span className="font-medium text-slate-800">{occ.name}</span>
+                        <span className="text-[10px] text-slate-500">Bed {occ.bed || '—'}</span>
                         <span className="text-[10px] text-slate-400 font-mono">({occ.enrollmentNo})</span>
                       </div>
                       {isStaff && (
@@ -333,6 +334,19 @@ export const HostelManagementPage: React.FC = () => {
                     className="w-full p-2 border border-slate-300 rounded-lg font-mono"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Bed</label>
+                <select
+                  value={allocateForm.bedNumber}
+                  onChange={(e) => setAllocateForm({ ...allocateForm, bedNumber: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  <option value="A">Bed A</option>
+                  <option value="B">Bed B</option>
+                  <option value="C">Bed C</option>
+                </select>
               </div>
 
               {allocateMsg && (

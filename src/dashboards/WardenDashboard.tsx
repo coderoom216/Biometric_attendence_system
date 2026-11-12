@@ -44,7 +44,7 @@ export const WardenDashboard: React.FC = () => {
     ? 'BH-2'
     : 'Girls Hostel';
 
-  const hostelStrength = effectiveHostelId === 'h-mandakini' ? 110 : 120;
+  const hostelStrength = effectiveHostelId === 'h-mandakini' ? 165 : 180;
   const wardenName = effectiveHostelId === 'h-shivalik'
     ? 'Dr. Sati Sir'
     : effectiveHostelId === 'h-nilgiri'

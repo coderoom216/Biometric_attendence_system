@@ -70,71 +70,71 @@ export const HostelAttendanceTrendsChart: React.FC<HostelAttendanceTrendsChartPr
       date: '2026-10-22',
       label: 'Oct 22',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 100, present: 87, late: 6, leave: 4, defaulters: 3, absent: 3, totalAttended: 93, complianceRate: 97 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 100, present: 89, late: 5, leave: 4, defaulters: 2, absent: 2, totalAttended: 94, complianceRate: 98 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 100, present: 85, late: 7, leave: 5, defaulters: 3, absent: 3, totalAttended: 92, complianceRate: 97 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 150, present: 87, late: 6, leave: 4, defaulters: 3, absent: 3, totalAttended: 93, complianceRate: 97 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 150, present: 89, late: 5, leave: 4, defaulters: 2, absent: 2, totalAttended: 94, complianceRate: 98 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 150, present: 85, late: 7, leave: 5, defaulters: 3, absent: 3, totalAttended: 92, complianceRate: 97 }
       ],
-      consolidated: { enrolled: 300, present: 261, late: 18, leave: 13, defaulters: 8, absent: 8, totalAttended: 279, complianceRate: 97 }
+      consolidated: { enrolled: 450, present: 261, late: 18, leave: 13, defaulters: 8, absent: 8, totalAttended: 279, complianceRate: 97 }
     },
     {
       date: '2026-10-23',
       label: 'Oct 23',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 100, present: 73, late: 16, leave: 4, defaulters: 7, absent: 7, totalAttended: 89, complianceRate: 93 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 100, present: 78, late: 13, leave: 5, defaulters: 4, absent: 4, totalAttended: 91, complianceRate: 96 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 100, present: 74, late: 15, leave: 5, defaulters: 6, absent: 6, totalAttended: 89, complianceRate: 94 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 150, present: 73, late: 16, leave: 4, defaulters: 7, absent: 7, totalAttended: 89, complianceRate: 93 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 150, present: 78, late: 13, leave: 5, defaulters: 4, absent: 4, totalAttended: 91, complianceRate: 96 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 150, present: 74, late: 15, leave: 5, defaulters: 6, absent: 6, totalAttended: 89, complianceRate: 94 }
       ],
-      consolidated: { enrolled: 300, present: 225, late: 44, leave: 14, defaulters: 17, absent: 17, totalAttended: 269, complianceRate: 94 }
+      consolidated: { enrolled: 450, present: 225, late: 44, leave: 14, defaulters: 17, absent: 17, totalAttended: 269, complianceRate: 94 }
     },
     {
       date: '2026-10-24',
       label: 'Oct 24',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 100, present: 84, late: 8, leave: 5, defaulters: 3, absent: 3, totalAttended: 92, complianceRate: 97 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 100, present: 85, late: 8, leave: 5, defaulters: 2, absent: 2, totalAttended: 93, complianceRate: 98 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 100, present: 81, late: 10, leave: 6, defaulters: 3, absent: 3, totalAttended: 91, complianceRate: 97 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 150, present: 84, late: 8, leave: 5, defaulters: 3, absent: 3, totalAttended: 92, complianceRate: 97 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 150, present: 85, late: 8, leave: 5, defaulters: 2, absent: 2, totalAttended: 93, complianceRate: 98 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 150, present: 81, late: 10, leave: 6, defaulters: 3, absent: 3, totalAttended: 91, complianceRate: 97 }
       ],
-      consolidated: { enrolled: 300, present: 250, late: 26, leave: 16, defaulters: 8, absent: 8, totalAttended: 276, complianceRate: 97 }
+      consolidated: { enrolled: 450, present: 250, late: 26, leave: 16, defaulters: 8, absent: 8, totalAttended: 276, complianceRate: 97 }
     },
     {
       date: '2026-10-25',
       label: 'Oct 25',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 100, present: 68, late: 15, leave: 11, defaulters: 6, absent: 6, totalAttended: 83, complianceRate: 94 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 100, present: 72, late: 12, leave: 12, defaulters: 4, absent: 4, totalAttended: 84, complianceRate: 96 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 100, present: 70, late: 14, leave: 10, defaulters: 6, absent: 6, totalAttended: 84, complianceRate: 94 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 150, present: 68, late: 15, leave: 11, defaulters: 6, absent: 6, totalAttended: 83, complianceRate: 94 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 150, present: 72, late: 12, leave: 12, defaulters: 4, absent: 4, totalAttended: 84, complianceRate: 96 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 150, present: 70, late: 14, leave: 10, defaulters: 6, absent: 6, totalAttended: 84, complianceRate: 94 }
       ],
-      consolidated: { enrolled: 300, present: 210, late: 41, leave: 33, defaulters: 16, absent: 16, totalAttended: 251, complianceRate: 95 }
+      consolidated: { enrolled: 450, present: 210, late: 41, leave: 33, defaulters: 16, absent: 16, totalAttended: 251, complianceRate: 95 }
     },
     {
       date: '2026-10-26',
       label: 'Oct 26',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 100, present: 83, late: 9, leave: 4, defaulters: 4, absent: 4, totalAttended: 92, complianceRate: 96 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 100, present: 86, late: 7, leave: 4, defaulters: 3, absent: 3, totalAttended: 93, complianceRate: 97 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 100, present: 82, late: 9, leave: 5, defaulters: 4, absent: 4, totalAttended: 91, complianceRate: 96 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 150, present: 83, late: 9, leave: 4, defaulters: 4, absent: 4, totalAttended: 92, complianceRate: 96 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 150, present: 86, late: 7, leave: 4, defaulters: 3, absent: 3, totalAttended: 93, complianceRate: 97 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 150, present: 82, late: 9, leave: 5, defaulters: 4, absent: 4, totalAttended: 91, complianceRate: 96 }
       ],
-      consolidated: { enrolled: 300, present: 251, late: 25, leave: 13, defaulters: 11, absent: 11, totalAttended: 276, complianceRate: 96 }
+      consolidated: { enrolled: 450, present: 251, late: 25, leave: 13, defaulters: 11, absent: 11, totalAttended: 276, complianceRate: 96 }
     },
     {
       date: '2026-10-27',
       label: 'Oct 27',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 100, present: 80, late: 10, leave: 5, defaulters: 5, absent: 5, totalAttended: 90, complianceRate: 95 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 100, present: 80, late: 10, leave: 5, defaulters: 5, absent: 5, totalAttended: 90, complianceRate: 95 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 100, present: 80, late: 10, leave: 5, defaulters: 5, absent: 5, totalAttended: 90, complianceRate: 95 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 150, present: 80, late: 10, leave: 5, defaulters: 5, absent: 5, totalAttended: 90, complianceRate: 95 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 150, present: 80, late: 10, leave: 5, defaulters: 5, absent: 5, totalAttended: 90, complianceRate: 95 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 150, present: 80, late: 10, leave: 5, defaulters: 5, absent: 5, totalAttended: 90, complianceRate: 95 }
       ],
-      consolidated: { enrolled: 300, present: 240, late: 30, leave: 15, defaulters: 15, absent: 15, totalAttended: 270, complianceRate: 95 }
+      consolidated: { enrolled: 450, present: 240, late: 30, leave: 15, defaulters: 15, absent: 15, totalAttended: 270, complianceRate: 95 }
     },
     {
       date: '2026-10-28',
       label: 'Oct 28',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 100, present: 85, late: 8, leave: 3, defaulters: 4, absent: 4, totalAttended: 93, complianceRate: 96 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 100, present: 88, late: 6, leave: 4, defaulters: 2, absent: 2, totalAttended: 94, complianceRate: 98 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 100, present: 83, late: 9, leave: 4, defaulters: 4, absent: 4, totalAttended: 92, complianceRate: 96 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', enrolled: 150, present: 85, late: 8, leave: 3, defaulters: 4, absent: 4, totalAttended: 93, complianceRate: 96 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', enrolled: 150, present: 88, late: 6, leave: 4, defaulters: 2, absent: 2, totalAttended: 94, complianceRate: 98 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', enrolled: 150, present: 83, late: 9, leave: 4, defaulters: 4, absent: 4, totalAttended: 92, complianceRate: 96 }
       ],
-      consolidated: { enrolled: 300, present: 256, late: 23, leave: 11, defaulters: 10, absent: 10, totalAttended: 279, complianceRate: 97 }
+      consolidated: { enrolled: 450, present: 256, late: 23, leave: 11, defaulters: 10, absent: 10, totalAttended: 279, complianceRate: 97 }
     }
   ];
 
@@ -715,3 +715,4 @@ export const HostelAttendanceTrendsChart: React.FC<HostelAttendanceTrendsChartPr
     </div>
   );
 };
+

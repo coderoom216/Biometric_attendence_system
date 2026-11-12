@@ -92,7 +92,7 @@ export const initialHostels: Hostel[] = [
     blocks: ['Block A', 'Block B'],
     totalFloors: 3,
     totalRooms: 60,
-    capacity: 120,
+    capacity: 180,
     chiefWarden: 'Prof. Sameer Varma',
     residentialWarden: 'Dr. Sati Sir'
   },
@@ -104,7 +104,7 @@ export const initialHostels: Hostel[] = [
     blocks: ['Block A', 'Block B'],
     totalFloors: 3,
     totalRooms: 55,
-    capacity: 110,
+    capacity: 165,
     chiefWarden: 'Prof. Sameer Varma',
     residentialWarden: 'Dr. Kavita Tariyal'
   },
@@ -116,7 +116,7 @@ export const initialHostels: Hostel[] = [
     blocks: ['Block A', 'Block B'],
     totalFloors: 3,
     totalRooms: 60,
-    capacity: 120,
+    capacity: 180,
     chiefWarden: 'Prof. Sameer Varma',
     residentialWarden: 'Dr. Pathak Sir'
   }
@@ -130,24 +130,25 @@ export const initialRooms: Room[] = [];
   { hostelId: 'h-nilgiri', totalRooms: 60 }
 ].forEach(({ hostelId, totalRooms }) => {
   for (let r = 1; r <= totalRooms; r++) {
-    const block = r <= Math.floor(totalRooms / 2) ? 'Block A' : 'Block B';
+    const block = r <= 25 ? 'Block A' : 'Block B';
     const floor = Math.ceil(r / 20);
-    const roomNumber = `${floor}0${r % 10 === 0 ? 10 : r % 10}`;
-    const isOccupied = r <= 50; // First 50 rooms occupied with 2 students = 100 residents
+    const roomOnFloor = ((r - 1) % 20) + 1;
+    const roomNumber = `${floor}${String(roomOnFloor).padStart(2, '0')}`;
+    const isOccupied = r <= 50; // First 50 rooms occupied with 3 students = 150 residents
     initialRooms.push({
       id: `room-${hostelId}-${r}`,
       hostelId,
       block,
       floor,
       roomNumber,
-      capacity: 2,
-      currentOccupancy: isOccupied ? 2 : 0,
+      capacity: 3,
+      currentOccupancy: isOccupied ? 3 : 0,
       status: isOccupied ? 'full' : 'available'
     });
   }
 });
 
-// Deterministic Generation of 100 students per hostel = 300 active verified students
+// Deterministic Generation of 150 students per hostel = 450 active verified students
 const firstNamesBoys = ['Rahul', 'Aman', 'Rohan', 'Vikram', 'Aditya', 'Harsh', 'Siddharth', 'Varun', 'Naveen', 'Kunal', 'Dev', 'Manish', 'Alok', 'Yash', 'Saurabh', 'Gaurav', 'Deepak', 'Rohit', 'Ayush', 'Kartik'];
 const firstNamesGirls = ['Priya', 'Sneha', 'Ananya', 'Pooja', 'Neha', 'Rhea', 'Kavita', 'Tanvi', 'Ishita', 'Divya', 'Shreya', 'Simran', 'Megha', 'Sakshi', 'Bhavna', 'Kritika', 'Swati', 'Aditi', 'Nisha', 'Aastha'];
 const lastNames = ['Sharma', 'Verma', 'Deshmukh', 'Patel', 'Kulkarni', 'Rathore', 'Gupta', 'Singh', 'Dubey', 'Mehta', 'Chopra', 'Mishra', 'Joshi', 'Bhatia', 'Yadav', 'Rawat', 'Pandey', 'Saxena', 'Iyer', 'Menon'];
@@ -162,13 +163,14 @@ const hostelConfigs = [
 ];
 
 hostelConfigs.forEach((hConfig) => {
-  for (let i = 1; i <= 100; i++) {
-    const isBlockA = i <= 50;
+  for (let i = 1; i <= 150; i++) {
+    const isBlockA = i <= 75;
     const block = isBlockA ? 'Block A' : 'Block B';
-    const roomIndex = isBlockA ? Math.ceil(i / 2) : Math.ceil((i - 50) / 2) + 25;
-    const floor = Math.ceil(roomIndex / 10);
-    const roomNumber = `${floor}0${(roomIndex % 10) || 10}`;
-    const bedNumber = i % 2 === 1 ? 'A' : 'B';
+    const roomIndex = isBlockA ? Math.ceil(i / 3) : Math.ceil((i - 75) / 3) + 25;
+    const floor = Math.ceil(roomIndex / 20);
+    const roomOnFloor = ((roomIndex - 1) % 20) + 1;
+    const roomNumber = `${floor}${String(roomOnFloor).padStart(2, '0')}`;
+    const bedNumber = ['A', 'B', 'C'][(i - 1) % 3];
     const fNames = hConfig.gender === 'male' ? firstNamesBoys : firstNamesGirls;
     const fName = fNames[(i - 1) % fNames.length];
     const lName = lastNames[(i + 3) % lastNames.length];
@@ -281,11 +283,7 @@ export const todayDate = '2026-10-27';
 
 // Date-wise attendance for 7 dates: 2026-10-22 through 2026-10-28
 // For EACH hostel on EACH date:
-// 100 students total:
-// - 80 Present on-time (punch 17:15 - 18:28 IST)
-// - 10 sample Late punches (after 7:00 PM through 10:00 PM IST)
-// - 5 Approved leave (FR-11 suppressed)
-// - 5 Defaulters (no punch by the 10:00 PM IST evaluation)
+// Attendance counts below define sample punches and leave records; remaining students are marked absent.
 export const initialAttendance: AttendanceRecord[] = [];
 const historyDates = [
   '2026-10-22',
@@ -581,7 +579,7 @@ export const initialScheduledJobs: ScheduledJobLog[] = [
     completedAt: '2026-10-27 19:00:15 IST',
     dateEvaluated: '2026-10-27',
     status: 'completed',
-    totalStudents: 300,
+    totalStudents: 450,
     presentCount: 240,
     lateCount: 30,
     leaveCount: 15,
@@ -596,7 +594,7 @@ export const initialScheduledJobs: ScheduledJobLog[] = [
     completedAt: '2026-10-27 22:01:30 IST',
     dateEvaluated: '2026-10-27',
     status: 'completed',
-    totalStudents: 300,
+    totalStudents: 450,
     presentCount: 240,
     lateCount: 30,
     leaveCount: 15,

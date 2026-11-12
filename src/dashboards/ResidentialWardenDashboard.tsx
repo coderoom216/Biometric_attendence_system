@@ -207,7 +207,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold text-slate-900">Hostel overview</h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-              Boys Hostel 1 · 120 residents
+              Boys Hostel 1 · 180 beds
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">

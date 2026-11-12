@@ -633,7 +633,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           <div className="flex items-center space-x-2">
             <Building2 className="w-5 h-5 text-indigo-600" />
             <h2 className="font-bold text-slate-800 text-sm">
-              Hostel Breakdown — Boys Hostel 1 (120), Girls Hostel (110), Boys Hostel 2 (120)
+              Hostel Breakdown — Boys Hostel 1 (180), Girls Hostel (165), Boys Hostel 2 (180)
             </h2>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
@@ -662,10 +662,10 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
 
             const capacityDisplay =
               h.hostelId === 'h-shivalik'
-                ? 120
+                ? 180
                 : h.hostelId === 'h-mandakini'
-                ? 110
-                : 120;
+                ? 165
+                : 180;
             const hostelMetrics: {
               category: AttendanceDrilldownCategory;
               label: string;

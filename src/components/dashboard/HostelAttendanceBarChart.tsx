@@ -73,71 +73,71 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
       date: '2026-10-22',
       label: 'Thu, Oct 22',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 120, enrolled: 100, present: 87, late: 6, leave: 4, defaulters: 3, complianceRate: 97 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 110, enrolled: 100, present: 89, late: 5, leave: 4, defaulters: 2, complianceRate: 98 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 120, enrolled: 100, present: 85, late: 7, leave: 5, defaulters: 3, complianceRate: 97 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180, enrolled: 150, present: 87, late: 6, leave: 4, defaulters: 3, complianceRate: 97 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165, enrolled: 150, present: 89, late: 5, leave: 4, defaulters: 2, complianceRate: 98 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180, enrolled: 150, present: 85, late: 7, leave: 5, defaulters: 3, complianceRate: 97 }
       ],
-      consolidated: { enrolled: 300, present: 261, late: 18, leave: 13, defaulters: 8, complianceRate: 97.3 }
+      consolidated: { enrolled: 450, present: 261, late: 18, leave: 13, defaulters: 8, complianceRate: 97.3 }
     },
     {
       date: '2026-10-23',
       label: 'Fri, Oct 23',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 120, enrolled: 100, present: 73, late: 16, leave: 4, defaulters: 7, complianceRate: 93 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 110, enrolled: 100, present: 78, late: 13, leave: 5, defaulters: 4, complianceRate: 96 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 120, enrolled: 100, present: 74, late: 15, leave: 5, defaulters: 6, complianceRate: 94 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180, enrolled: 150, present: 73, late: 16, leave: 4, defaulters: 7, complianceRate: 93 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165, enrolled: 150, present: 78, late: 13, leave: 5, defaulters: 4, complianceRate: 96 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180, enrolled: 150, present: 74, late: 15, leave: 5, defaulters: 6, complianceRate: 94 }
       ],
-      consolidated: { enrolled: 300, present: 225, late: 44, leave: 14, defaulters: 17, complianceRate: 94.3 }
+      consolidated: { enrolled: 450, present: 225, late: 44, leave: 14, defaulters: 17, complianceRate: 94.3 }
     },
     {
       date: '2026-10-24',
       label: 'Sat, Oct 24',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 120, enrolled: 100, present: 84, late: 8, leave: 5, defaulters: 3, complianceRate: 97 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 110, enrolled: 100, present: 85, late: 8, leave: 5, defaulters: 2, complianceRate: 98 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 120, enrolled: 100, present: 81, late: 10, leave: 6, defaulters: 3, complianceRate: 97 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180, enrolled: 150, present: 84, late: 8, leave: 5, defaulters: 3, complianceRate: 97 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165, enrolled: 150, present: 85, late: 8, leave: 5, defaulters: 2, complianceRate: 98 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180, enrolled: 150, present: 81, late: 10, leave: 6, defaulters: 3, complianceRate: 97 }
       ],
-      consolidated: { enrolled: 300, present: 250, late: 26, leave: 16, defaulters: 8, complianceRate: 97.3 }
+      consolidated: { enrolled: 450, present: 250, late: 26, leave: 16, defaulters: 8, complianceRate: 97.3 }
     },
     {
       date: '2026-10-25',
       label: 'Sun, Oct 25',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 120, enrolled: 100, present: 68, late: 15, leave: 11, defaulters: 6, complianceRate: 94 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 110, enrolled: 100, present: 72, late: 12, leave: 12, defaulters: 4, complianceRate: 96 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 120, enrolled: 100, present: 70, late: 14, leave: 10, defaulters: 6, complianceRate: 94 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180, enrolled: 150, present: 68, late: 15, leave: 11, defaulters: 6, complianceRate: 94 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165, enrolled: 150, present: 72, late: 12, leave: 12, defaulters: 4, complianceRate: 96 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180, enrolled: 150, present: 70, late: 14, leave: 10, defaulters: 6, complianceRate: 94 }
       ],
-      consolidated: { enrolled: 300, present: 210, late: 41, leave: 33, defaulters: 16, complianceRate: 94.7 }
+      consolidated: { enrolled: 450, present: 210, late: 41, leave: 33, defaulters: 16, complianceRate: 94.7 }
     },
     {
       date: '2026-10-26',
       label: 'Mon, Oct 26',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 120, enrolled: 100, present: 83, late: 9, leave: 4, defaulters: 4, complianceRate: 96 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 110, enrolled: 100, present: 86, late: 7, leave: 4, defaulters: 3, complianceRate: 97 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 120, enrolled: 100, present: 82, late: 9, leave: 5, defaulters: 4, complianceRate: 96 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180, enrolled: 150, present: 83, late: 9, leave: 4, defaulters: 4, complianceRate: 96 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165, enrolled: 150, present: 86, late: 7, leave: 4, defaulters: 3, complianceRate: 97 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180, enrolled: 150, present: 82, late: 9, leave: 5, defaulters: 4, complianceRate: 96 }
       ],
-      consolidated: { enrolled: 300, present: 251, late: 25, leave: 13, defaulters: 11, complianceRate: 96.3 }
+      consolidated: { enrolled: 450, present: 251, late: 25, leave: 13, defaulters: 11, complianceRate: 96.3 }
     },
     {
       date: '2026-10-27',
       label: 'Tue, Oct 27',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 120, enrolled: 100, present: 80, late: 10, leave: 5, defaulters: 5, complianceRate: 95 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 110, enrolled: 100, present: 80, late: 10, leave: 5, defaulters: 5, complianceRate: 95 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 120, enrolled: 100, present: 80, late: 10, leave: 5, defaulters: 5, complianceRate: 95 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180, enrolled: 150, present: 80, late: 10, leave: 5, defaulters: 5, complianceRate: 95 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165, enrolled: 150, present: 80, late: 10, leave: 5, defaulters: 5, complianceRate: 95 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180, enrolled: 150, present: 80, late: 10, leave: 5, defaulters: 5, complianceRate: 95 }
       ],
-      consolidated: { enrolled: 300, present: 240, late: 30, leave: 15, defaulters: 15, complianceRate: 95.0 }
+      consolidated: { enrolled: 450, present: 240, late: 30, leave: 15, defaulters: 15, complianceRate: 95.0 }
     },
     {
       date: '2026-10-28',
       label: 'Wed, Oct 28',
       hostels: [
-        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 120, enrolled: 100, present: 85, late: 8, leave: 3, defaulters: 4, complianceRate: 96 },
-        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 110, enrolled: 100, present: 88, late: 6, leave: 4, defaulters: 2, complianceRate: 98 },
-        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 120, enrolled: 100, present: 83, late: 9, leave: 4, defaulters: 4, complianceRate: 96 }
+        { hostelId: 'h-shivalik', hostelName: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180, enrolled: 150, present: 85, late: 8, leave: 3, defaulters: 4, complianceRate: 96 },
+        { hostelId: 'h-mandakini', hostelName: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165, enrolled: 150, present: 88, late: 6, leave: 4, defaulters: 2, complianceRate: 98 },
+        { hostelId: 'h-nilgiri', hostelName: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180, enrolled: 150, present: 83, late: 9, leave: 4, defaulters: 4, complianceRate: 96 }
       ],
-      consolidated: { enrolled: 300, present: 256, late: 23, leave: 11, defaulters: 10, complianceRate: 96.7 }
+      consolidated: { enrolled: 450, present: 256, late: 23, leave: 11, defaulters: 10, complianceRate: 96.7 }
     }
   ];
 
@@ -341,7 +341,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                     </div>
                     <div className="text-right">
                       <span className="text-xs text-slate-500 block">Total Capacity</span>
-                      <span className="text-xs font-bold text-slate-800">{hostel.capacity} beds (100 active)</span>
+                      <span className="text-xs font-bold text-slate-800">{hostel.capacity} beds (150 active)</span>
                     </div>
                   </div>
 
@@ -563,3 +563,5 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
     </div>
   );
 };
+
+
