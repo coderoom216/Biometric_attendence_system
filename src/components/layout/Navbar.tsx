@@ -63,7 +63,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
       case 'warden':
         return <span className="bg-teal-100 text-teal-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-teal-200">Warden</span>;
       case 'caretaker_operator':
-        return <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-amber-200">Caretaker</span>;
+        return (
+          <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-amber-200">
+            {localStorage.getItem('demo_dashboard') === 'mehra' ? 'Mr. Mehra Sir' : 'Caretaker'}
+          </span>
+        );
       case 'student':
         return <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">Student</span>;
       default:
@@ -148,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                     {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker'
                       ? 'Caretaker'
                       : user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'mehra'
-                        ? 'Mr Mehra Sir'
+                        ? 'Mr. Mehra Sir'
                         : user?.role?.replace('_', ' ')}
                   </span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -198,14 +202,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                       onClick={() => { localStorage.setItem('demo_dashboard', 'caretaker'); quickLoginAsRole('caretaker_operator'); setShowRoleDropdown(false); }}
                       className="w-full text-left px-3 py-2 hover:bg-orange-50 text-slate-700 hover:text-orange-900 flex items-center justify-between"
                     >
-                      <span>Caretaker (Attendance Dashboard)</span>
+                      <span>Caretakers</span>
                       {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker' && <span className="text-orange-600 font-bold">✓</span>}
                     </button>
                     <button
                       onClick={() => { localStorage.setItem('demo_dashboard', 'mehra'); quickLoginAsRole('caretaker_operator'); setShowRoleDropdown(false); }}
                       className="w-full text-left px-3 py-2 hover:bg-amber-50 text-slate-700 hover:text-amber-900 flex items-center justify-between"
                     >
-                      <span>Mr. Mehra (Biometric Sync)</span>
+                      <span>Mr. Mehra </span>
                       {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') !== 'caretaker' && <span className="text-amber-600 font-bold">✓</span>}
                     </button>
                     <button

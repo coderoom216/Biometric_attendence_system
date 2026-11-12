@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       case 'caretaker_operator':
         return [
           { name: 'Operator Dashboard', path: '/', icon: LayoutDashboard },
-          { name: 'Biometric Device Health', path: '/biometrics', icon: Cpu, highlight: true },
+        
           { name: 'Student Biometric Directory', path: '/students', icon: Users },
           
           { name: 'Hostel Rooms & Vacancies', path: '/hostels', icon: Building2 },
