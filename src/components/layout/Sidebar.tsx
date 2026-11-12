@@ -27,9 +27,11 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const role = user?.role;
+  const isMehraDashboard = role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'mehra';
+  const sidebarRole = isMehraDashboard ? 'mehra' : role;
 
   const getNavLinks = () => {
-    switch (role) {
+    switch (sidebarRole) {
       case 'student':
         return [
           { name: 'My Dashboard', path: '/', icon: LayoutDashboard },
@@ -81,15 +83,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         ];
 
+      case 'mehra':
+        return [
+          { name: 'Mehra Sir Dashboard', path: '/', icon: LayoutDashboard },
+          { name: 'System & Device Health', path: '/system-health', icon: Activity },
+        
+          
+        ];
+
       case 'caretaker_operator':
         return [
           { name: 'Operator Dashboard', path: '/', icon: LayoutDashboard },
           { name: 'Biometric Device Health', path: '/biometrics', icon: Cpu, highlight: true },
           { name: 'Student Biometric Directory', path: '/students', icon: Users },
-          { name: 'Onboard Verified Student', path: '/students/verification', icon: UserPlus },
+          
           { name: 'Hostel Rooms & Vacancies', path: '/hostels', icon: Building2 },
           
         ];
+
+        
 
       default:
         return [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }];
@@ -131,9 +143,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         {/* Role Scope Notice */}
         <div className="sticky top-0 z-10 px-4 py-3 mx-3 my-3 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs backdrop-blur-sm">
-          <div className="text-[10px] uppercase font-semibold text-slate-400">Current Scope</div>
+          <div className="text-[10px] uppercase font-semibold text-slate-400">{isMehraDashboard ? 'Operator' : 'Current Scope'}</div>
           <div className="font-semibold text-white mt-0.5 capitalize">
-            {role?.replace('_', ' ')}
+            {isMehraDashboard ? 'Mr. Mehra Sir · Biometric Sync' : role?.replace('_', ' ')}
           </div>
           {user?.hostelId && (
             <div className="text-[11px] text-indigo-300 mt-0.5">
@@ -172,11 +184,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Bottom Directive & Institutional badge */}
         <div className="p-4 border-t border-slate-800 text-[11px] text-slate-400 bg-slate-950/40">
           <div className="flex items-center space-x-2 text-indigo-400 font-semibold mb-1">
-            <ShieldCheck className="w-4 h-4" />
-            <span>Director's Directive</span>
+            {isMehraDashboard ? <Cpu className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+            <span>{isMehraDashboard ? 'Biometric Operations' : "Director's Directive"}</span>
           </div>
           <p className="text-[10px] text-slate-400 leading-tight">
-            7:00 PM IST Attendance Cutoff. Sequentially escalated absence notifications to 6 tiers.
+            {isMehraDashboard
+              ? 'Sync offline terminal punches and maintain verified student biometric records.'
+              : '7:00 PM IST Attendance Cutoff. Sequentially escalated absence notifications to 6 tiers.'}
           </p>
         </div>
       </aside>
