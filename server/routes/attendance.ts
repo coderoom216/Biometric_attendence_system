@@ -193,6 +193,9 @@ router.post(
     record.correctedBy = `${user.name} (${user.role})`;
     record.correctedAt = `${store.virtualDate} ${store.virtualTime} IST`;
     record.correctionReason = reason;
+    if (record.isDefaulter) {
+      store.recordDefaulter(record.studentId, record.date, `Attendance marked as defaulter: ${reason}`);
+    }
 
     store.logAudit(
       'ATTENDANCE_CORRECTION',
@@ -257,6 +260,9 @@ router.post(
       record.remarks = classification.remarks;
     }
 
+    if (classification.isDefaulter) {
+      store.recordDefaulter(student.id, store.virtualDate, classification.remarks);
+    }
     if (classification.isDefaulter) store.triggerSequentialNotifications(student, store.virtualDate);
 
     return res.json({

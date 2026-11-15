@@ -1,23 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import {
+  ArrowLeft,
+  Award,
+  Ban,
   CalendarCheck,
   Clock,
-  ShieldCheck,
-  User,
+  History,
   Home,
   FileText,
   AlertCircle,
   CheckCircle2,
-  AlertTriangle,
-  Send
+  ShieldAlert
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import { Student, AttendanceRecord, LeaveRecord } from '../types';
+import { DisciplinaryCardStatus, Student, StudentTokenSummary, AttendanceRecord, LeaveRecord } from '../types';
+
+const disciplinaryStatusLabels: Record<DisciplinaryCardStatus, string> = {
+  none: 'Good Standing',
+  normal_warning: 'Normal Warning',
+  yellow_card: 'Yellow Card',
+  red_card_blacklist: 'Red Card + Blacklist'
+};
+
+const warningCardStages: { status: DisciplinaryCardStatus; label: string; range: string; startsAt: number }[] = [
+  { status: 'normal_warning', label: 'Normal Warning', range: '1–5 tokens', startsAt: 1 },
+  { status: 'yellow_card', label: 'Yellow Card', range: '6–10 tokens', startsAt: 6 },
+  { status: 'red_card_blacklist', label: 'Red Card + Blacklist', range: 'More than 10 tokens', startsAt: 11 }
+];
+
+const demoTokenCount = 2;
+const demoDisciplinaryStatus: DisciplinaryCardStatus =
+  demoTokenCount > 10 ? 'red_card_blacklist' :
+  demoTokenCount >= 6 ? 'yellow_card' :
+  demoTokenCount >= 1 ? 'normal_warning' : 'none';
+const isDemoBlacklisted = demoTokenCount > 10;
 
 export const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Student | null>(null);
+  const [disciplinary, setDisciplinary] = useState<StudentTokenSummary | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
@@ -28,7 +51,10 @@ export const StudentDashboard: React.FC = () => {
     try {
       if (user?.studentId) {
         const studentRes = await apiService.getStudentById(user.studentId);
-        if (studentRes.success) setProfile(studentRes.student);
+        if (studentRes.success) {
+          setProfile(studentRes.student);
+          setDisciplinary(studentRes.disciplinary);
+        }
       }
 
       const attRes = await apiService.getAttendanceHistory();
@@ -62,7 +88,7 @@ export const StudentDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-100 items-center justify-center">
         <div className="text-sm text-slate-500 font-medium">Loading student records...</div>
       </div>
     );
@@ -146,6 +172,81 @@ export const StudentDashboard: React.FC = () => {
           <div className="text-[11px] text-slate-400 mt-1">After 10:00 PM or no punch by 10:00 PM</div>
         </div>
       </div>
+
+      {disciplinary && (
+        <section className={`rounded-2xl border p-5 shadow-xs sm:p-6 ${isDemoBlacklisted ? 'border-rose-300 bg-rose-50/70' : 'border-slate-200 bg-white'}`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <ShieldAlert className={`h-5 w-5 ${isDemoBlacklisted ? 'text-rose-600' : 'text-indigo-600'}`} />
+                <h2>Token &amp; Disciplinary Management</h2>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Demo display: current-month and lifetime counts are shown as {demoTokenCount}. Stored token records are unchanged.
+              </p>
+            </div>
+            {isDemoBlacklisted && (
+              <div role="status" className="inline-flex items-center gap-2 self-start rounded-lg border-2 border-rose-600 bg-rose-600 px-4 py-2 text-sm font-black tracking-widest text-white shadow-sm">
+                <Ban className="h-5 w-5" />
+                BLACKLISTED
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Month Tokens</div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+                <span className="text-xs text-slate-500">tokens</span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">{disciplinary.currentMonth}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Lifetime Tokens</div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+                <span className="text-xs text-slate-500">tokens</span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">Across all recorded months</div>
+            </div>
+            <div className={`rounded-xl border p-4 ${isDemoBlacklisted ? 'border-rose-200 bg-white' : 'border-indigo-100 bg-indigo-50/60'}`}>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Disciplinary Status</div>
+              <div className={`mt-2 flex items-center gap-2 text-base font-bold ${isDemoBlacklisted ? 'text-rose-700' : demoDisciplinaryStatus === 'yellow_card' ? 'text-amber-700' : demoDisciplinaryStatus === 'normal_warning' ? 'text-orange-700' : 'text-emerald-700'}`}>
+                {isDemoBlacklisted ? <Ban className="h-5 w-5" /> : <Award className="h-5 w-5" />}
+                {disciplinaryStatusLabels[demoDisciplinaryStatus]}
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">Based on the demo count</div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+            {warningCardStages.map((stage) => {
+              const isCurrent =
+                (stage.status === 'normal_warning' && demoTokenCount >= 1 && demoTokenCount <= 5) ||
+                (stage.status === 'yellow_card' && demoTokenCount >= 6 && demoTokenCount <= 10) ||
+                (stage.status === 'red_card_blacklist' && isDemoBlacklisted);
+              const hasBeenReached = demoTokenCount >= stage.startsAt;
+              const stageTone = stage.status === 'normal_warning'
+                ? 'border-orange-200 bg-orange-50 text-orange-800'
+                : stage.status === 'yellow_card'
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-800';
+
+              return (
+                <div key={stage.status} className={`rounded-xl border p-3 ${stageTone} ${isCurrent ? 'ring-2 ring-offset-1 ring-current' : 'opacity-75'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold">{stage.label}</span>
+                    {isCurrent && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold uppercase">Current</span>}
+                  </div>
+                  <div className="mt-1 text-[11px]">{stage.range}</div>
+                  {!isCurrent && <div className="mt-1 text-[10px]">{hasBeenReached ? 'Reached this month' : 'Not reached'}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Student Hostel & Room Profile Info */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -305,6 +406,200 @@ export const StudentDashboard: React.FC = () => {
           </p>
         </div>
       </div>
+    </div>
+  );
+};
+
+export const StudentDisciplinaryDashboard: React.FC = () => {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<Student | null>(null);
+  const [disciplinary, setDisciplinary] = useState<StudentTokenSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+    if (!user?.studentId) {
+      setErrorMessage('No student profile is linked to this account.');
+      setIsLoading(false);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    apiService.getStudentById(user.studentId)
+      .then((response) => {
+        if (!isActive) return;
+        setProfile(response.student);
+        setDisciplinary(response.disciplinary);
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to load student disciplinary record:', error);
+        if (isActive) setErrorMessage('Unable to load your token and disciplinary record. Please try again later.');
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.studentId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-100 items-center justify-center">
+        <div className="text-sm font-medium text-slate-500">Loading your disciplinary record...</div>
+      </div>
+    );
+  }
+
+  if (errorMessage || !disciplinary) {
+    return (
+      <div className="rounded-xl border border-rose-200 bg-white p-6 shadow-xs">
+        <p className="text-sm font-semibold text-rose-700">{errorMessage || 'Disciplinary record is unavailable.'}</p>
+        <Link to="/" className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+          <ArrowLeft className="h-4 w-4" />
+          Back to My Dashboard
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div>
+          <Link to="/" className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Student Dashboard
+          </Link>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <ShieldAlert className="h-5 w-5 text-indigo-600" />
+            Tokens &amp; Disciplinary Record
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            {profile?.name} · {profile?.enrollmentNo} · {profile?.course}
+          </p>
+        </div>
+        {isDemoBlacklisted && (
+          <div role="status" className="inline-flex items-center gap-2 self-start rounded-lg border-2 border-rose-600 bg-rose-600 px-4 py-2 text-sm font-black tracking-widest text-white shadow-sm sm:self-center">
+            <Ban className="h-5 w-5" />
+            BLACKLISTED
+          </div>
+        )}
+      </div>
+
+      <section className={`rounded-2xl border p-5 shadow-xs sm:p-6 ${isDemoBlacklisted ? 'border-rose-300 bg-rose-50/70' : 'border-slate-200 bg-white'}`}>
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          Demo display only: current-month and lifetime counts are shown as {demoTokenCount}. Stored token records and history are unchanged.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Month Tokens</div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+              <span className="text-xs text-slate-500">tokens</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500">{disciplinary.currentMonth}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Lifetime Tokens</div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+              <span className="text-xs text-slate-500">tokens</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500">Demo count</div>
+          </div>
+          <div className={`rounded-xl border p-4 ${isDemoBlacklisted ? 'border-rose-200 bg-white' : 'border-indigo-100 bg-indigo-50/60'}`}>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Disciplinary Status</div>
+            <div className={`mt-2 flex items-center gap-2 text-base font-bold ${isDemoBlacklisted ? 'text-rose-700' : demoDisciplinaryStatus === 'yellow_card' ? 'text-amber-700' : demoDisciplinaryStatus === 'normal_warning' ? 'text-orange-700' : 'text-emerald-700'}`}>
+              {isDemoBlacklisted ? <Ban className="h-5 w-5" /> : <Award className="h-5 w-5" />}
+              {disciplinaryStatusLabels[demoDisciplinaryStatus]}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500">Based on the demo count</div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {warningCardStages.map((stage) => {
+            const isCurrent =
+              (stage.status === 'normal_warning' && demoTokenCount >= 1 && demoTokenCount <= 5) ||
+              (stage.status === 'yellow_card' && demoTokenCount >= 6 && demoTokenCount <= 10) ||
+              (stage.status === 'red_card_blacklist' && isDemoBlacklisted);
+            const hasBeenReached = demoTokenCount >= stage.startsAt;
+            const stageTone = stage.status === 'normal_warning'
+              ? 'border-orange-200 bg-orange-50 text-orange-800'
+              : stage.status === 'yellow_card'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-rose-200 bg-rose-50 text-rose-800';
+
+            return (
+              <div key={stage.status} className={`rounded-xl border p-3 ${stageTone} ${isCurrent ? 'ring-2 ring-offset-1 ring-current' : 'opacity-75'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold">{stage.label}</span>
+                  {isCurrent && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold uppercase">Current</span>}
+                </div>
+                <div className="mt-1 text-[11px]">{stage.range}</div>
+                {!isCurrent && <div className="mt-1 text-[10px]">{hasBeenReached ? 'Reached this month' : 'Not reached'}</div>}
+              </div>
+            );
+          })}
+        </div>
+
+        {isDemoBlacklisted && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-white p-3 text-xs leading-relaxed text-rose-800">
+            <Ban className="mt-0.5 h-4 w-4 shrink-0" />
+            <p><strong>Monthly blacklist active.</strong> Your current month total is above 10 tokens. The temporary blacklist clears at the start of the next month; token history remains on record.</p>
+          </div>
+        )}
+        <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+          One token is normally added for each attendance defaulter. Monthly token and warning status reset on the first day of a new month, while previous token and card history is retained.
+        </p>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+        <div className="mb-4 flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+            <History className="h-4 w-4 text-indigo-600" />
+            <h2>Token History</h2>
+          </div>
+          <span className="text-xs text-slate-500">Previous months remain in your profile after monthly reset.</span>
+        </div>
+
+        {disciplinary.history.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400">No tokens have been recorded.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-xs">
+              <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-3 py-2.5">Date</th>
+                  <th className="px-3 py-2.5">Reason</th>
+                  <th className="px-3 py-2.5">Tokens Received</th>
+                  <th className="px-3 py-2.5">Warning Card Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {disciplinary.history.map((entry) => (
+                  <tr key={entry.id} className="align-top hover:bg-slate-50/80">
+                    <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{entry.date}</td>
+                    <td className="px-3 py-3 text-slate-600">{entry.reason}</td>
+                    <td className="px-3 py-3 font-semibold text-slate-800">+{entry.tokensReceived}</td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${entry.warningCardStatus === 'red_card_blacklist' ? 'bg-rose-100 text-rose-800' : entry.warningCardStatus === 'yellow_card' ? 'bg-amber-100 text-amber-800' : entry.warningCardStatus === 'normal_warning' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600'}`}>
+                        {disciplinaryStatusLabels[entry.warningCardStatus]}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 };
