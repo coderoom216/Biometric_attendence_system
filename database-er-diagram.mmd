@@ -1,0 +1,79 @@
+erDiagram
+    USER_ACCOUNT {
+        string user_id PK
+        string role_id FK
+        string name
+        string email UK
+        string password_hash
+        
+    }
+
+    ROLE {
+        string role_id PK
+        string role_name UK
+    }
+
+
+    
+
+    STUDENT {
+        string student_id PK
+        string enrollment_no UK
+        string name
+        string course
+        string block
+        string room_number
+        string bed_number
+        string biometric_id UK
+        string verification_status
+        
+    }
+
+    HOSTEL {
+        string hostel_id PK
+        string name
+        string code UK
+       
+    }
+
+    ATTENDANCE_RECORD {
+        string attendance_id PK
+        string student_id FK
+        date attendance_date
+        string status
+        time punch_time
+        boolean is_defaulter
+    }
+
+    LEAVE_RECORD {
+        string leave_id PK
+        string student_id FK
+        date start_date
+        date end_date
+        string reason
+        string gate_pass_no
+    }
+
+    TOKEN_HISTORY {
+        string token_id PK
+        string student_id FK
+        date token_date
+        int tokens_received
+        string reason
+        string warning_card_status
+    }
+
+
+
+    ROLE ||--o{ USER_ACCOUNT : assigned_to
+
+    USER_ACCOUNT ||--o| STUDENT : linked_profile
+    HOSTEL ||--o{ STUDENT : houses
+    STUDENT ||--o{ ATTENDANCE_RECORD : has
+    STUDENT ||--o{ LEAVE_RECORD : has
+    STUDENT ||--o{ TOKEN_HISTORY : earns
+
+    USER_ACCOUNT ||--o{ ATTENDANCE_RECORD : records_or_corrects
+    USER_ACCOUNT ||--o{ LEAVE_RECORD : enters
+    USER_ACCOUNT ||--o{ TOKEN_HISTORY : awards
+
