@@ -14,7 +14,8 @@ import {
   UserCheck,
   UserPlus,
   BarChart3,
-  HelpCircle
+  HelpCircle,
+  Award
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types';
@@ -35,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       case 'student':
         return [
           { name: 'My Dashboard', path: '/', icon: LayoutDashboard },
+          { name: 'Tokens & Discipline', path: '/student/disciplinary', icon: Award },
           { name: 'My Attendance', path: '/attendance', icon: CalendarCheck },
           { name: 'My Approved Leaves', path: '/leaves', icon: FileText },
           { name: 'Registration Status', path: '/registration', icon: UserCheck }

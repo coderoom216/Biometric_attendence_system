@@ -10,7 +10,10 @@ import {
   NotificationLog,
   ScheduledJobLog,
   AuditLog,
-  WarningTicket
+  WarningTicket,
+  DisciplinaryCardStatus,
+  StudentTokenSummary,
+  TokenHistoryEntry
 } from '../types';
 import {
   initialUsers,
@@ -53,6 +56,7 @@ class DataStore {
   notifications = [...initialNotifications];
   auditLogs = [...initialAuditLogs];
   warningTickets: WarningTicket[] = [];
+  tokenHistory: TokenHistoryEntry[] = [];
 
   virtualTime: string = '19:15:00';
   virtualDate: string = todayDate;
@@ -82,7 +86,88 @@ class DataStore {
         studentId: u.studentId
       });
     }
+    this.seedTokenHistory();
     this.initWarningTickets();
+  }
+
+  private getDisciplinaryCardStatus(tokens: number): DisciplinaryCardStatus {
+    if (tokens > 10) return 'red_card_blacklist';
+    if (tokens >= 6) return 'yellow_card';
+    if (tokens >= 1) return 'normal_warning';
+    return 'none';
+  }
+
+  private seedTokenHistory() {
+    const defaulters = this.attendance
+      .filter((record) => record.isDefaulter && record.date <= this.virtualDate)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.studentId.localeCompare(b.studentId));
+    const monthlyTotals = new Map<string, number>();
+    const awardedDates = new Set<string>();
+
+    for (const record of defaulters) {
+      const eventKey = `${record.studentId}:${record.date}`;
+      if (awardedDates.has(eventKey)) continue;
+      awardedDates.add(eventKey);
+
+      const monthKey = `${record.studentId}:${record.date.slice(0, 7)}`;
+      const tokens = (monthlyTotals.get(monthKey) || 0) + 1;
+      monthlyTotals.set(monthKey, tokens);
+      this.tokenHistory.push({
+        id: `token-${record.id}`,
+        studentId: record.studentId,
+        date: record.date,
+        reason: record.remarks || 'Attendance defaulter',
+        tokensReceived: 1,
+        warningCardStatus: this.getDisciplinaryCardStatus(tokens)
+      });
+    }
+  }
+
+  recordDefaulter(studentId: string, date: string, reason: string) {
+    if (this.tokenHistory.some((entry) => entry.studentId === studentId && entry.date === date)) {
+      return null;
+    }
+
+    const monthTokens = this.tokenHistory
+      .filter((entry) => entry.studentId === studentId && entry.date.startsWith(date.slice(0, 7)))
+      .reduce((total, entry) => total + entry.tokensReceived, 0);
+    const entry: TokenHistoryEntry = {
+      id: `token-${studentId}-${date}`,
+      studentId,
+      date,
+      reason,
+      tokensReceived: 1,
+      warningCardStatus: this.getDisciplinaryCardStatus(monthTokens + 1)
+    };
+    this.tokenHistory.push(entry);
+    return entry;
+  }
+
+  getStudentTokenSummary(studentId: string): StudentTokenSummary {
+    const defaultersThroughToday = this.attendance
+      .filter((record) => record.studentId === studentId && record.isDefaulter && record.date <= this.virtualDate)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.studentId.localeCompare(b.studentId));
+    for (const record of defaultersThroughToday) {
+      this.recordDefaulter(record.studentId, record.date, record.remarks || 'Attendance defaulter');
+    }
+
+    const currentMonth = this.virtualDate.slice(0, 7);
+    const history = this.tokenHistory
+      .filter((entry) => entry.studentId === studentId && entry.date <= this.virtualDate)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    const currentMonthTokens = history
+      .filter((entry) => entry.date.startsWith(currentMonth))
+      .reduce((total, entry) => total + entry.tokensReceived, 0);
+    const disciplinaryStatus = this.getDisciplinaryCardStatus(currentMonthTokens);
+
+    return {
+      currentMonth,
+      currentMonthTokens,
+      lifetimeTokens: history.reduce((total, entry) => total + entry.tokensReceived, 0),
+      disciplinaryStatus,
+      isBlacklisted: currentMonthTokens > 10,
+      history
+    };
   }
 
   initWarningTickets() {
@@ -303,6 +388,7 @@ class DataStore {
         else if (record.status === 'late') lateCount++;
         else if (record.status === 'absent' && record.isDefaulter) {
           defaultersCount++;
+          this.recordDefaulter(student.id, targetDate, record.remarks || 'Attendance defaulter');
           this.triggerSequentialNotifications(student, targetDate);
         }
       } else {
@@ -329,6 +415,7 @@ class DataStore {
           record.remarks = `No biometric punch recorded by ${this.defaulterFlagTime} IST. Categorized as Defaulter.`;
         }
         defaultersCount++;
+        this.recordDefaulter(student.id, targetDate, record.remarks || 'No biometric punch by the defaulter cutoff');
         this.triggerSequentialNotifications(student, targetDate);
       }
     }

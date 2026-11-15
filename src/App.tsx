@@ -5,7 +5,7 @@ import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 
 // Dashboards
-import { StudentDashboard } from './dashboards/StudentDashboard';
+import { StudentDashboard, StudentDisciplinaryDashboard } from './dashboards/StudentDashboard';
 import { ResidentialWardenDashboard } from './dashboards/ResidentialWardenDashboard';
 import { WardenDashboard } from './dashboards/WardenDashboard';
 import { ChiefWardenDashboard } from './dashboards/ChiefWardenDashboard';
@@ -63,7 +63,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const AuthenticatedApp: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -84,6 +84,10 @@ const AuthenticatedApp: React.FC = () => {
     <AppLayout>
       <Routes>
         <Route path="/" element={<DashboardRouter />} />
+        <Route
+          path="/student/disciplinary"
+          element={user?.role === 'student' ? <StudentDisciplinaryDashboard /> : <Navigate to="/" replace />}
+        />
         <Route path="/attendance" element={<ReportsPage />} />
         <Route path="/defaulters" element={<DefaultersPage />} />
         <Route path="/leaves" element={<LeaveManagementPage />} />
