@@ -1,0 +1,145 @@
+erDiagram
+    USER {
+        string id PK
+        string name
+        string email
+        string role
+        string phone
+        string hostel_id FK
+        string block_id
+        string student_id FK
+    }
+
+    HOSTEL {
+        string id PK
+        string name
+        string code
+        string type
+        string blocks
+        int total_floors
+        int total_rooms
+        int capacity
+        string chief_warden
+        string residential_warden
+    }
+
+    ROOM {
+        string id PK
+        string hostel_id FK
+        string block
+        int floor
+        string room_number
+        int capacity
+        int current_occupancy
+        string status
+    }
+
+    STUDENT {
+        string id PK
+        string enrollment_no
+        string name
+        string course
+        string branch
+        int year
+        int semester
+        string gender
+        string hostel_id FK
+        string block
+        string room_number
+        string bed_number
+        string biometric_id
+        string student_email
+        string student_phone
+        string parent_name
+        string parent_email
+        string parent_phone
+        string verification_status
+        string verified_by
+        string verified_at
+        string rejection_reason
+        string allotment_date
+        string checkout_date
+        string checkout_status
+    }
+
+    BIOMETRIC_DEVICE {
+        string id PK
+        string device_id
+        string name
+        string model
+        string serial_number
+        string hostel_id FK
+        string location
+        string installation_date
+        string installed_by
+        string installation_notes
+        int total_logs_stored_locally
+        string last_sync_at
+        string status
+        string authorized_technician
+    }
+
+    BIOMETRIC_PUNCH_LOG {
+        string id PK
+        string biometric_id
+        string device_id FK
+        string punch_timestamp
+        string imported_at
+        string imported_by
+        string status
+    }
+
+    ATTENDANCE_RECORD {
+        string id PK
+        string student_id FK
+        string enrollment_no
+        string student_name
+        string hostel_id FK
+        string block
+        string room_number
+        string date
+        string status
+        string punch_time
+        string biometric_device_id FK
+        boolean is_defaulter
+        string evaluated_at
+        string corrected_by
+        string corrected_at
+        string correction_reason
+        string remarks
+    }
+
+    WARNING_TICKET {
+        string id PK
+        string student_id FK
+        string student_name
+        string enrollment_no
+        string hostel_id FK
+        string hostel_name
+        string block
+        string room_number
+        string course
+        string parent_name
+        string parent_phone
+        string parent_email
+        int late_punches_count
+        int missed_checkins_count
+        int total_violations
+        string severity
+        string status
+        string issued_at
+        string latest_violation_date
+        string reason
+        string admin_notes
+    }
+
+    HOSTEL ||--o{ ROOM : contains
+    HOSTEL ||--o{ STUDENT : houses
+    HOSTEL ||--o{ BIOMETRIC_DEVICE : has
+    HOSTEL ||--o{ ATTENDANCE_RECORD : scopes
+    ROOM ||--o{ STUDENT : assigned_location
+    USER o|--o| STUDENT : linked_profile
+    STUDENT ||--o{ ATTENDANCE_RECORD : has
+    STUDENT ||--o{ WARNING_TICKET : receives
+    BIOMETRIC_DEVICE ||--o{ BIOMETRIC_PUNCH_LOG : imports
+    BIOMETRIC_DEVICE ||--o{ ATTENDANCE_RECORD : records

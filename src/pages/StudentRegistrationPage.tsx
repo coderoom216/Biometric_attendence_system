@@ -28,10 +28,12 @@ export const StudentRegistrationPage: React.FC = () => {
     semester: 1,
     studentEmail: user?.email || '',
     studentPhone: user?.phone || '',
+    gender: 'male' as 'male' | 'female' | 'other',
     hostelId: 'h-shivalik',
     block: 'Block A',
     roomNumber: '101',
-    biometricId: '',
+    bedNumber: 'A',
+    biometricId: isCaretaker ? `BIO-${Math.floor(1000 + Math.random() * 9000)}` : '',
     parentName: '',
     parentEmail: '',
     parentPhone: ''
@@ -55,9 +57,11 @@ export const StudentRegistrationPage: React.FC = () => {
               semester: res.student.semester || 1,
               studentEmail: res.student.studentEmail || user?.email || '',
               studentPhone: res.student.studentPhone || user?.phone || '',
+              gender: res.student.gender,
               hostelId: res.student.hostelId,
               block: res.student.block,
               roomNumber: res.student.roomNumber,
+              bedNumber: res.student.bedNumber || 'A',
               biometricId: res.student.biometricId,
               parentName: res.student.parentName,
               parentEmail: res.student.parentEmail || '',
@@ -139,8 +143,12 @@ export const StudentRegistrationPage: React.FC = () => {
             <div>
               <span className="text-slate-400">Hostel & Room:</span>
               <div className="font-medium text-slate-800 mt-0.5">
-                {student.hostelId === 'h-shivalik' ? 'Boys Hostel 1' : student.hostelId === 'h-mandakini' ? 'Girls Hostel' : 'Boys Hostel 2'}, {student.block}, Room {student.roomNumber}
+                {student.hostelId === 'h-shivalik' ? 'Boys Hostel 1' : student.hostelId === 'h-mandakini' ? 'Girls Hostel' : 'Boys Hostel 2'}, {student.block}, Room {student.roomNumber}, Bed {student.bedNumber || '—'}
               </div>
+            </div>
+            <div>
+              <span className="text-slate-400">Gender:</span>
+              <div className="font-medium text-slate-800 mt-0.5">{student.gender}</div>
             </div>
             <div>
               <span className="text-slate-400">Parent / Guardian:</span>
@@ -219,7 +227,7 @@ export const StudentRegistrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Hostel</label>
               <select
@@ -252,6 +260,31 @@ export const StudentRegistrationPage: React.FC = () => {
                 className="w-full p-2 border border-slate-300 rounded-lg"
               />
             </div>
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Bed</label>
+              <select value={form.bedNumber} onChange={(e) => setForm({ ...form, bedNumber: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="A">Bed A</option>
+                <option value="B">Bed B</option>
+                <option value="C">Bed C</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Gender</label>
+              <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as 'male' | 'female' | 'other' })} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            {isCaretaker && (
+              <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Biometric ID</label>
+                <input type="text" required value={form.biometricId} onChange={(e) => setForm({ ...form, biometricId: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg font-mono" />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

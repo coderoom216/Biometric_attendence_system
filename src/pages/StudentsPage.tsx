@@ -305,6 +305,7 @@ export const StudentsPage: React.FC = () => {
                         <td className="py-3 px-3">
                           <div className="font-bold text-slate-900">{s.name}</div>
                           <div className="text-[10px] text-slate-400">{s.studentEmail}</div>
+                          {s.studentPhone && <div className="text-[10px] text-slate-500">{s.studentPhone}</div>}
                         </td>
 
                         {/* Roll Number */}
@@ -321,7 +322,8 @@ export const StudentsPage: React.FC = () => {
                         {/* Branch / Course */}
                         <td className="py-3 px-3 text-slate-700">
                           <div className="font-medium">{s.course}</div>
-                          <div className="text-[10px] text-slate-400">Semester {s.semester}</div>
+                          <div className="text-[10px] text-slate-500">{s.branch || 'Branch not recorded'}</div>
+                          <div className="text-[10px] text-slate-400">Year {s.year || '—'} · Semester {s.semester}</div>
                         </td>
 
                         {/* Parent Phone Number */}
@@ -331,6 +333,7 @@ export const StudentsPage: React.FC = () => {
                             <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
                             <span>{s.parentPhone || '—'}</span>
                           </div>
+                          {s.parentEmail && <div className="text-[10px] text-slate-500 mt-0.5">{s.parentEmail}</div>}
                         </td>
 
                         {/* Biometric ID */}
@@ -341,19 +344,18 @@ export const StudentsPage: React.FC = () => {
                         {/* Strikes / Warning Status */}
                         <td className="py-3 px-3">
                           {ticket ? (
-                            ticket.severity === 'flagged_for_admin_review' ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">
-                                Admin Review ({ticket.totalViolations} strikes)
-                              </span>
-                            ) : ticket.severity === 'strike_2' ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                Strike 2 Warning
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                                Strike 1 Notice
-                              </span>
-                            )
+                            <div title={ticket.reason}>
+                              {ticket.severity === 'flagged_for_admin_review' ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">Admin Review</span>
+                              ) : ticket.severity === 'strike_2' ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Strike 2 Warning</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">Strike 1 Notice</span>
+                              )}
+                              <div className="text-[10px] text-slate-500 mt-1">{ticket.latePunchesCount} late · {ticket.missedCheckInsCount} missed · {ticket.totalViolations} total</div>
+                              <div className="text-[10px] text-slate-400">{ticket.status.replace('_', ' ')} · {ticket.latestViolationDate}</div>
+                              <div className="text-[10px] text-slate-500 line-clamp-2">{ticket.reason}</div>
+                            </div>
                           ) : (
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
                               Good Standing

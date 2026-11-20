@@ -388,6 +388,18 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                 </select>
               </div>
               <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Gender</label>
+                <select
+                  value={studentForm.gender}
+                  onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value as 'male' | 'female' | 'other' })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Biometric Hardware ID</label>
                 <input
                   type="text"
@@ -399,7 +411,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Hostel</label>
                 <select
@@ -431,6 +443,18 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                   onChange={(e) => setStudentForm({ ...studentForm, roomNumber: e.target.value })}
                   className="w-full p-2 border border-slate-300 rounded-lg"
                 />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Bed</label>
+                <select
+                  value={studentForm.bedNumber}
+                  onChange={(e) => setStudentForm({ ...studentForm, bedNumber: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  <option value="A">Bed A</option>
+                  <option value="B">Bed B</option>
+                  <option value="C">Bed C</option>
+                </select>
               </div>
             </div>
 

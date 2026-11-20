@@ -393,10 +393,13 @@ router.post(
 // POST /api/students/submit-registration (Student submits registration form for review)
 router.post('/submit-registration', authenticate, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { enrollmentNo, name, course, branch, year, semester, studentEmail, studentPhone, hostelId, block, roomNumber, biometricId, parentName, parentEmail, parentPhone } = req.body;
+  const { enrollmentNo, name, course, branch, year, semester, studentEmail, studentPhone, gender, hostelId, block, roomNumber, bedNumber, biometricId, parentName, parentEmail, parentPhone } = req.body;
 
   if (user.role === 'caretaker_operator' && hostelId === 'h-mandakini') {
     return res.status(403).json({ success: false, message: 'Access denied: Caretaker accounts can only register students in boys hostels.' });
+  }
+  if (user.role === 'caretaker_operator' && !biometricId) {
+    return res.status(400).json({ success: false, message: 'Biometric ID is required for caretaker registration.' });
   }
 
   const existing = store.students.find((s) => s.enrollmentNo.toLowerCase() === (enrollmentNo || '').toLowerCase());
@@ -412,11 +415,12 @@ router.post('/submit-registration', authenticate, (req: AuthenticatedRequest, re
     branch: branch || '',
     year: Number(year) || 1,
     semester: Number(semester) || 1,
-    gender: 'male',
+    gender: gender || 'male',
     hostelId: hostelId || 'h-shivalik',
     block: block || 'Block A',
     roomNumber: roomNumber || '101',
-    biometricId: biometricId || `BIO-${Date.now().toString().slice(-4)}`,
+    bedNumber: bedNumber || 'A',
+    biometricId: user.role === 'caretaker_operator' ? biometricId : `BIO-${Date.now().toString().slice(-4)}`,
     studentEmail: studentEmail || user.email,
     studentPhone: studentPhone || user.phone || '',
     parentName: parentName || '',
