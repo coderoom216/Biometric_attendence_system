@@ -1,0 +1,174 @@
+erDiagram
+    USER_ACCOUNT {
+        string id PK
+        string name
+        string email
+        string role
+        string phone
+        string hostel_id FK
+        string block_id
+    }
+
+    HOSTEL {
+        string id PK
+        string name
+        string code
+        string type
+        string blocks
+        int total_floors
+        int total_rooms
+        int capacity
+        string chief_warden
+        string residential_warden
+        int current_occupancy
+        int available_beds
+    }
+
+    ROOM {
+        string id PK
+        string hostel_id FK
+        string block
+        int floor
+        string room_number
+        int capacity
+        int current_occupancy
+        int available_beds
+        boolean is_vacant
+        string status
+    }
+
+    STUDENT {
+        string id PK
+        string enrollment_no
+        string name
+        string course
+        string branch
+        int year
+        int semester
+        string gender
+        string hostel_id FK
+        string block
+        string room_number
+        string bed_number
+        string biometric_id
+        string student_email
+        string student_phone
+        string parent_name
+        string parent_email
+        string parent_phone
+        string verification_status
+        string verified_by
+        string verified_at
+        string allotment_date
+        string checkout_date
+        string checkout_status
+    }
+
+    BIOMETRIC_DEVICE {
+        string id PK
+        string device_id
+        string name
+        string hostel_id FK
+        string location
+        string status
+        string last_sync_at
+    }
+
+    ATTENDANCE_RECORD {
+        string id PK
+        string student_id FK
+        string enrollment_no
+        string student_name
+        string hostel_id FK
+        string block
+        string room_number
+        string date
+        string status
+        string punch_time
+        string biometric_device_id FK
+        boolean is_defaulter
+        string evaluated_at
+        string corrected_by
+        string corrected_at
+        string correction_reason
+        string remarks
+    }
+
+    LEAVE_RECORD {
+        string id PK
+        string student_id FK
+        string enrollment_no
+        string student_name
+        string hostel_id FK
+        string block
+        string room_number
+        string start_date
+        string end_date
+        string reason
+        string gate_pass_no
+        boolean parent_consent_verified
+        string entered_by_residential_warden_id FK
+        string residential_warden_name
+        string created_at
+        string notes
+    }
+
+    WARNING_TICKET {
+        string id PK
+        string student_id FK
+        string student_name
+        string enrollment_no
+        string hostel_id FK
+        string hostel_name
+        string block
+        string room_number
+        string course
+        string parent_name
+        string parent_phone
+        string parent_email
+        int late_punches_count
+        int missed_checkins_count
+        int total_violations
+        string severity
+        string status
+        string issued_at
+        string latest_violation_date
+        string reason
+        string admin_notes
+    }
+
+    NOTIFICATION_LOG {
+        string id PK
+        string date
+        string student_id FK
+        string student_name
+        string enrollment_no
+        string hostel_id FK
+        int tier
+        string recipient_role
+        string recipient_name
+        string recipient_email
+        string status
+        string failure_reason
+        string timestamp
+        int retry_count
+    }
+
+    HOSTEL ||--o{ USER_ACCOUNT : assigned_scope
+    HOSTEL ||--o{ ROOM : contains
+    HOSTEL ||--o{ STUDENT : houses
+    HOSTEL ||--o{ BIOMETRIC_DEVICE : has
+    HOSTEL ||--o{ ATTENDANCE_RECORD : scopes
+    HOSTEL ||--o{ LEAVE_RECORD : scopes
+    HOSTEL ||--o{ WARNING_TICKET : has
+    HOSTEL ||--o{ NOTIFICATION_LOG : scopes
+    ROOM ||--o{ STUDENT : location_match
+    STUDENT ||--o{ ATTENDANCE_RECORD : has
+    STUDENT ||--o{ LEAVE_RECORD : has
+    STUDENT ||--o{ WARNING_TICKET : receives
+    STUDENT ||--o{ NOTIFICATION_LOG : receives
+    BIOMETRIC_DEVICE ||--o{ ATTENDANCE_RECORD : records
+    USER_ACCOUNT ||--o{ LEAVE_RECORD : enters
+
+%% current_occupancy, available_beds, and is_vacant are API/UI values derived from resident and room data.
+%% ROOM and STUDENT are matched by hostel_id, block, and room_number in the current project.
