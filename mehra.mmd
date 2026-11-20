@@ -1,0 +1,42 @@
+
+erDiagram
+    BIOMETRIC_TERMINAL {
+        string terminal_id PK
+        string terminal_name
+        string protocol
+        string sync_status
+        datetime last_sync
+    }
+
+    STUDENT {
+        string enrollment_no PK
+        string student_name
+        string course
+        string biometric_id
+        string hostel
+        string block
+        string room_no
+        string student_email
+        string parent_email
+    }
+
+    BIOMETRIC_LOG {
+        string log_id PK
+        string terminal_id FK
+        string biometric_id
+        datetime punch_time
+        string log_status
+    }
+
+    NOTIFICATION_FAILURE {
+        string failure_id PK
+        string enrollment_no FK
+        string tier_role
+        string failure_reason
+        datetime timestamp
+        string recovery_action
+    }
+
+    BIOMETRIC_TERMINAL ||--o{ BIOMETRIC_LOG : generates
+    STUDENT ||--o{ BIOMETRIC_LOG : records
+    STUDENT ||--o{ NOTIFICATION_FAILURE : has
