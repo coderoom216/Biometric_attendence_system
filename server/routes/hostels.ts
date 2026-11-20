@@ -13,6 +13,9 @@ router.get('/', authenticate, (req: AuthenticatedRequest, res: Response) => {
   if ((user.role === 'residential_warden' || user.role === 'warden') && user.hostelId) {
     hostels = hostels.filter((h) => h.id === user.hostelId);
   }
+  if (user.role === 'caretaker_operator') {
+    hostels = hostels.filter((h) => h.id !== 'h-mandakini');
+  }
 
   // Calculate dynamic active occupancy
   const enrichedHostels = hostels.map((h) => {
@@ -35,6 +38,9 @@ router.get('/', authenticate, (req: AuthenticatedRequest, res: Response) => {
 // GET /api/hostels/:hostelId/rooms (FR-04)
 router.get('/:hostelId/rooms', authenticate, requireHostelScope('hostelId'), (req: AuthenticatedRequest, res: Response) => {
   const { hostelId } = req.params;
+  if (req.user?.role === 'caretaker_operator' && hostelId === 'h-mandakini') {
+    return res.status(403).json({ success: false, message: 'Access denied: Girls Hostel data is unavailable to caretaker accounts.' });
+  }
   const rooms = store.rooms.filter((r) => r.hostelId === hostelId);
 
   // For each room, get assigned students
@@ -63,7 +69,7 @@ router.get('/:hostelId/rooms', authenticate, requireHostelScope('hostelId'), (re
 router.post(
   '/allocate-room',
   authenticate,
-  requireRole(['caretaker_operator', 'residential_warden', 'warden', 'chief_warden', 'director']),
+  requireRole(['residential_warden', 'warden', 'chief_warden', 'director']),
   (req: AuthenticatedRequest, res: Response) => {
     const user = req.user!;
     const { studentId, hostelId, block, roomNumber, bedNumber } = req.body;

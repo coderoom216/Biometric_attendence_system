@@ -32,7 +32,9 @@ export const StudentsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  const isWardenOrAdmin = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker_operator'].includes(user?.role || '');
+  const canReviewRegistrations = ['residential_warden', 'warden', 'chief_warden', 'director'].includes(user?.role || '');
+  const isWardenOrAdmin = canReviewRegistrations;
+  const isCaretaker = user?.role === 'caretaker_operator';
 
   const loadData = async () => {
     setIsLoading(true);
@@ -136,7 +138,9 @@ export const StudentsPage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Complete records of active residents across Boys Hostel 1 (180 bed capacity), Girls Hostel (165 bed capacity), and Boys Hostel 2 (180 bed capacity).
+            {isCaretaker
+              ? 'Student records for Boys Hostel 1 and Boys Hostel 2.'
+              : 'Complete records of active residents across Boys Hostel 1 (180 bed capacity), Girls Hostel (165 bed capacity), and Boys Hostel 2 (180 bed capacity).'}
           </p>
         </div>
 
@@ -184,22 +188,24 @@ export const StudentsPage: React.FC = () => {
           </span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('verification')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-            activeTab === 'verification'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>Registration Verification Queue</span>
-          {pendingCount > 0 && (
-            <span className="px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-semibold animate-pulse">
-              {pendingCount} Pending
-            </span>
-          )}
-        </button>
+        {canReviewRegistrations && (
+          <button
+            onClick={() => setActiveTab('verification')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              activeTab === 'verification'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Registration Verification Queue</span>
+            {pendingCount > 0 && (
+              <span className="px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-semibold animate-pulse">
+                {pendingCount} Pending
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -222,9 +228,9 @@ export const StudentsPage: React.FC = () => {
               onChange={(e) => setHostelFilter(e.target.value)}
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs text-slate-700"
             >
-              <option value="all">All Hostels (BH1, GH, BH2)</option>
+              <option value="all">{isCaretaker ? 'All Boys Hostels (BH1, BH2)' : 'All Hostels (BH1, GH, BH2)'}</option>
               <option value="h-shivalik">Boys Hostel 1</option>
-              <option value="h-mandakini">Girls Hostel</option>
+              {!isCaretaker && <option value="h-mandakini">Girls Hostel</option>}
               <option value="h-nilgiri">Boys Hostel 2</option>
             </select>
           )}
@@ -365,7 +371,7 @@ export const StudentsPage: React.FC = () => {
       )}
 
       {/* Tab 2: Verification Queue */}
-      {activeTab === 'verification' && (
+      {activeTab === 'verification' && canReviewRegistrations && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-4 bg-slate-50/75 border-b border-slate-200 flex items-center justify-between">
             <span className="font-bold text-slate-800 text-xs">

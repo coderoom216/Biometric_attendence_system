@@ -41,20 +41,27 @@ export const HostelManagementPage: React.FC = () => {
   const [vacateMsg, setVacateMsg] = useState<string | null>(null);
 
   const isStaff = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker_operator'].includes(user?.role || '');
+  const isCaretaker = user?.role === 'caretaker_operator';
+  const canAllocateRoom = ['residential_warden', 'warden', 'chief_warden', 'director'].includes(user?.role || '');
 
   const loadData = async () => {
     setIsLoading(true);
     try {
       const hRes = await apiService.getHostels();
       if (hRes.success) {
-        setHostels(hRes.hostels);
-        const defaultH = user?.hostelId || hRes.hostels[0]?.id || 'h-shivalik';
+        const availableHostels = isCaretaker
+          ? hRes.hostels.filter((hostel) => hostel.id !== 'h-mandakini')
+          : hRes.hostels;
+        setHostels(availableHostels);
+        const defaultH = availableHostels.some((hostel) => hostel.id === user?.hostelId)
+          ? user?.hostelId as string
+          : availableHostels[0]?.id || 'h-shivalik';
         setSelectedHostelId(defaultH);
         fetchRooms(defaultH);
       }
 
       const sRes = await apiService.getStudents();
-      if (sRes.success) setStudents(sRes.students);
+      if (sRes.success) setStudents(isCaretaker ? sRes.students.filter((student) => student.hostelId !== 'h-mandakini') : sRes.students);
     } catch (err) {
       console.error(err);
     } finally {
@@ -76,6 +83,7 @@ export const HostelManagementPage: React.FC = () => {
   }, [user]);
 
   const handleSelectHostel = (hId: string) => {
+    if (isCaretaker && hId === 'h-mandakini') return;
     setSelectedHostelId(hId);
     setAllocateForm((prev) => ({ ...prev, hostelId: hId }));
     fetchRooms(hId);
@@ -143,7 +151,7 @@ export const HostelManagementPage: React.FC = () => {
           </p>
         </div>
 
-        {isStaff && (
+        {canAllocateRoom && (
           <button
             onClick={() => setIsAllocateOpen(true)}
             className="flex items-center space-x-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
@@ -275,7 +283,7 @@ export const HostelManagementPage: React.FC = () => {
       </div>
 
       {/* Room Allocation Modal */}
-      {isAllocateOpen && (
+      {isAllocateOpen && canAllocateRoom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">

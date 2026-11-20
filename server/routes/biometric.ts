@@ -11,10 +11,13 @@ router.get(
   authenticate,
   requireRole(['caretaker_operator', 'residential_warden', 'warden', 'chief_warden', 'director']),
   (req: AuthenticatedRequest, res: Response) => {
+    const devices = req.user?.role === 'caretaker_operator'
+      ? store.biometricDevices.filter((device) => device.hostelId !== 'h-mandakini')
+      : store.biometricDevices;
     return res.json({
       success: true,
       authorizedAdministrator: 'Mr. Vivek Mehra (Computer Science Dept)',
-      devices: store.biometricDevices
+      devices
     });
   }
 );
@@ -31,6 +34,10 @@ router.post(
     const device = store.biometricDevices.find((d) => d.id === deviceId || d.deviceId === deviceId);
     if (!device) {
       return res.status(404).json({ success: false, message: 'Biometric terminal device not registered' });
+    }
+
+    if (user.role === 'caretaker_operator' && device.hostelId === 'h-mandakini') {
+      return res.status(403).json({ success: false, message: 'Access denied: Girls Hostel biometric devices are unavailable to caretaker accounts.' });
     }
 
     if (!Array.isArray(punches) || punches.length === 0) {
@@ -167,12 +174,20 @@ router.get(
   authenticate,
   requireRole(['caretaker_operator', 'residential_warden', 'warden', 'chief_warden', 'director']),
   (req: AuthenticatedRequest, res: Response) => {
-    const devices = store.biometricDevices;
+    const isCaretaker = req.user?.role === 'caretaker_operator';
+    const devices = isCaretaker
+      ? store.biometricDevices.filter((device) => device.hostelId !== 'h-mandakini')
+      : store.biometricDevices;
     const staleDevices = devices.filter((d) => d.status === 'stale_pending_import');
-    const missingParentEmails = store.students.filter(
+    const visibleStudents = isCaretaker
+      ? store.students.filter((student) => student.hostelId !== 'h-mandakini')
+      : store.students;
+    const missingParentEmails = visibleStudents.filter(
       (s) => s.verificationStatus === 'verified' && !s.parentEmail
     );
-    const notificationFailures = store.notifications.filter((n) => n.status === 'failed');
+    const notificationFailures = store.notifications.filter((notification) =>
+      notification.status === 'failed' && (!isCaretaker || notification.hostelId !== 'h-mandakini')
+    );
 
     return res.json({
       success: true,

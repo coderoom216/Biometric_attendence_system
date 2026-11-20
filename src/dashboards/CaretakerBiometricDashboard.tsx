@@ -25,6 +25,8 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     enrollmentNo: string;
     name: string;
     course: string;
+    branch: string;
+    year: number;
     semester: number;
     gender: 'male' | 'female' | 'other';
     hostelId: string;
@@ -41,6 +43,8 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     enrollmentNo: '',
     name: '',
     course: 'B.Tech CSE',
+    branch: 'Computer Science and Engineering',
+    year: 1,
     semester: 1,
     gender: 'male',
     hostelId: 'h-shivalik',
@@ -49,20 +53,20 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     bedNumber: 'B',
     biometricId: `BIO-${Math.floor(1000 + Math.random() * 9000)}`,
     studentEmail: '',
-    studentPhone: '+91 98',
+    studentPhone: '',
     parentName: '',
     parentEmail: '',
-    parentPhone: '+91 98'
+    parentPhone: ''
   });
   const [onboardFeedback, setOnboardFeedback] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
       const devRes = await apiService.getBiometricDevices();
-      if (devRes.success) setDevices(devRes.devices);
+      if (devRes.success) setDevices(devRes.devices.filter((device) => device.hostelId !== 'h-mandakini'));
 
       const hRes = await apiService.getHostels();
-      if (hRes.success) setHostels(hRes.hostels);
+      if (hRes.success) setHostels(hRes.hostels.filter((hostel) => hostel.id !== 'h-mandakini'));
     } catch (err) {
       console.error(err);
     }
@@ -77,12 +81,10 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     setIsSyncing(true);
     setSyncStatus(null);
     try {
-      // Simulate punches fetched locally by Mr. Mehra from offline terminal
+      // Simulate punches fetched locally from the offline terminal
       const simulatedLocalPunches = [
         { biometricId: 'BIO-SHIV-01', punchTime: '18:15:22', punchTimestamp: '2026-10-27 18:15:22' },
-        { biometricId: 'BIO-MAND-01', punchTime: '18:48:10', punchTimestamp: '2026-10-27 18:48:10' },
         { biometricId: 'BIO-SHIV-03', punchTime: '18:20:00', punchTimestamp: '2026-10-27 18:20:00' },
-        { biometricId: 'BIO-MAND-02', punchTime: '18:22:45', punchTimestamp: '2026-10-27 18:22:45' }
       ];
 
       const res = await apiService.syncBiometricLogs(selectedDevice, simulatedLocalPunches);
@@ -104,11 +106,13 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     try {
       const res = await apiService.onboardStudent(studentForm);
       if (res.success) {
-        setOnboardFeedback(`Student ${studentForm.name} successfully registered and verified in central DB.`);
+        setOnboardFeedback(`Student ${studentForm.name} submitted for resident warden verification.`);
         setStudentForm({
           enrollmentNo: '',
           name: '',
           course: 'B.Tech CSE',
+          branch: 'Computer Science and Engineering',
+          year: 1,
           semester: 1,
           gender: 'male',
           hostelId: 'h-shivalik',
@@ -117,10 +121,10 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           bedNumber: 'B',
           biometricId: `BIO-${Math.floor(1000 + Math.random() * 9000)}`,
           studentEmail: '',
-          studentPhone: '+91 98',
+          studentPhone: '',
           parentName: '',
           parentEmail: '',
-          parentPhone: '+91 98'
+          parentPhone: ''
         });
       }
     } catch (err: any) {
@@ -130,34 +134,12 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-xl font-bold text-slate-900">Biometric Terminal & Caretaker Onboarding Portal</h1>
-
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Offline Biometric Device Log Ingestion (FR-01) & Verified Student Master Record Entry (FR-02)
-          </p>
-        </div>
-
-        <div className="text-right">
-          <div className="text-xs text-slate-400 font-mono">Terminal Protocol: ESSL/ZKTeco</div>
-          <div className="text-xs font-bold text-emerald-700">Authorized Ingestion Script</div>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Biometric Offline Log Sync Interface (FR-01) */}
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
           <div className="flex items-center space-x-2 text-indigo-700 font-bold text-sm border-b border-slate-100 pb-3">
             <Cpu className="w-5 h-5 text-indigo-600" />
             <span>Biometric Hardware Synchronization Terminal (FR-01)</span>
-          </div>
-
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-xs leading-relaxed">
-            <strong>Architecture Note (From Requirements Report):</strong> Biometric devices store punch data locally without direct LAN connectivity. Mr. Mehra holds administrative credentials to retrieve local logs and execute the authorized push script into the central portal DB.
           </div>
 
           <div className="space-y-3 text-xs">
@@ -239,7 +221,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           </div>
 
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs leading-relaxed">
-            <strong>Director's Explicit Directive:</strong> Students will not enter authoritative data. Caretakers / Officials input verified profile details (Enrollment No, Name, Room, Parent Email, Biometric ID).
+            <strong>Registration details:</strong> Enter the student's verified profile and room assignment. A resident warden will review and verify the record.
           </div>
 
           <form onSubmit={handleOnboardSubmit} className="space-y-3 text-xs">
@@ -278,6 +260,38 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                   onChange={(e) => setStudentForm({ ...studentForm, course: e.target.value })}
                   className="w-full p-2 border border-slate-300 rounded-lg"
                 />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Branch</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Computer Science and Engineering"
+                  value={studentForm.branch}
+                  onChange={(e) => setStudentForm({ ...studentForm, branch: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Year of Study</label>
+                <select
+                  required
+                  value={studentForm.year}
+                  onChange={(e) => setStudentForm({ ...studentForm, year: Number(e.target.value) })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((year) => <option key={year} value={year}>Year {year}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Semester</label>
+                <select
+                  value={studentForm.semester}
+                  onChange={(e) => setStudentForm({ ...studentForm, semester: Number(e.target.value) })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((semester) => <option key={semester} value={semester}>Semester {semester}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Biometric Hardware ID</label>
@@ -326,7 +340,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Email</label>
                 <input
@@ -338,21 +352,44 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                   className="w-full p-2 border border-slate-300 rounded-lg"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Parent Email (For 6-Tier Alerts)</label>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Phone</label>
                 <input
-                  type="email"
-                  required
-                  placeholder="parent@example.com"
-                  value={studentForm.parentEmail}
-                  onChange={(e) => setStudentForm({ ...studentForm, parentEmail: e.target.value })}
+                  type="tel"
+                  value={studentForm.studentPhone}
+                  onChange={(e) => setStudentForm({ ...studentForm, studentPhone: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Parent / Guardian Name</label>
+                <input
+                  type="text"
+                  value={studentForm.parentName}
+                  onChange={(e) => setStudentForm({ ...studentForm, parentName: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Parent Email or Phone</label>
+                <input
+                  type="text"
+                  placeholder="Email address or phone number"
+                  value={studentForm.parentEmail || studentForm.parentPhone}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    setStudentForm({ ...studentForm, parentEmail: value.includes('@') ? value : '', parentPhone: value.includes('@') ? '' : value });
+                  }}
                   className="w-full p-2 border border-slate-300 rounded-lg"
                 />
               </div>
             </div>
 
             {onboardFeedback && (
-              <div className={`p-2.5 rounded-lg text-xs ${onboardFeedback.includes('successfully') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+              <div className={`p-2.5 rounded-lg text-xs ${onboardFeedback.includes('submitted') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
                 {onboardFeedback}
               </div>
             )}
@@ -361,7 +398,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               type="submit"
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition shadow-xs mt-2"
             >
-              Onboard & Link Biometric ID to Student
+              Submit for Resident Warden Verification
             </button>
           </form>
         </div>

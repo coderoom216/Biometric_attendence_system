@@ -18,6 +18,9 @@ router.get('/', authenticate, (req: AuthenticatedRequest, res: Response) => {
   else if ((user.role === 'residential_warden' || user.role === 'warden') && user.hostelId) {
     list = list.filter((s) => s.hostelId === user.hostelId);
   }
+  else if (user.role === 'caretaker_operator') {
+    list = list.filter((s) => s.hostelId !== 'h-mandakini');
+  }
 
   return res.json({
     success: true,
@@ -38,6 +41,8 @@ router.get(
     // Warden hostel scoping
     if ((user.role === 'residential_warden' || user.role === 'warden') && user.hostelId) {
       tickets = tickets.filter((t) => t.hostelId === user.hostelId);
+    } else if (user.role === 'caretaker_operator') {
+      tickets = tickets.filter((t) => t.hostelId !== 'h-mandakini');
     } else if (req.query.hostelId && req.query.hostelId !== 'all') {
       tickets = tickets.filter((t) => t.hostelId === req.query.hostelId);
     }
@@ -101,6 +106,8 @@ router.get(
     // Warden hostel scoping
     if ((user.role === 'residential_warden' || user.role === 'warden') && user.hostelId) {
       students = students.filter((s) => s.hostelId === user.hostelId);
+    } else if (user.role === 'caretaker_operator') {
+      students = students.filter((s) => s.hostelId !== 'h-mandakini');
     } else if (req.query.hostelId && req.query.hostelId !== 'all') {
       students = students.filter((s) => s.hostelId === req.query.hostelId);
     }
@@ -214,6 +221,9 @@ router.get('/:studentId', authenticate, requireStudentOwnership('studentId'), (r
 
   // Double check warden scope
   const user = req.user!;
+  if (user.role === 'caretaker_operator' && student.hostelId === 'h-mandakini') {
+    return res.status(403).json({ success: false, message: 'Access denied: Girls Hostel student data is unavailable to caretaker accounts.' });
+  }
   if ((user.role === 'residential_warden' || user.role === 'warden') && user.hostelId && student.hostelId !== user.hostelId) {
     return res.status(403).json({
       success: false,
@@ -238,6 +248,8 @@ router.post(
       enrollmentNo,
       name,
       course,
+      branch,
+      year,
       semester,
       gender,
       hostelId,
@@ -251,6 +263,10 @@ router.post(
       parentEmail,
       parentPhone
     } = req.body;
+
+    if (user.role === 'caretaker_operator' && hostelId === 'h-mandakini') {
+      return res.status(403).json({ success: false, message: 'Access denied: Caretaker accounts can only register students in boys hostels.' });
+    }
 
     if (!enrollmentNo || !name || !hostelId || !block || !roomNumber || !biometricId || !studentEmail) {
       return res.status(400).json({
@@ -272,6 +288,8 @@ router.post(
       enrollmentNo: enrollmentNo.trim().toUpperCase(),
       name: name.trim(),
       course: course || 'B.Tech CSE',
+      branch: branch || '',
+      year: Number(year) || 1,
       semester: Number(semester) || 1,
       gender: gender || 'male',
       hostelId,
@@ -284,35 +302,24 @@ router.post(
       parentName: parentName || '',
       parentEmail: parentEmail ? parentEmail.trim().toLowerCase() : '',
       parentPhone: parentPhone || '',
-      verificationStatus: 'verified',
-      verifiedBy: `${user.name} (${user.role})`,
-      verifiedAt: `${store.virtualDate} ${store.virtualTime} IST`,
+      verificationStatus: 'pending_verification',
       allotmentDate: store.virtualDate,
       checkoutStatus: 'active'
     };
 
     store.students.push(newStudent);
 
-    // Also update room occupancy
-    const room = store.rooms.find((r) => r.hostelId === hostelId && r.block === block && r.roomNumber === roomNumber);
-    if (room) {
-      room.currentOccupancy = Math.min(room.capacity, room.currentOccupancy + 1);
-      if (room.currentOccupancy >= room.capacity) {
-        room.status = 'full';
-      }
-    }
-
     store.logAudit(
       'STUDENT_ONBOARDED',
       user,
       'Student',
       newStudent.id,
-      `Onboarded verified student: ${newStudent.name} (${newStudent.enrollmentNo}), Room ${newStudent.roomNumber}, Biometric ${newStudent.biometricId}`
+      `Caretaker submitted student registration for verification: ${newStudent.name} (${newStudent.enrollmentNo}), Room ${newStudent.roomNumber}, Biometric ${newStudent.biometricId}`
     );
 
     return res.status(201).json({
       success: true,
-      message: 'Student record onboarded and verified successfully',
+      message: 'Student record submitted for resident warden verification',
       student: newStudent
     });
   }
@@ -333,10 +340,19 @@ router.post(
     }
 
     if (action === 'approve') {
+      const wasPending = student.verificationStatus === 'pending_verification';
       student.verificationStatus = 'verified';
       student.verifiedBy = `${user.name} (${user.role})`;
       student.verifiedAt = `${store.virtualDate} ${store.virtualTime} IST`;
       student.rejectionReason = undefined;
+
+      if (wasPending) {
+        const room = store.rooms.find((r) => r.hostelId === student.hostelId && r.block === student.block && r.roomNumber === student.roomNumber);
+        if (room) {
+          room.currentOccupancy = Math.min(room.capacity, room.currentOccupancy + 1);
+          if (room.currentOccupancy >= room.capacity) room.status = 'full';
+        }
+      }
 
       store.logAudit(
         'STUDENT_REGISTRATION_VERIFIED',
@@ -377,7 +393,11 @@ router.post(
 // POST /api/students/submit-registration (Student submits registration form for review)
 router.post('/submit-registration', authenticate, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { enrollmentNo, name, course, hostelId, block, roomNumber, biometricId, parentName, parentEmail, parentPhone } = req.body;
+  const { enrollmentNo, name, course, branch, year, semester, studentEmail, studentPhone, hostelId, block, roomNumber, biometricId, parentName, parentEmail, parentPhone } = req.body;
+
+  if (user.role === 'caretaker_operator' && hostelId === 'h-mandakini') {
+    return res.status(403).json({ success: false, message: 'Access denied: Caretaker accounts can only register students in boys hostels.' });
+  }
 
   const existing = store.students.find((s) => s.enrollmentNo.toLowerCase() === (enrollmentNo || '').toLowerCase());
   if (existing) {
@@ -389,14 +409,16 @@ router.post('/submit-registration', authenticate, (req: AuthenticatedRequest, re
     enrollmentNo: enrollmentNo.trim().toUpperCase(),
     name: name || user.name,
     course: course || 'B.Tech CSE',
-    semester: 1,
+    branch: branch || '',
+    year: Number(year) || 1,
+    semester: Number(semester) || 1,
     gender: 'male',
     hostelId: hostelId || 'h-shivalik',
     block: block || 'Block A',
     roomNumber: roomNumber || '101',
     biometricId: biometricId || `BIO-${Date.now().toString().slice(-4)}`,
-    studentEmail: user.email,
-    studentPhone: user.phone || '',
+    studentEmail: studentEmail || user.email,
+    studentPhone: studentPhone || user.phone || '',
     parentName: parentName || '',
     parentEmail: parentEmail || '',
     parentPhone: parentPhone || '',

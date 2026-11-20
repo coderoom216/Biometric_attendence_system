@@ -477,9 +477,9 @@ export const ResidentialWardenDashboard: React.FC = () => {
                 <tr>
                   <th className="py-2.5 px-3">Name</th>
                   <th className="py-2.5 px-3">Enrollment No</th>
-                  <th className="py-2.5 px-3">Course</th>
+                  <th className="py-2.5 px-3">Student & Academic Details</th>
                   <th className="py-2.5 px-3">Room</th>
-                  <th className="py-2.5 px-3">Parent Email</th>
+                  <th className="py-2.5 px-3">Biometric ID</th>
                   <th className="py-2.5 px-3 text-right">Verification Action</th>
                 </tr>
               </thead>
@@ -488,9 +488,15 @@ export const ResidentialWardenDashboard: React.FC = () => {
                   <tr key={s.id}>
                     <td className="py-2.5 px-3 font-semibold text-slate-900">{s.name}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-700">{s.enrollmentNo}</td>
-                    <td className="py-2.5 px-3 text-slate-600">{s.course}</td>
+                    <td className="py-2.5 px-3 text-slate-600">
+                      <div>{s.course}{s.branch ? ` · ${s.branch}` : ''}</div>
+                      <div className="text-[10px] text-slate-500">Year {s.year || '—'} · Semester {s.semester}</div>
+                      <div className="text-[10px] text-slate-500">Student: {s.studentEmail}{s.studentPhone ? ` · ${s.studentPhone}` : ''}</div>
+                      <div className="text-[10px] text-slate-500">Parent/Guardian: {s.parentName || '—'}</div>
+                      <div className="text-[10px] text-slate-500">Parent email: {s.parentEmail || '—'} · Phone: {s.parentPhone || '—'}</div>
+                    </td>
                     <td className="py-2.5 px-3 text-slate-600">{s.block}, Room {s.roomNumber}</td>
-                    <td className="py-2.5 px-3 text-slate-600">{s.parentEmail}</td>
+                    <td className="py-2.5 px-3 text-slate-600 font-mono">{s.biometricId}</td>
                     <td className="py-2.5 px-3 text-right space-x-2">
                       <button
                         onClick={() => handleVerifyStudent(s.id, 'approve')}

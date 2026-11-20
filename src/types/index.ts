@@ -51,6 +51,8 @@ export interface Student {
   enrollmentNo: string;
   name: string;
   course: string;
+  branch?: string;
+  year?: number;
   semester: number;
   gender: 'male' | 'female' | 'other';
   hostelId: string;

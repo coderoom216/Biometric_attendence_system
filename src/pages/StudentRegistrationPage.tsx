@@ -14,14 +14,20 @@ import { Student } from '../types';
 
 export const StudentRegistrationPage: React.FC = () => {
   const { user } = useAuth();
+  const isCaretaker = user?.role === 'caretaker_operator';
   const [student, setStudent] = useState<Student | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Form state
   const [form, setForm] = useState({
     enrollmentNo: '',
-    name: user?.name || '',
+    name: '',
     course: 'B.Tech Computer Science',
+    branch: '',
+    year: 1,
+    semester: 1,
+    studentEmail: user?.email || '',
+    studentPhone: user?.phone || '',
     hostelId: 'h-shivalik',
     block: 'Block A',
     roomNumber: '101',
@@ -44,12 +50,17 @@ export const StudentRegistrationPage: React.FC = () => {
               enrollmentNo: res.student.enrollmentNo,
               name: res.student.name,
               course: res.student.course,
+              branch: res.student.branch || '',
+              year: res.student.year || 1,
+              semester: res.student.semester || 1,
+              studentEmail: res.student.studentEmail || user?.email || '',
+              studentPhone: res.student.studentPhone || user?.phone || '',
               hostelId: res.student.hostelId,
               block: res.student.block,
               roomNumber: res.student.roomNumber,
               biometricId: res.student.biometricId,
               parentName: res.student.parentName,
-              parentEmail: res.student.parentEmail,
+              parentEmail: res.student.parentEmail || '',
               parentPhone: res.student.parentPhone
             });
           }
@@ -119,7 +130,7 @@ export const StudentRegistrationPage: React.FC = () => {
             </div>
             <div>
               <span className="text-slate-400">Course / Semester:</span>
-              <div className="font-medium text-slate-700 mt-0.5">{student.course} (Sem {student.semester})</div>
+              <div className="font-medium text-slate-700 mt-0.5">{student.course}{student.branch ? ` · ${student.branch}` : ''} (Year {student.year || '—'}, Sem {student.semester})</div>
             </div>
             <div>
               <span className="text-slate-400">Biometric Credential ID:</span>
@@ -133,7 +144,7 @@ export const StudentRegistrationPage: React.FC = () => {
             </div>
             <div>
               <span className="text-slate-400">Parent / Guardian:</span>
-              <div className="font-medium text-slate-800 mt-0.5">{student.parentName} ({student.parentEmail})</div>
+              <div className="font-medium text-slate-800 mt-0.5">{student.parentName || '—'} ({student.parentEmail || student.parentPhone || 'No contact provided'})</div>
             </div>
             <div>
               <span className="text-slate-400">Verified By:</span>
@@ -177,6 +188,37 @@ export const StudentRegistrationPage: React.FC = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Course</label>
+              <input type="text" required value={form.course} onChange={(e) => setForm({ ...form, course: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Branch</label>
+              <input type="text" required placeholder="e.g. Computer Science and Engineering" value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Year</label>
+              <select value={form.year} onChange={(e) => setForm({ ...form, year: Number(e.target.value) })} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                {[1, 2, 3, 4, 5, 6].map((year) => <option key={year} value={year}>Year {year}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Semester</label>
+              <select value={form.semester} onChange={(e) => setForm({ ...form, semester: Number(e.target.value) })} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((semester) => <option key={semester} value={semester}>Semester {semester}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Email</label>
+              <input type="email" required value={form.studentEmail} onChange={(e) => setForm({ ...form, studentEmail: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Phone</label>
+              <input type="tel" value={form.studentPhone} onChange={(e) => setForm({ ...form, studentPhone: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Hostel</label>
@@ -186,7 +228,7 @@ export const StudentRegistrationPage: React.FC = () => {
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white"
               >
                 <option value="h-shivalik">Boys Hostel 1</option>
-                <option value="h-mandakini">Girls Hostel</option>
+                {!isCaretaker && <option value="h-mandakini">Girls Hostel</option>}
                 <option value="h-nilgiri">Boys Hostel 2</option>
               </select>
             </div>
@@ -224,12 +266,15 @@ export const StudentRegistrationPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Parent Email (For Absence Alerts)</label>
+              <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Parent Email or Phone (Optional)</label>
               <input
-                type="email"
-                required
-                value={form.parentEmail}
-                onChange={(e) => setForm({ ...form, parentEmail: e.target.value })}
+                type="text"
+                placeholder="Email address or phone number"
+                value={form.parentEmail || form.parentPhone}
+                onChange={(e) => {
+                  const value = e.target.value.trim();
+                  setForm({ ...form, parentEmail: value.includes('@') ? value : '', parentPhone: value.includes('@') ? '' : value });
+                }}
                 className="w-full p-2 border border-slate-300 rounded-lg"
               />
             </div>
