@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Cpu,
-  Upload,
   UserPlus,
   CheckCircle2,
-  AlertTriangle,
   RefreshCw,
-  HardDrive,
-  ShieldCheck,
-  Building2
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { BiometricDevice, Hostel, Student } from '../types';
@@ -19,6 +14,17 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   const [selectedDevice, setSelectedDevice] = useState<string>('bdev-shiv-01');
   const [syncStatus, setSyncStatus] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [deviceForm, setDeviceForm] = useState({
+    name: '',
+    model: '',
+    serialNumber: '',
+    location: '',
+    installationDate: '',
+    installedBy: '',
+    installationNotes: ''
+  });
+  const [isSavingDevice, setIsSavingDevice] = useState(false);
+  const [deviceFeedback, setDeviceFeedback] = useState<string | null>(null);
 
   // Onboard form state (FR-02)
   const [studentForm, setStudentForm] = useState<{
@@ -63,7 +69,23 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   const loadData = async () => {
     try {
       const devRes = await apiService.getBiometricDevices();
-      if (devRes.success) setDevices(devRes.devices.filter((device) => device.hostelId !== 'h-mandakini'));
+      if (devRes.success) {
+        const availableDevices = devRes.devices.filter((device) => device.hostelId !== 'h-mandakini');
+        setDevices(availableDevices);
+        const selected = availableDevices.find((device) => device.id === selectedDevice) || availableDevices[0];
+        if (selected) {
+          setSelectedDevice(selected.id);
+          setDeviceForm({
+            name: selected.name || '',
+            model: selected.model || '',
+            serialNumber: selected.serialNumber || selected.deviceId || '',
+            location: selected.location || '',
+            installationDate: selected.installationDate || '',
+            installedBy: selected.installedBy || '',
+            installationNotes: selected.installationNotes || ''
+          });
+        }
+      }
 
       const hRes = await apiService.getHostels();
       if (hRes.success) setHostels(hRes.hostels.filter((hostel) => hostel.id !== 'h-mandakini'));
@@ -75,6 +97,40 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleDeviceDetailsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeviceFeedback(null);
+    setIsSavingDevice(true);
+    try {
+      const res = await apiService.updateBiometricDevice(selectedDevice, deviceForm);
+      if (res.success) {
+        setDevices((current) => current.map((device) => device.id === res.device.id ? res.device : device));
+        setDeviceFeedback(res.message);
+      }
+    } catch (err: any) {
+      setDeviceFeedback(err.response?.data?.message || 'Could not save device details.');
+    } finally {
+      setIsSavingDevice(false);
+    }
+  };
+
+  const handleDeviceSelection = (deviceId: string) => {
+    const device = devices.find((entry) => entry.id === deviceId);
+    setSelectedDevice(deviceId);
+    setDeviceFeedback(null);
+    if (device) {
+      setDeviceForm({
+        name: device.name || '',
+        model: device.model || '',
+        serialNumber: device.serialNumber || device.deviceId || '',
+        location: device.location || '',
+        installationDate: device.installationDate || '',
+        installedBy: device.installedBy || '',
+        installationNotes: device.installationNotes || ''
+      });
+    }
+  };
 
   // Run Biometric Log Sync from Local Device (FR-01)
   const handleSyncPunches = async () => {
@@ -149,7 +205,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               </label>
               <select
                 value={selectedDevice}
-                onChange={(e) => setSelectedDevice(e.target.value)}
+                onChange={(e) => handleDeviceSelection(e.target.value)}
                 className="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-xs font-medium"
               >
                 {devices.map((d) => (
@@ -160,11 +216,47 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               </select>
             </div>
 
-            <div className="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] space-y-1">
-              <div className="text-slate-400"># Authorized Terminal Ingestion CLI</div>
-              <div className="text-emerald-400">$ fetch-local-biometric --device={selectedDevice} --format=raw_log</div>
-              <div className="text-slate-300">Punches after 7:00 PM through 10:00 PM IST are late; punches after 10:00 PM are defaulters. Students without a punch are evaluated at 10:00 PM.</div>
-            </div>
+            <form onSubmit={handleDeviceDetailsSubmit} className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+              <div className="text-xs font-bold text-slate-800">Device Installation Details</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
+                  Device Name
+                  <input required value={deviceForm.name} onChange={(e) => setDeviceForm({ ...deviceForm, name: e.target.value })} placeholder="e.g. Boys Hostel 1 Main Gate" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
+                </label>
+                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
+                  Device Model
+                  <input required value={deviceForm.model} onChange={(e) => setDeviceForm({ ...deviceForm, model: e.target.value })} placeholder="e.g. ESSL K30" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
+                </label>
+                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
+                  Serial Number / Device Code
+                  <input required value={deviceForm.serialNumber} onChange={(e) => setDeviceForm({ ...deviceForm, serialNumber: e.target.value })} className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-mono font-normal normal-case" />
+                </label>
+                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
+                  Installation Location
+                  <input required value={deviceForm.location} onChange={(e) => setDeviceForm({ ...deviceForm, location: e.target.value })} placeholder="e.g. Main entrance" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
+                </label>
+                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
+                  Installation Date
+                  <input required type="date" value={deviceForm.installationDate} onChange={(e) => setDeviceForm({ ...deviceForm, installationDate: e.target.value })} className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
+                </label>
+                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
+                  Installed By
+                  <input required value={deviceForm.installedBy} onChange={(e) => setDeviceForm({ ...deviceForm, installedBy: e.target.value })} placeholder="Installer's full name" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
+                </label>
+              </div>
+              <label className="block font-semibold text-slate-600 text-[10px] uppercase">
+                Additional Details
+                <textarea value={deviceForm.installationNotes} onChange={(e) => setDeviceForm({ ...deviceForm, installationNotes: e.target.value })} rows={2} placeholder="Optional notes about the device or installation" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
+              </label>
+              {deviceFeedback && (
+                <div className={`p-2 rounded-lg text-xs ${deviceFeedback.includes('saved') ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+                  {deviceFeedback}
+                </div>
+              )}
+              <button type="submit" disabled={isSavingDevice} className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold disabled:opacity-50">
+                {isSavingDevice ? 'Saving Device Details…' : 'Save Device Details'}
+              </button>
+            </form>
 
             <button
               disabled={isSyncing}
@@ -202,7 +294,9 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                 <div key={d.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs">
                   <div>
                     <div className="font-semibold text-slate-800">{d.name}</div>
+                    <div className="text-[10px] text-slate-500">{d.model || 'Model not recorded'} · {d.location}</div>
                     <div className="text-[10px] text-slate-400 font-mono">Last Sync: {d.lastSyncAt}</div>
+                    <div className="text-[10px] text-slate-400">Installed {d.installationDate || 'date not recorded'}{d.installedBy ? ` by ${d.installedBy}` : ''}</div>
                   </div>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.status === 'online_synced' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                     {d.status === 'online_synced' ? 'Online Synced' : 'Stale Pending Import'}

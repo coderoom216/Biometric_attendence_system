@@ -208,6 +208,10 @@ export const apiService = {
     const res = await api.get<{ success: boolean; authorizedAdministrator: string; devices: BiometricDevice[] }>('/biometric/devices');
     return res.data;
   },
+  async updateBiometricDevice(deviceId: string, data: Partial<BiometricDevice>) {
+    const res = await api.patch<{ success: boolean; message: string; device: BiometricDevice }>(`/biometric/devices/${deviceId}`, data);
+    return res.data;
+  },
   async syncBiometricLogs(deviceId: string, punches: { biometricId: string; punchTime?: string; punchTimestamp?: string }[]) {
     const res = await api.post<{
       success: boolean;

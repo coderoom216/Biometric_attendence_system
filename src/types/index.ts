@@ -153,8 +153,13 @@ export interface BiometricDevice {
   id: string;
   deviceId: string;
   name: string;
+  model?: string;
+  serialNumber?: string;
   hostelId: string;
   location: string;
+  installationDate?: string;
+  installedBy?: string;
+  installationNotes?: string;
   totalLogsStoredLocally: number;
   lastSyncAt: string;
   status: 'online_synced' | 'stale_pending_import' | 'error';

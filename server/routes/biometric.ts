@@ -22,6 +22,49 @@ router.get(
   }
 );
 
+// PATCH /api/biometric/devices/:deviceId (Record installation details)
+router.patch(
+  '/devices/:deviceId',
+  authenticate,
+  requireRole(['caretaker_operator', 'chief_warden', 'director']),
+  (req: AuthenticatedRequest, res: Response) => {
+    const user = req.user!;
+    const device = store.biometricDevices.find((entry) => entry.id === req.params.deviceId || entry.deviceId === req.params.deviceId);
+    if (!device) {
+      return res.status(404).json({ success: false, message: 'Biometric device not found' });
+    }
+    if (user.role === 'caretaker_operator' && device.hostelId === 'h-mandakini') {
+      return res.status(403).json({ success: false, message: 'Access denied: Girls Hostel devices are unavailable to caretaker accounts.' });
+    }
+
+    const { name, model, serialNumber, location, installationDate, installedBy, installationNotes } = req.body;
+    if (!name?.trim() || !model?.trim() || !serialNumber?.trim() || !location?.trim() || !installedBy?.trim() || !installationDate) {
+      return res.status(400).json({ success: false, message: 'Device name, model, serial number, location, installation date, and installer name are required.' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(installationDate) || Number.isNaN(Date.parse(installationDate))) {
+      return res.status(400).json({ success: false, message: 'Installation date must be a valid date.' });
+    }
+
+    device.name = name.trim();
+    device.model = model.trim();
+    device.serialNumber = serialNumber.trim();
+    device.location = location.trim();
+    device.installationDate = installationDate;
+    device.installedBy = installedBy.trim();
+    device.installationNotes = typeof installationNotes === 'string' ? installationNotes.trim() : '';
+
+    store.logAudit(
+      'BIOMETRIC_DEVICE_DETAILS_UPDATED',
+      user,
+      'BiometricDevice',
+      device.id,
+      `Recorded installation details for ${device.name} (${device.deviceId}), installed by ${device.installedBy} on ${device.installationDate}`
+    );
+
+    return res.json({ success: true, message: 'Device installation details saved.', device });
+  }
+);
+
 // POST /api/biometric/sync (Authorized import script under Mr. Mehra's access - FR-01)
 router.post(
   '/sync',
