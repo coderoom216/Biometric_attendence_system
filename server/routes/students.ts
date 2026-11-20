@@ -233,7 +233,8 @@ router.get('/:studentId', authenticate, requireStudentOwnership('studentId'), (r
 
   return res.json({
     success: true,
-    student
+    student,
+    disciplinary: store.getStudentTokenSummary(studentId)
   });
 });
 

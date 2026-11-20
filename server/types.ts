@@ -70,6 +70,26 @@ export interface Student {
   checkoutStatus: 'active' | 'vacated';
 }
 
+export type DisciplinaryCardStatus = 'none' | 'normal_warning' | 'yellow_card' | 'red_card_blacklist';
+
+export interface TokenHistoryEntry {
+  id: string;
+  studentId: string;
+  date: string;
+  reason: string;
+  tokensReceived: number;
+  warningCardStatus: DisciplinaryCardStatus;
+}
+
+export interface StudentTokenSummary {
+  currentMonth: string;
+  currentMonthTokens: number;
+  lifetimeTokens: number;
+  disciplinaryStatus: DisciplinaryCardStatus;
+  isBlacklisted: boolean;
+  history: TokenHistoryEntry[];
+}
+
 export type AttendanceStatus = 'present' | 'late' | 'approved_leave' | 'absent';
 
 export interface AttendanceRecord {

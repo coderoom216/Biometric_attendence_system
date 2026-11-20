@@ -10,7 +10,8 @@ import {
   ScheduledJobLog,
   BiometricDevice,
   AuditLog,
-  SecurityTestCaseResult
+  SecurityTestCaseResult,
+  StudentTokenSummary
 } from '../types';
 
 const api = axios.create({
@@ -165,7 +166,7 @@ export const apiService = {
     return res.data;
   },
   async getStudentById(id: string) {
-    const res = await api.get<{ success: boolean; student: Student }>(`/students/${id}`);
+    const res = await api.get<{ success: boolean; student: Student; disciplinary: StudentTokenSummary }>(`/students/${id}`);
     return res.data;
   },
   async onboardStudent(data: Partial<Student>) {

@@ -172,6 +172,7 @@ router.post(
       }
 
       if (punchClassification.isDefaulter && att.status !== 'approved_leave') {
+        store.recordDefaulter(student.id, store.virtualDate, punchClassification.remarks);
         store.triggerSequentialNotifications(student, store.virtualDate);
       }
 
