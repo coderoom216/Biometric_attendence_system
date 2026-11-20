@@ -1,0 +1,210 @@
+erDiagram
+
+    USER_ACCOUNT {
+        string user_id PK
+        string role_id FK
+        string name
+        string email UK
+        string password_hash
+        string email
+    }
+
+    ROLE {
+        string role_id PK
+        string role_name UK
+        string role_name
+    }
+
+    STUDENT {
+        string student_id PK
+        string enrollment_no UK
+        string name
+        string course
+        string hostel_id
+        string block
+        string room_number
+        string bed_number
+        string biometric_id UK
+        string verification_status
+        string room_id FK
+        string biometric_id
+        int student_id PK
+        string enrollment_number
+        string full_name
+        string student_email
+        string biometric_hardware_id
+        string parent_guardian_name
+        string parent_email
+        int room_id FK
+    }
+
+    HOSTEL {
+        string hostel_id PK
+        string name
+        string code UK
+        string code
+        int hostel_id PK
+        string hostel_name
+    }
+
+    ATTENDANCE_RECORD {
+        string attendance_id PK
+        string student_id FK
+        date attendance_date
+        string status
+        time punch_time
+        boolean is_defaulter
+        string user_id FK
+    }
+
+    LEAVE_RECORD {
+        string leave_id PK
+        string student_id FK
+        date start_date
+        date end_date
+        string reason
+        string gate_pass_no
+        string user_id FK
+        string approval_status
+    }
+
+    BLOCK {
+        string block_id PK
+        string hostel_id FK
+        string block_name
+        int block_id PK
+        int hostel_id FK
+    }
+
+    ROOM {
+        string room_id PK
+        string block_id FK
+        string room_number
+        int capacity
+        int room_id PK
+        int block_id FK
+    }
+
+    VIOLATION_RECORD {
+        string violation_id PK
+        string student_id FK
+        string violation_type
+        date violation_date
+        string description
+    }
+
+    WARNING_TICKET {
+        string ticket_id PK
+        string violation_id FK
+        string warning_status
+        date issue_date
+    }
+
+    DISCIPLINARY_ACTION {
+        string action_id PK
+        string ticket_id FK
+        string user_id FK
+        string action_taken
+        date action_date
+    }
+
+
+    ALERT_TIER {
+        string tier_id PK
+        string tier_name
+        int threshold
+    }
+
+    EMAIL_ALERT {
+        string alert_id PK
+        string student_id FK
+        string tier_id FK
+        string alert_status
+        date sent_date
+    }
+
+    NOTIFICATION_LOG {
+        string log_id PK
+        string alert_id FK
+        string delivery_status
+        date sent_at
+    }
+
+    SCHEDULED_JOB {
+        string job_id PK
+        string job_name
+        string schedule
+        boolean is_active
+    }
+
+    JOB_EXECUTION_LOG {
+        string execution_id PK
+        string job_id FK
+        date execution_date
+        string status
+    }
+
+    JOB_EVALUATION_RESULT {
+        string result_id PK
+        string execution_id FK
+        string result_status
+    }
+
+    AUDIT_LOG {
+        string audit_id PK
+        string user_id FK
+        string activity
+        date activity_date
+    }
+
+    BIOMETRIC_DEVICE {
+        int device_id PK
+        string device_name
+        string device_status
+        datetime last_sync
+    }
+
+    ATTENDANCE {
+        int attendance_id PK
+        int student_id FK
+        int device_id FK
+        date attendance_date
+        time punch_time
+        string attendance_status
+        string remarks
+    }
+
+    VERIFICATION {
+        int verification_id PK
+        int student_id FK
+        string verification_status
+    }
+
+    ROLE ||--o{ USER_ACCOUNT : assigned_to
+    USER_ACCOUNT ||--o| STUDENT : linked_profile
+    HOSTEL ||--o{ STUDENT : houses
+    STUDENT ||--o{ ATTENDANCE_RECORD : has
+    STUDENT ||--o{ LEAVE_RECORD : has
+    USER_ACCOUNT ||--o{ ATTENDANCE_RECORD : records_or_corrects
+    USER_ACCOUNT ||--o{ LEAVE_RECORD : enters
+    ROLE ||--o{ USER_ACCOUNT : assigned
+    USER_ACCOUNT ||--o{ AUDIT_LOG : generates
+    HOSTEL ||--o{ BLOCK : contains
+    BLOCK ||--o{ ROOM : contains
+    ROOM ||--o{ STUDENT : accommodates
+    STUDENT ||--o{ LEAVE_RECORD : requests
+    USER_ACCOUNT ||--o{ ATTENDANCE_RECORD : manages
+    USER_ACCOUNT ||--o{ LEAVE_RECORD : approves
+    STUDENT ||--o{ VIOLATION_RECORD : commits
+    VIOLATION_RECORD ||--o{ WARNING_TICKET : generates
+    WARNING_TICKET ||--o{ DISCIPLINARY_ACTION : reviewed
+    ALERT_TIER ||--o{ EMAIL_ALERT : defines
+    STUDENT ||--o{ EMAIL_ALERT : receives
+    EMAIL_ALERT ||--o{ NOTIFICATION_LOG : tracks
+    SCHEDULED_JOB ||--o{ JOB_EXECUTION_LOG : executes
+    JOB_EXECUTION_LOG ||--o{ JOB_EVALUATION_RESULT : produces
+    USER_ACCOUNT ||--o{ AUDIT_LOG : creates
+    ROOM ||--o{ STUDENT : allotted_to
+    STUDENT ||--o{ ATTENDANCE : has
+    BIOMETRIC_DEVICE ||--o{ ATTENDANCE : generates
+    STUDENT ||--o| VERIFICATION : undergoes
