@@ -1,15 +1,4 @@
 erDiagram
-    USER {
-        string id PK
-        string name
-        string email
-        string role
-        string phone
-        string hostel_id FK
-        string block_id
-        string student_id FK
-    }
-
     HOSTEL {
         string id PK
         string name
@@ -19,6 +8,8 @@ erDiagram
         int total_floors
         int total_rooms
         int capacity
+        int current_occupancy
+        int available_beds
         string chief_warden
         string residential_warden
     }
@@ -31,6 +22,8 @@ erDiagram
         string room_number
         int capacity
         int current_occupancy
+        int available_beds
+        boolean is_vacant
         string status
     }
 
@@ -138,8 +131,10 @@ erDiagram
     HOSTEL ||--o{ BIOMETRIC_DEVICE : has
     HOSTEL ||--o{ ATTENDANCE_RECORD : scopes
     ROOM ||--o{ STUDENT : assigned_location
-    USER o|--o| STUDENT : linked_profile
     STUDENT ||--o{ ATTENDANCE_RECORD : has
     STUDENT ||--o{ WARNING_TICKET : receives
     BIOMETRIC_DEVICE ||--o{ BIOMETRIC_PUNCH_LOG : imports
     BIOMETRIC_DEVICE ||--o{ ATTENDANCE_RECORD : records
+
+%% current_occupancy, available_beds, and is_vacant are returned for display by the API.
+%% They are calculated values, not separate stored database columns.
