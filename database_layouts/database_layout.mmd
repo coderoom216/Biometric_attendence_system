@@ -1,0 +1,257 @@
+
+erDiagram
+
+    roles {
+        bigint id PK
+        string name UK
+        string description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    users {
+        bigint id PK
+        bigint role_id FK
+        bigint hostel_id FK
+        string name
+        string email UK
+        string password
+        boolean is_active
+        timestamp email_verified_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    hostels {
+        bigint id PK
+        string name
+        string code UK
+        string address
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    rooms {
+        bigint id PK
+        bigint hostel_id FK
+        string room_number
+        int capacity
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    students {
+        bigint id PK
+        bigint user_id FK
+        bigint room_id FK
+        string enrollment_no UK
+        string course
+        string biometric_id UK
+        string hostel_id
+        string bed_number
+        string parent_guardian_name
+        string parent_email
+        string verification_status
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    devices {
+        bigint id PK
+        bigint hostel_id FK
+        string device_name
+        string device_serial UK
+        string device_status
+        datetime last_sync
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    punches {
+        bigint id PK
+        bigint student_id FK
+        bigint device_id FK
+        datetime punched_at
+        datetime synced_at
+        timestamp created_at
+    }
+
+    attendances {
+        bigint id PK
+        bigint student_id FK
+        bigint marked_by FK
+        date attendance_date
+        time punch_time
+        string status
+        boolean is_defaulter
+        string remarks
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    leaves {
+        bigint id PK
+        bigint student_id FK
+        bigint approved_by FK
+        date start_date
+        date end_date
+        string reason
+        string gate_pass_no UK
+        string approval_status
+        datetime approved_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    violations {
+        bigint id PK
+        bigint student_id FK
+        string violation_type
+        date violation_date
+        string description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    tickets {
+        bigint id PK
+        bigint violation_id FK, UK
+        string warning_status
+        date issue_date
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    actions {
+        bigint id PK
+        bigint ticket_id FK
+        bigint user_id FK
+        string action_taken
+        date action_date
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    tokens {
+        bigint id PK
+        bigint student_id FK
+        bigint issued_by FK
+        int token_count
+        string reason
+        date issued_date
+        date month_start
+        timestamp created_at
+    }
+
+    blacklists {
+        bigint id PK
+        bigint student_id FK
+        date month_start
+        int total_tokens
+        string status
+        datetime blacklisted_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    alert_tiers {
+        bigint id PK
+        string tier_name
+        int threshold
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    alerts {
+        bigint id PK
+        bigint student_id FK
+        bigint tier_id FK
+        string alert_type
+        string alert_status
+        datetime triggered_at
+        timestamp created_at
+    }
+
+    notifications {
+        bigint id PK
+        bigint alert_id FK
+        string channel
+        string recipient
+        string delivery_status
+        datetime sent_at
+        text error_message
+        timestamp created_at
+    }
+
+    jobs {
+        bigint id PK
+        string name
+        string schedule
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    executions {
+        bigint id PK
+        bigint job_id FK
+        datetime started_at
+        datetime completed_at
+        string status
+        text error_message
+        timestamp created_at
+    }
+
+    evaluations {
+        bigint id PK
+        bigint execution_id FK
+        string result_status
+        text result_details
+        timestamp created_at
+    }
+
+    audits {
+        bigint id PK
+        bigint user_id FK
+        string activity
+        string entity_type
+        bigint entity_id
+        text details
+        datetime activity_at
+        timestamp created_at
+    }
+
+    roles ||--o{ users : "1:M mapping"
+    hostels ||--o{ users : "1:M mapping"
+    hostels ||--o{ rooms : "1:M mapping"
+    hostels ||--|| devices : "1:1 mapping"
+
+    users ||--o| students : "1:1 mapping"
+    rooms ||--o{ students : "1:M mapping"
+
+    students ||--o{ punches : "1:M mapping"
+    devices ||--o{ punches : "1:M mapping"
+
+    students ||--o{ attendances : "1:M mapping"
+    users ||--o{ attendances : "1:M mapping"
+
+    students ||--o{ leaves : "1:M mapping"
+    users ||--o{ leaves : "1:M mapping"
+
+    students ||--o{ violations : "1:M mapping"
+    violations ||--o| tickets : "1:0..1 mapping"
+    tickets ||--o{ actions : "1:M mapping"
+    users ||--o{ actions : "1:M mapping"
+
+    students ||--o{ tokens : "1:M mapping"
+    users ||--o{ tokens : "1:M mapping"
+    students ||--o{ blacklists : "1:M mapping"
+
+    alert_tiers ||--o{ alerts : "1:M mapping"
+    students ||--o{ alerts : "1:M mapping"
+    alerts ||--o{ notifications : "1:M mapping"
+
+    jobs ||--o{ executions : "1:M mapping"
+    executions ||--o{ evaluations : "1:M mapping"
+
+    users ||--o{ audits : "1:M mapping"
