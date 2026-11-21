@@ -1,0 +1,1007 @@
+# MASTER DEVELOPMENT PROMPT
+# Hostel Attendance Management System — Complete React Frontend + Existing Laravel Backend
+
+## 1. Project Overview
+
+Act as a senior full-stack software engineer, React developer, Laravel developer, UI/UX designer, database architect, and application security engineer.
+
+I am developing a Hostel Attendance Management System for an educational institution under the Spiders Student Development Team.
+
+I will provide a requirements document named `Today Progress.pdf`. Read and analyze the entire PDF, including all four pages, before implementing the project.
+
+The PDF is the primary source of truth for institutional workflows and functional requirements. Implement all 14 functional requirements, FR-01 through FR-14, and respect the operational rules and future expansion roadmap specified in the document.
+
+### Existing technology and development scope
+
+- Existing backend: Laravel.
+- Frontend to build: A completely fresh React application.
+- React build tool: Vite.
+- Existing database: Inspect and preserve it wherever possible.
+- Frontend styling: Tailwind CSS.
+- API communication: Axios.
+- Navigation: React Router.
+- Authentication: Integrate with the existing Laravel authentication system or Laravel Sanctum if compatible.
+- Database: Continue using the existing Laravel-supported database.
+- Operating environment: Windows development environment.
+
+Do not replace the Laravel backend with another backend without a documented technical reason.
+
+Do not delete or overwrite existing Laravel files, database records, biometric integrations, or working backend functionality.
+
+The goal is to create a secure, production-oriented, responsive web application with a professional interface and reliable real backend functionality.
+
+---
+
+# 2. FIRST STEP: ANALYZE THE ENTIRE EXISTING PROJECT
+
+Before writing code, inspect the existing repository.
+
+Examine:
+
+- Laravel version and PHP requirements.
+- Existing frontend and frontend build configuration.
+- `composer.json` and relevant dependency configuration.
+- Existing API routes and web routes.
+- Controllers, models, services, middleware, policies, and form requests.
+- Authentication implementation and session configuration.
+- Database schema, migrations, relationships, and indexes.
+- Existing student, hostel, room, attendance, leave, and notification modules.
+- Existing biometric integration and scheduled jobs.
+- Existing email configuration and queues.
+- Existing authorization rules.
+- Existing automated tests.
+- Current folder structure and environment requirements.
+
+Never display or expose secrets from `.env` or other credential files.
+
+Create a short implementation assessment containing:
+
+1. What already exists.
+2. What is working.
+3. What is incomplete.
+4. What needs modification.
+5. What should be newly implemented in React.
+6. Which backend APIs are already available.
+7. Which APIs need to be created or modified.
+8. Any hardware, server-access, or institutional-policy dependencies.
+
+After the assessment, proceed with implementation in manageable phases.
+
+Do not stop at a plan or provide only sample code. Implement the application and verify each phase using the actual repository.
+
+If a necessary requirement cannot be completed because credentials, APIs, or hardware access are unavailable, implement the appropriate interface and integration boundary, document the dependency, and never pretend the integration is operational.
+
+---
+
+# 3. PROJECT ARCHITECTURE
+
+Create a separate React frontend without unnecessarily restructuring the existing Laravel backend.
+
+Recommended architecture:
+
+- React + Vite frontend.
+- Laravel REST API backend.
+- Existing database and business logic.
+- Laravel authentication and server-side authorization.
+- Background jobs and queues for email notifications where supported.
+- Scheduled Laravel commands for daily attendance evaluation.
+- Authorized biometric import/synchronization service.
+- Automated tests for business rules and authorization.
+
+The frontend and backend must communicate through documented APIs.
+
+Configure development and production API URLs using environment variables.
+
+Never hardcode production credentials, email passwords, database credentials, API keys, or private server URLs.
+
+Use the existing backend conventions wherever practical.
+
+If React and Laravel run on separate origins, configure CORS, cookies, credentials, CSRF protection, and session settings correctly.
+
+Prefer secure, HTTP-only session cookies with an appropriate Laravel authentication setup when compatible with the deployment architecture. Do not store privileged authentication tokens or secrets in localStorage.
+
+---
+
+# 4. FRESH REACT FRONTEND
+
+Create a new React application using Vite.
+
+Use:
+
+- React.
+- Vite.
+- React Router.
+- Tailwind CSS.
+- Axios.
+- Lucide React.
+- Recharts or an equivalent charting library when useful.
+- Reusable components and maintainable modular code.
+
+Create a clear project structure, for example:
+
+`src/components/`
+`src/layouts/`
+`src/pages/`
+`src/dashboards/`
+`src/routes/`
+`src/services/`
+`src/contexts/`
+`src/hooks/`
+`src/utils/`
+`src/assets/`
+
+Organize components, layouts, pages, API services, and permission-related logic logically.
+
+Use a shared design system for typography, colors, spacing, form controls, cards, tables, navigation, and feedback states.
+
+Avoid putting the entire application into one large component.
+
+Use proper loading states, empty states, API error handling, form validation, and reusable components.
+
+---
+
+# 5. LOGIN MUST BE THE FIRST PAGE
+
+The application must open on the login page when no valid authenticated session exists.
+
+Create a professional and clean login screen with:
+
+- Institutional branding and project title.
+- Username or email field.
+- Password field.
+- Show/hide password button.
+- Input validation.
+- Login loading state.
+- Clear invalid-credentials and server-error messages.
+- Forgot-password link.
+- Secure password-reset workflow.
+- Responsive layout for phones, tablets, and desktops.
+
+Do not allow unauthenticated users to open protected dashboards or data pages.
+
+After successful authentication, fetch the authenticated user's actual role from the Laravel backend and redirect the user to the correct dashboard.
+
+Do not trust a role submitted by the browser.
+
+Do not let users choose a privileged role from the login form.
+
+Implement logout, session expiration, unauthorized responses, and session recovery appropriately.
+
+If the backend already has an authentication system, integrate with it rather than creating a conflicting second system.
+
+Student registration and staff account creation must follow the institutional verification and authorization rules.
+
+---
+
+# 6. DIFFERENT DASHBOARD FOR EVERY ROLE
+
+Create distinct, functional dashboards with separate navigation, page layouts, statistics, tables, charts, and authorized actions.
+
+Do not build one generic dashboard that merely changes its heading based on the role.
+
+## A. Student Dashboard
+
+Students must be able to:
+
+- View their own attendance summary.
+- View their own attendance history.
+- View present, late, absent, and approved-leave records.
+- View their own hostel, room, and relevant profile details.
+- View attendance trends and personal statistics.
+- View their own leave records.
+- View registration-verification status.
+- View relevant personal notifications.
+- View permitted historical information.
+
+Students must not be able to:
+
+- View another student's information.
+- Search or enumerate other students' private records.
+- View another student's enrollment number, room, attendance, parent contact, or leave history.
+- Modify verified master data.
+- Modify biometric attendance logs.
+- Approve their own leave.
+- Change their role or permissions.
+- Access administrative dashboards, APIs, or reports.
+
+Student dashboards must remain simple, clear, and mobile-friendly.
+
+## B. Residential Warden Dashboard
+
+Create a separate Residential Warden dashboard for the responsibilities assigned in the PDF.
+
+Provide:
+
+- Assigned-resident overview.
+- Attendance monitoring.
+- Student registration verification.
+- Approved-leave entry.
+- Missing-attendance follow-up.
+- Relevant student records.
+- Authorized attendance correction workflows.
+- Hostel-specific reports.
+- Notification and exception status.
+- Relevant audit history.
+
+The Residential Warden must not automatically gain access to unrelated hostels.
+
+The system must preserve the distinction between Residential Warden and Warden where the institution uses separate roles.
+
+## C. Warden Dashboard
+
+Provide:
+
+- Assigned hostel/block attendance statistics.
+- Present, late, absent, and leave counts.
+- Assigned-hostel student list.
+- Post-cutoff defaulter list.
+- Attendance history.
+- Hostel-specific reports.
+- Leave and correction visibility according to permissions.
+- Notification delivery status.
+- Relevant exception and audit information.
+
+Restrict all data to the warden's authorized hostel/block scope.
+
+## D. Chief Warden Dashboard
+
+Provide authorized institution-wide hostel oversight:
+
+- Consolidated attendance statistics.
+- Hostel-wise and block-wise comparisons.
+- Attendance trends.
+- Post-cutoff defaulter summaries.
+- Relevant student and warden records.
+- Leave and correction audit summaries.
+- Notification failures and unresolved exceptions.
+- Historical reports and exports.
+- Biometric synchronization health.
+
+Allow institution-wide visibility only to the extent authorized by the institutional policy.
+
+## E. Director Dashboard
+
+Create a separate executive dashboard with:
+
+- Total registered students.
+- Active hostel residents.
+- Present, late, absent, and approved-leave counts.
+- Hostel-wise attendance statistics.
+- Block-wise comparisons.
+- Historical attendance trends.
+- Post-cutoff defaulter overview.
+- Daily consolidated reports.
+- Email notification status.
+- Biometric synchronization health.
+- Scheduled job execution status.
+- Administrative exception summaries.
+- Authorized audit reports.
+
+The Director dashboard should emphasize high-level statistics, clear visual hierarchy, and meaningful operational insights.
+
+Do not create fake statistics or display hardcoded production values.
+
+## F. Additional Operational Roles
+
+Support the following roles if required by the existing system and institutional policy:
+
+- Authorized caretaker/data-entry official.
+- Biometric integration operator.
+- Technical administrator.
+
+Assign explicit permissions to each role.
+
+Technical access must not automatically grant unrestricted access to personal information.
+
+Maintain a configurable role-permission matrix rather than scattering hardcoded role checks throughout the application.
+
+---
+
+# 7. STRICT SECURITY AND USER DATA ISOLATION
+
+This is the highest-priority requirement.
+
+One user must never be able to access another user's private information unless the requesting user has explicit authorization.
+
+Frontend restrictions alone are insufficient. Enforce authorization on the Laravel backend for every relevant API request.
+
+Implement:
+
+1. Authentication on all protected endpoints.
+2. Server-side role-based access control.
+3. Student-record ownership checks.
+4. Hostel/block scope checks.
+5. Explicit permissions for administrative operations.
+6. Authorization on individual record endpoints.
+7. Authorization on search and filter endpoints.
+8. Authorization on report generation and file downloads.
+9. Authorization on attendance corrections and leave operations.
+10. Safe error responses that do not reveal private records.
+11. Secure session management and CSRF protection where applicable.
+12. Server-side input validation.
+13. Protection against SQL injection through parameterized queries or ORM usage.
+14. Rate limiting on login and sensitive operations.
+15. Secure password hashing through Laravel's supported mechanisms.
+16. Audit logs for security-sensitive changes.
+17. Appropriate protection for parent/guardian contacts and Aadhaar information.
+18. Environment-based secrets management.
+19. Protection against insecure direct object reference (IDOR) vulnerabilities.
+20. Proper session expiration and logout handling.
+
+Never trust the role, student ID, hostel ID, permissions, or ownership claims supplied by the browser.
+
+Derive identity and authorization from the authenticated server-side context.
+
+Where practical, use policies, gates, middleware, and scoped database queries.
+
+Never send unrelated student records to the browser and rely on React to hide them.
+
+Do not expose sensitive values in console logs, API error messages, URLs, or unnecessary application logs.
+
+### Mandatory security tests
+
+Create at least the following tests:
+
+- Student A attempts to access Student B's attendance.
+- Student A attempts to access Student B's profile.
+- Student A changes a record ID in an API request.
+- Student A attempts to modify another student's attendance.
+- Student A attempts to approve leave.
+- Warden A attempts to access an unassigned hostel.
+- Warden attempts to open a Director-only report.
+- Unauthenticated user requests a protected endpoint.
+- Unauthorized user attempts to download a restricted report.
+- User attempts to escalate their own role through a modified request.
+
+All unauthorized attempts must fail without leaking protected data.
+
+A visually separate dashboard does not count as secure isolation unless backend authorization independently enforces it.
+
+---
+
+# 8. MOBILE-FRIENDLY RESPONSIVE DESIGN
+
+The complete application must work on:
+
+- Android phones.
+- iPhones.
+- Tablets.
+- Laptops.
+- Desktop monitors.
+
+Use mobile-first responsive design.
+
+Requirements:
+
+- Responsive sidebar with a mobile drawer.
+- Compact top navigation.
+- Touch-friendly controls.
+- Responsive dashboard cards.
+- Properly resized charts.
+- Readable tables on narrow screens.
+- Horizontal scrolling only where necessary.
+- Alternative card layouts for important mobile tables where appropriate.
+- Responsive modals and forms.
+- No overlapping buttons or content.
+- No unintended horizontal overflow.
+- Accessible labels and keyboard navigation.
+- Visible focus states.
+- Appropriate color contrast.
+- Responsive empty, loading, error, and success states.
+
+Test at viewport widths of approximately 320px, 375px, 768px, 1024px, and 1440px.
+
+Do not consider the UI complete until the core workflows work on both mobile and desktop.
+
+---
+
+# 9. EACH PAGE MUST HAVE ITS OWN PURPOSE AND LAYOUT
+
+Use a consistent design language, but make every page visually and functionally appropriate to its task.
+
+Implement the following pages as required by the backend and institutional workflow:
+
+### Authentication
+- Login.
+- Forgot password.
+- Reset password.
+- Unauthorized access.
+- Session-expired handling.
+
+### Student
+- Student dashboard.
+- Personal attendance.
+- Attendance details.
+- Personal profile.
+- Registration form.
+- Verification status.
+- Leave history.
+- Notifications.
+
+### Residential Warden and Warden
+- Warden dashboard.
+- Student list.
+- Student details.
+- Registration verification.
+- Attendance monitoring.
+- Defaulter list.
+- Approved-leave entry.
+- Attendance correction workflow.
+- Hostel/block reports.
+
+### Chief Warden and Director
+- Separate executive dashboards.
+- Consolidated attendance reports.
+- Hostel/block comparisons.
+- Defaulter summaries.
+- Historical reporting.
+- Notification monitoring.
+- Integration-health overview.
+- Audit and exception reports.
+
+### System and administration
+- Hostel management.
+- Block, floor, and room management.
+- Room allocation.
+- Checkout/vacating records.
+- Authorized user and role management.
+- Biometric synchronization status.
+- Scheduled job execution logs.
+- Email delivery logs.
+- Audit history.
+- System health.
+- Not-found page.
+
+Do not expose pages or actions to users who lack permission.
+
+Use appropriate filters, pagination, status badges, date selectors, confirmation dialogs, and search functionality.
+
+---
+
+# 10. STUDENT ONBOARDING AND VERIFICATION
+
+Follow the workflow in the PDF.
+
+Students do not directly create or control verified master records.
+
+Authorized caretakers or officials enter verified information, which may include:
+
+- Enrollment number.
+- Student name.
+- Course.
+- Hostel/block.
+- Room number.
+- Parent/guardian email.
+- Contact details.
+- Biometric ID.
+
+Students may submit a registration form for formal review.
+
+Wardens verify the registration request through an authorized dashboard.
+
+Only verified and properly linked records become active student records.
+
+Implement:
+
+- Duplicate enrollment-number checks.
+- Unique account-to-student mapping.
+- Verification status.
+- Validation and error handling.
+- Authorized record corrections.
+- Audit history.
+- Restricted access to sensitive fields.
+
+A student must not be able to bypass verification by manipulating a frontend request.
+
+Collect and retain Aadhaar information only when institutionally authorized and legally appropriate. Restrict access and apply suitable safeguards.
+
+---
+
+# 11. HOSTEL, BLOCK, FLOOR, ROOM, AND CHECKOUT MANAGEMENT
+
+Implement the hostel-management requirements from FR-04.
+
+Support:
+
+- Multiple hostels.
+- Hostel blocks.
+- Floors.
+- Rooms.
+- Room capacity.
+- Room allocation.
+- Current occupancy.
+- Vacant-room identification.
+- Student-to-room assignment history.
+- Hostel checkout/vacating records.
+
+Prevent invalid allocations, duplicate active room assignments, and allocations that exceed room capacity.
+
+Restrict warden access to the assigned scope.
+
+Keep checkout and historical allocation records rather than silently deleting history.
+
+Design the schema so the application can support additional campuses later.
+
+---
+
+# 12. BIOMETRIC ATTENDANCE INTEGRATION
+
+Implement FR-01 and the related attendance-processing requirements.
+
+The PDF states that biometric devices store data locally without direct LAN connectivity, and authorized personnel retrieve local logs for synchronization with the central web portal.
+
+Therefore:
+
+- Inspect the existing biometric integration before changing it.
+- Use only authorized device interfaces, exports, credentials, and scripts.
+- Keep device-specific logic inside a backend integration service.
+- Support the available authorized import format.
+- Store source timestamps and synchronization timestamps.
+- Handle duplicate logs safely.
+- Handle missing or delayed logs.
+- Record synchronization failures.
+- Expose the last successful synchronization time.
+- Provide authorized administrators with integration-health status.
+- Preserve the source of attendance records.
+
+Do not assume direct live biometric connectivity exists.
+
+If hardware access is unavailable, build a clearly identified import/testing workflow and document the hardware integration dependency.
+
+Do not use fabricated biometric data as real attendance.
+
+---
+
+# 13. ATTENDANCE PROCESSING AND DAILY CUTOFF
+
+Implement FR-05, FR-06, and FR-07.
+
+Supported attendance statuses:
+
+- Present.
+- Late.
+- Approved Leave.
+- Absent/Defaulter.
+
+### Exact timing requirements
+
+Use the `Asia/Kolkata` timezone.
+
+At 7:00 PM IST each day:
+
+1. Run the scheduled attendance evaluation.
+2. Identify attendance records that meet the institution's absence rules.
+3. Apply approved leave.
+4. Freeze ordinary attendance entry according to the institutional policy.
+5. Record the execution result.
+6. Identify any processing failures.
+
+At 7:01 PM IST:
+
+- Make the evaluated defaulter list available to authorized executive and operational dashboards.
+- Show the relevant student, hostel/block, and attendance status only to authorized users.
+- Trigger the configured notification workflow.
+
+Implement the cutoff and scheduled processing in Laravel, not in the browser.
+
+Use an appropriate Laravel scheduler and scheduled command.
+
+Make the job idempotent, timezone-aware, and safe to retry.
+
+Record:
+
+- Job start time.
+- Job completion time.
+- Processing status.
+- Relevant record counts.
+- Failure details.
+- Last successful execution.
+
+Handle delayed biometric imports through a documented correction/reconciliation workflow.
+
+Do not silently rewrite frozen attendance records.
+
+Authorized corrections must preserve audit history.
+
+Define the exact boundary behaviour for events recorded at or near 7:00 PM and test it explicitly.
+
+---
+
+# 14. LEAVE APPLICATION AND APPROVED-LEAVE WORKFLOW
+
+Implement FR-11 according to the institutional policy.
+
+The PDF states that students cannot directly apply for or approve leave in the system on their own. The student submits a formal application to the Residential Warden, who verifies and enters the approved leave into the system.
+
+Implement:
+
+1. A formal leave-submission and review process.
+2. Authorized Residential Warden verification.
+3. Entry of approved leave by authorized staff.
+4. Leave start date and end date.
+5. Approval details and applicable reason fields.
+6. Student visibility into their own leave status and history.
+7. Audit history for every change.
+8. Validation against invalid dates and duplicate entries.
+9. Suppression of absence alerts for approved dates.
+
+Do not treat a pending or rejected leave request as approved.
+
+Do not permit students to approve their own leave or modify authoritative attendance records.
+
+Where the existing project already has an approved institutional leave process, integrate with that process rather than introducing conflicting rules.
+
+---
+
+# 15. SEQUENTIAL EMAIL NOTIFICATION WORKFLOW
+
+Implement FR-03, FR-08, and FR-12.
+
+When a student is identified as absent/defaulter after the attendance evaluation, the notification hierarchy must follow the order specified in the PDF:
+
+1. Residential Warden.
+2. Warden.
+3. Chief Warden.
+4. Director.
+5. Student's parents/guardians.
+6. Student.
+
+Requirements:
+
+- Trigger notifications from backend processing.
+- Respect approved leave.
+- Validate recipient addresses.
+- Use configurable email templates.
+- Track each recipient and delivery attempt.
+- Record timestamps, status, retry count, and failure reasons.
+- Support background queues where available.
+- Avoid duplicate successful notifications.
+- Handle temporary failures and missing email addresses.
+- Provide authorized notification monitoring.
+- Keep sensitive student information out of unnecessary email content.
+
+The PDF defines the recipient order but does not specify exact waiting intervals or what to do when an earlier recipient cannot be reached.
+
+Therefore, make escalation delays and failure-handling rules configurable.
+
+Do not invent institutional escalation intervals. Document the unresolved policy decisions and request confirmation before production deployment.
+
+Never claim an email was delivered merely because the application attempted to send it.
+
+Distinguish queued, attempted, sent, delivered where verifiable, and failed states according to available infrastructure.
+
+---
+
+# 16. REPORTING AND HISTORICAL SEARCH
+
+Implement FR-09 and FR-13.
+
+Provide authorized users with:
+
+- Daily attendance reports.
+- Hostel-wise attendance reports.
+- Block-wise attendance reports.
+- Consolidated institutional reports.
+- Historical attendance search.
+- Historical leave search.
+- Notification-log search.
+- Date filters.
+- Hostel and block filters.
+- Attendance-status filters.
+- Student search within the user's authorized scope.
+- Pagination and sorting.
+- CSV or Excel export where appropriate.
+
+All reports, searches, filters, and exports must enforce the same authorization rules as normal API endpoints.
+
+Do not export unrelated students' information.
+
+Provide accurate report totals derived from actual database records.
+
+Handle empty results and invalid filter combinations gracefully.
+
+---
+
+# 17. FAILURE HANDLING AND SYSTEM HEALTH
+
+Implement FR-12.
+
+Detect and report:
+
+- Biometric synchronization failures.
+- Network and server connection failures.
+- Stale biometric logs.
+- Missing parent/guardian email addresses.
+- Email notification failures.
+- Scheduled-job failures.
+- Invalid or duplicate imported records.
+- Unexpected attendance-processing errors.
+
+Provide an authorized system-health page with:
+
+- Integration status.
+- Last successful synchronization.
+- Last scheduled-job execution.
+- Pending notification counts.
+- Failed notification counts.
+- Relevant error summaries.
+- Safe retry actions where supported.
+
+Do not expose technical secrets or sensitive personal data in health dashboards.
+
+Ensure failures can be investigated through structured logs and audit records.
+
+---
+
+# 18. DATABASE AND API IMPLEMENTATION
+
+Inspect the existing database and reuse its current schema when appropriate.
+
+Do not create duplicate tables or incompatible relationships without first understanding the existing implementation.
+
+Where necessary, define or update entities for:
+
+- Users.
+- Roles and permissions.
+- Student profiles.
+- Parent/guardian contacts.
+- Hostels.
+- Blocks and floors.
+- Rooms.
+- Room allocations and checkout history.
+- Registration requests.
+- Biometric devices and imported logs.
+- Attendance records.
+- Leave records.
+- Notification events.
+- Notification delivery attempts.
+- Scheduled-job logs.
+- Audit events.
+- Integration health.
+
+Use proper foreign keys, indexes, uniqueness constraints, relationships, transactions, and timestamps.
+
+Preserve existing production data.
+
+Create new migrations instead of manually changing deployed databases.
+
+Document any required data migration or backfill.
+
+Build and document APIs for:
+
+- Authentication.
+- Current authenticated user.
+- Dashboard summaries.
+- Student records.
+- Registration verification.
+- Hostel and room management.
+- Attendance.
+- Leave.
+- Reports and exports.
+- Notifications.
+- Audit history.
+- Integration health.
+
+Use server-side pagination and filtering.
+
+Return only the fields required by the requesting user and operation.
+
+Do not expose passwords, secrets, or unnecessary sensitive fields through API resources.
+
+---
+
+# 19. UI/UX DESIGN REQUIREMENTS
+
+Create a modern, professional institutional dashboard.
+
+The visual design should be:
+
+- Clean.
+- Minimal.
+- Consistent.
+- Accessible.
+- Responsive.
+- Easy to navigate.
+- Suitable for an educational institution.
+
+Use:
+
+- Consistent spacing and typography.
+- Carefully selected neutral colors and one restrained accent palette.
+- Distinct dashboard layouts for each role.
+- Clear status indicators.
+- Meaningful charts and statistics.
+- Well-designed forms and tables.
+- Breadcrumbs where useful.
+- Search and filtering.
+- Confirmation dialogs for sensitive operations.
+- Success, warning, error, and loading feedback.
+
+Avoid:
+
+- Excessive gradients.
+- Unnecessary animation.
+- Repetitive placeholder cards.
+- Fake statistics.
+- Decorative elements that reduce readability.
+- Inconsistent spacing.
+- Identical page layouts for unrelated tasks.
+
+Every page should have a clear purpose and a layout appropriate to its workflow.
+
+Use realistic sample data only in an explicitly marked development/demo environment.
+
+Production dashboards must use actual authorized API responses.
+
+---
+
+# 20. FUTURE EXPANSION
+
+According to page 4 of the requirements PDF, keep the architecture extensible for:
+
+- Hostel allotment applications.
+- Fee-status tracking.
+- Hostel-empty/vacating/checkout applications.
+- Mess attendance.
+- Daily meal tracking.
+- Mess advance payments.
+- Monthly mess rebate and billing.
+- Multi-campus deployment.
+- Multi-college deployment.
+- Classroom-level biometric attendance.
+
+Do not build every future module before completing the current core requirements.
+
+Ensure that future modules can be added without redesigning authentication, tenant/campus scope, hostel relationships, or permission handling.
+
+---
+
+# 21. TESTING REQUIREMENTS
+
+Use the testing tools already established in the project. Add appropriate Laravel backend tests and React tests where necessary.
+
+Test the following:
+
+### Authentication
+- Valid login.
+- Invalid login.
+- Logout.
+- Session expiration.
+- Password reset.
+- Protected routes.
+
+### Authorization
+- Student-to-student data isolation.
+- Warden-to-other-hostel isolation.
+- Unauthorized dashboard access.
+- Unauthorized API access.
+- Unauthorized attendance modifications.
+- Unauthorized leave approval.
+- Restricted report exports.
+- Role-escalation attempts.
+- IDOR attempts.
+
+### Attendance
+- Present status.
+- Late status.
+- Approved leave.
+- Absent/defaulter detection.
+- Attendance cutoff.
+- Defaulter visibility.
+- Duplicate biometric logs.
+- Delayed biometric imports.
+- Authorized corrections.
+- Scheduled-job retry behaviour.
+
+### Notifications
+- Correct recipient ordering.
+- Approved-leave suppression.
+- Missing parent email.
+- Temporary delivery failure.
+- Retry handling.
+- Duplicate-notification prevention.
+- Audit and delivery status.
+
+### Responsive UI
+- Mobile navigation.
+- Responsive forms.
+- Dashboard cards.
+- Tables and filters.
+- Charts.
+- Modal dialogs.
+- Loading and error states.
+- No unintended horizontal overflow.
+
+Use a controllable test clock or equivalent method to verify the 7:00 PM and 7:01 PM behaviour without waiting for the actual time.
+
+Do not run destructive tests against production data.
+
+---
+
+# 22. IMPLEMENTATION PHASES
+
+Execute the work in this order.
+
+## Phase 1: Existing Project Audit
+Inspect the Laravel backend, database, routes, authentication, jobs, and current frontend. Produce a concise technical assessment.
+
+## Phase 2: React Setup
+Create the separate Vite-based React application. Install dependencies, configure environment variables, and verify that the frontend starts.
+
+## Phase 3: Authentication
+Implement the login page, password recovery, logout, authenticated-user retrieval, and protected routes. Connect to the actual Laravel authentication API.
+
+## Phase 4: Security Foundation
+Implement and test role permissions, ownership checks, hostel scoping, and backend authorization before exposing sensitive dashboards.
+
+## Phase 5: Dashboard and Responsive UI
+Build the four primary dashboards and additional operational-role views. Implement responsive layouts and role-specific navigation.
+
+## Phase 6: Core Modules
+Implement student management, verification, hostel management, attendance, leave, and authorized corrections.
+
+## Phase 7: Automation
+Implement the scheduled cutoff, defaulter evaluation, email escalation, notification logs, and integration-health monitoring.
+
+## Phase 8: Reporting
+Implement historical search, authorized reports, filters, exports, and audit views.
+
+## Phase 9: Testing and Hardening
+Run authentication, authorization, business-rule, API, and responsive UI tests. Fix critical defects before declaring completion.
+
+## Phase 10: Documentation and Delivery
+Provide installation instructions, environment configuration, development commands, API documentation, migration instructions, testing instructions, and a clear list of remaining dependencies.
+
+After each phase, report the files changed, functionality implemented, tests run, and any unresolved issues.
+
+---
+
+# 23. REQUIRED DELIVERY
+
+At the end, provide:
+
+1. A working React frontend.
+2. Integration with the existing Laravel backend.
+3. A functional login and logout workflow.
+4. Four distinct main dashboards.
+5. Additional operational-role dashboards where required.
+6. Responsive pages for phones, tablets, and desktops.
+7. Server-enforced role-based authorization.
+8. Verified cross-user and cross-hostel data isolation.
+9. Student onboarding and verification.
+10. Attendance and leave workflows.
+11. The 7:00 PM IST attendance cutoff.
+12. The 7:01 PM IST defaulter list.
+13. Sequential notification processing.
+14. Daily and historical reporting.
+15. Failure monitoring and audit logs.
+16. Automated tests and documented test results.
+17. Environment-variable examples without secrets.
+18. Clear installation and startup commands.
+19. Documentation of biometric hardware requirements.
+20. A functional-requirement checklist mapping FR-01 through FR-14 to implementation and tests.
+21. A list of incomplete features and external dependencies.
+
+Do not mark a feature complete if only its UI has been built.
+
+Do not fabricate test results, API responses, biometric integrations, email delivery, or successful deployments.
+
+---
+
+# 24. FINAL EXECUTION INSTRUCTIONS
+
+Start by reading `Today Progress.pdf` and inspecting the existing Laravel repository.
+
+Then audit the current backend and create the separate React application.
+
+Preserve working Laravel functionality and existing database records.
+
+Implement the login page first, then authentication and server-side authorization, then the role-specific dashboards, and then the remaining functional modules.
+
+Build the project incrementally, verify each stage, and fix errors before moving forward.
+
+If a necessary technical detail is unknown, inspect the existing source code first. If the answer cannot be determined from the code, ask a focused question instead of guessing.
+
+Prioritize security, correctness, maintainability, responsive design, and actual end-to-end functionality over superficial visual completion.
+
+The final result must be a complete, secure, mobile-friendly Hostel Attendance Management System with a fresh React frontend and the existing Laravel backend.
