@@ -57,7 +57,7 @@ router.get(
     const targetDate = req.query.date ? String(req.query.date) : store.virtualDate;
 
     let defaulters = store.attendance.filter(
-      (a) => a.date === targetDate && (a.isDefaulter || a.status === 'absent')
+      (a) => a.date === targetDate && !store.isHoliday(targetDate) && (a.isDefaulter || a.status === 'absent')
     );
 
     // Warden scoping
@@ -178,6 +178,7 @@ router.post(
     if (!record) {
       return res.status(404).json({ success: false, message: 'Attendance record not found' });
     }
+    if (store.isHoliday(record.date)) return res.status(409).json({ success: false, message: 'Attendance cannot be corrected on an official holiday.' });
 
     // Warden scope check
     if ((user.role === 'residential_warden' || user.role === 'warden') && user.hostelId && record.hostelId !== user.hostelId) {
@@ -224,6 +225,7 @@ router.post(
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
+    if (store.isHoliday(store.virtualDate)) return res.status(409).json({ success: false, message: 'Attendance is not required on this official holiday.' });
 
     const time = punchTime || store.virtualTime;
     if (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) {

@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
 import {
   User,
   Hostel,
@@ -5,14 +9,17 @@ import {
   Student,
   AttendanceRecord,
   LeaveRecord,
+  LeaveApplication,
   BiometricDevice,
   BiometricPunchLog,
   NotificationLog,
   ScheduledJobLog,
   AuditLog,
+  HolidayRecord,
   WarningTicket,
   DisciplinaryCardStatus,
   StudentTokenSummary,
+  SemesterSettings,
   TokenHistoryEntry
 } from '../types';
 import {
@@ -43,6 +50,53 @@ const readClockSetting = (name: string, defaultValue: string): string => {
   return value;
 };
 
+const addUtcDays = (date: string, days: number) => {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+};
+
+const addUtcMonths = (date: string, months: number) => {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  const originalDay = value.getUTCDate();
+  value.setUTCDate(1);
+  value.setUTCMonth(value.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + 1, 0)).getUTCDate();
+  value.setUTCDate(Math.min(originalDay, lastDay));
+  return value.toISOString().slice(0, 10);
+};
+
+const dataDirectory = path.dirname(fileURLToPath(import.meta.url));
+const leaveApplicationsFile = path.join(dataDirectory, 'leave-applications.sqlite');
+const legacyLeaveApplicationsFile = path.join(dataDirectory, 'leave-applications.json');
+const leaveApplicationsDatabase = new DatabaseSync(leaveApplicationsFile);
+leaveApplicationsDatabase.exec(`
+  PRAGMA journal_mode = WAL;
+  CREATE TABLE IF NOT EXISTS leave_applications (
+    id TEXT PRIMARY KEY,
+    student_id TEXT NOT NULL,
+    hostel_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    submitted_at TEXT NOT NULL,
+    application_json TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_leave_applications_student ON leave_applications(student_id, submitted_at);
+  CREATE INDEX IF NOT EXISTS idx_leave_applications_hostel ON leave_applications(hostel_id, submitted_at);
+`);
+
+const readLeaveApplications = (): LeaveApplication[] => {
+  try {
+    const stored = leaveApplicationsDatabase.prepare('SELECT application_json FROM leave_applications ORDER BY submitted_at DESC').all() as { application_json: string }[];
+    if (stored.length > 0) return stored.map((row) => JSON.parse(row.application_json) as LeaveApplication);
+    if (!existsSync(legacyLeaveApplicationsFile)) return [];
+    const parsed: unknown = JSON.parse(readFileSync(legacyLeaveApplicationsFile, 'utf8'));
+    return Array.isArray(parsed) ? parsed as LeaveApplication[] : [];
+  } catch (error) {
+    console.error('Unable to load saved leave applications:', error);
+    return [];
+  }
+};
+
 class DataStore {
   users = [...initialUsers];
   hostels = [...initialHostels];
@@ -51,6 +105,9 @@ class DataStore {
   biometricDevices = [...initialBiometricDevices];
   biometricLogs: BiometricPunchLog[] = [];
   leaves = [...initialLeaves];
+  leaveApplications: LeaveApplication[] = readLeaveApplications();
+  holidays: HolidayRecord[] = [];
+  private holidayAttendanceSnapshots = new Map<string, AttendanceRecord>();
   attendance = [...initialAttendance];
   scheduledJobs = [...initialScheduledJobs];
   notifications = [...initialNotifications];
@@ -63,6 +120,8 @@ class DataStore {
   cutoffTime: string = readClockSetting('ATTENDANCE_CUTOFF_TIME', '19:00');
   graceEndTime: string = readClockSetting('ATTENDANCE_GRACE_END_TIME', '22:00');
   defaulterFlagTime: string = readClockSetting('DEFAULTER_FLAG_TIME', '22:00');
+  semesterStartDate = todayDate;
+  semesterEndDate = addUtcDays(addUtcMonths(todayDate, 6), -1);
 
   sessions = new Map<string, User>();
 
@@ -73,6 +132,14 @@ class DataStore {
     if (clockTimeToSeconds(this.defaulterFlagTime) !== clockTimeToSeconds(this.graceEndTime)) {
       throw new Error('DEFAULTER_FLAG_TIME must match ATTENDANCE_GRACE_END_TIME.');
     }
+
+    for (const application of this.leaveApplications) {
+      const savedLeave = application.approvedLeaveRecord;
+      if (savedLeave && !this.leaves.some((leave) => leave.id === savedLeave.id)) {
+        this.leaves.unshift(savedLeave);
+      }
+    }
+    if (this.leaveApplications.length > 0) this.persistLeaveApplications();
 
     for (const u of this.users) {
       this.sessions.set(`token-${u.id}`, {
@@ -90,6 +157,29 @@ class DataStore {
     this.initWarningTickets();
   }
 
+  persistLeaveApplications() {
+    const upsert = leaveApplicationsDatabase.prepare(`
+      INSERT INTO leave_applications (id, student_id, hostel_id, status, submitted_at, application_json)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        student_id = excluded.student_id,
+        hostel_id = excluded.hostel_id,
+        status = excluded.status,
+        submitted_at = excluded.submitted_at,
+        application_json = excluded.application_json
+    `);
+    leaveApplicationsDatabase.exec('BEGIN IMMEDIATE');
+    try {
+      for (const application of this.leaveApplications) {
+        upsert.run(application.id, application.studentId, application.hostelId, application.status, application.submittedAt, JSON.stringify(application));
+      }
+      leaveApplicationsDatabase.exec('COMMIT');
+    } catch (error) {
+      leaveApplicationsDatabase.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   private getDisciplinaryCardStatus(tokens: number): DisciplinaryCardStatus {
     if (tokens > 10) return 'red_card_blacklist';
     if (tokens >= 6) return 'yellow_card';
@@ -101,7 +191,6 @@ class DataStore {
     const defaulters = this.attendance
       .filter((record) => record.isDefaulter && record.date <= this.virtualDate)
       .sort((a, b) => a.date.localeCompare(b.date) || a.studentId.localeCompare(b.studentId));
-    const monthlyTotals = new Map<string, number>();
     const awardedDates = new Set<string>();
 
     for (const record of defaulters) {
@@ -109,27 +198,30 @@ class DataStore {
       if (awardedDates.has(eventKey)) continue;
       awardedDates.add(eventKey);
 
-      const monthKey = `${record.studentId}:${record.date.slice(0, 7)}`;
-      const tokens = (monthlyTotals.get(monthKey) || 0) + 1;
-      monthlyTotals.set(monthKey, tokens);
+      const semesterTokens = this.tokenHistory
+        .filter((entry) => entry.studentId === record.studentId && entry.date >= this.semesterStartDate && entry.date <= this.semesterEndDate)
+        .reduce((total, entry) => total + entry.tokensReceived, 0) + (record.date >= this.semesterStartDate && record.date <= this.semesterEndDate ? 1 : 0);
       this.tokenHistory.push({
         id: `token-${record.id}`,
         studentId: record.studentId,
         date: record.date,
         reason: record.remarks || 'Attendance defaulter',
         tokensReceived: 1,
-        warningCardStatus: this.getDisciplinaryCardStatus(tokens)
+        warningCardStatus: record.date >= this.semesterStartDate && record.date <= this.semesterEndDate
+          ? this.getDisciplinaryCardStatus(semesterTokens)
+          : 'none'
       });
     }
   }
 
   recordDefaulter(studentId: string, date: string, reason: string) {
+    if (date < this.semesterStartDate || date > this.semesterEndDate) return null;
     if (this.tokenHistory.some((entry) => entry.studentId === studentId && entry.date === date)) {
       return null;
     }
 
-    const monthTokens = this.tokenHistory
-      .filter((entry) => entry.studentId === studentId && entry.date.startsWith(date.slice(0, 7)))
+    const semesterTokens = this.tokenHistory
+      .filter((entry) => entry.studentId === studentId && entry.date >= this.semesterStartDate && entry.date <= this.semesterEndDate)
       .reduce((total, entry) => total + entry.tokensReceived, 0);
     const entry: TokenHistoryEntry = {
       id: `token-${studentId}-${date}`,
@@ -137,7 +229,7 @@ class DataStore {
       date,
       reason,
       tokensReceived: 1,
-      warningCardStatus: this.getDisciplinaryCardStatus(monthTokens + 1)
+      warningCardStatus: this.getDisciplinaryCardStatus(semesterTokens + 1)
     };
     this.tokenHistory.push(entry);
     return entry;
@@ -145,29 +237,55 @@ class DataStore {
 
   getStudentTokenSummary(studentId: string): StudentTokenSummary {
     const defaultersThroughToday = this.attendance
-      .filter((record) => record.studentId === studentId && record.isDefaulter && record.date <= this.virtualDate)
+      .filter((record) => record.studentId === studentId && record.isDefaulter && record.date <= this.virtualDate && record.date >= this.semesterStartDate && record.date <= this.semesterEndDate)
       .sort((a, b) => a.date.localeCompare(b.date) || a.studentId.localeCompare(b.studentId));
     for (const record of defaultersThroughToday) {
       this.recordDefaulter(record.studentId, record.date, record.remarks || 'Attendance defaulter');
     }
 
-    const currentMonth = this.virtualDate.slice(0, 7);
     const history = this.tokenHistory
       .filter((entry) => entry.studentId === studentId && entry.date <= this.virtualDate)
       .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-    const currentMonthTokens = history
-      .filter((entry) => entry.date.startsWith(currentMonth))
+    const semesterHistory = history
+      .filter((entry) => entry.date >= this.semesterStartDate && entry.date <= this.semesterEndDate)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    let semesterTokens = 0;
+    const statusByEntry = new Map<string, DisciplinaryCardStatus>();
+    for (const entry of semesterHistory) {
+      semesterTokens += entry.tokensReceived;
+      statusByEntry.set(entry.id, this.getDisciplinaryCardStatus(semesterTokens));
+    }
+    const currentHistory = history.map((entry) => ({
+      ...entry,
+      warningCardStatus: statusByEntry.get(entry.id) || entry.warningCardStatus
+    }));
+    const lifetimeTokens = history
       .reduce((total, entry) => total + entry.tokensReceived, 0);
-    const disciplinaryStatus = this.getDisciplinaryCardStatus(currentMonthTokens);
+    const disciplinaryStatus = this.getDisciplinaryCardStatus(semesterTokens);
 
     return {
-      currentMonth,
-      currentMonthTokens,
-      lifetimeTokens: history.reduce((total, entry) => total + entry.tokensReceived, 0),
+      semesterStartDate: this.semesterStartDate,
+      semesterEndDate: this.semesterEndDate,
+      semesterTokens,
+      lifetimeTokens,
       disciplinaryStatus,
-      isBlacklisted: currentMonthTokens > 10,
-      history
+      isBlacklisted: semesterTokens > 10,
+      history: currentHistory
     };
+  }
+
+  getSemesterSettings(): SemesterSettings {
+    const start = new Date(`${this.semesterStartDate}T00:00:00.000Z`).getTime();
+    const end = new Date(`${this.semesterEndDate}T00:00:00.000Z`).getTime();
+    return { startDate: this.semesterStartDate, endDate: this.semesterEndDate, durationDays: Math.floor((end - start) / 86400000) + 1 };
+  }
+
+  setSemesterSettings(startDate: string, endDate: string) {
+    this.semesterStartDate = startDate;
+    this.semesterEndDate = endDate;
+    for (const student of this.students) this.getStudentTokenSummary(student.id);
+    this.warningTickets = [];
+    this.initWarningTickets();
   }
 
   initWarningTickets() {
@@ -175,7 +293,7 @@ class DataStore {
     const violationsByStudent = new Map<string, { late: number; defaulter: number; latestDate: string }>();
 
     for (const record of this.attendance) {
-      if (record.status === 'late' || record.status === 'absent' || record.isDefaulter) {
+      if (record.date >= this.semesterStartDate && record.date <= this.semesterEndDate && (record.status === 'late' || record.status === 'absent' || record.isDefaulter)) {
         const current = violationsByStudent.get(record.studentId) || { late: 0, defaulter: 0, latestDate: record.date };
         if (record.status === 'late') {
           current.late += 1;
@@ -189,6 +307,7 @@ class DataStore {
       }
     }
 
+    const previousTickets = new Map(this.warningTickets.map((ticket) => [ticket.id, ticket]));
     const tickets: WarningTicket[] = [];
     violationsByStudent.forEach((counts, studentId) => {
       const student = this.students.find((s) => s.id === studentId);
@@ -196,6 +315,7 @@ class DataStore {
 
       const hostel = this.hostels.find((h) => h.id === student.hostelId);
       const totalViolations = counts.late + counts.defaulter;
+      const previousTicket = previousTickets.get(`ticket-${student.id}`);
 
       let severity: 'strike_1' | 'strike_2' | 'flagged_for_admin_review' = 'strike_1';
       let status: 'active' | 'under_review' | 'resolved' = 'active';
@@ -232,10 +352,11 @@ class DataStore {
         missedCheckInsCount: counts.defaulter,
         totalViolations,
         severity,
-        status,
+        status: previousTicket?.status || status,
         issuedAt: `${counts.latestDate} 22:00:00 IST`,
         latestViolationDate: counts.latestDate,
-        reason
+        reason,
+        adminNotes: previousTicket?.adminNotes
       });
     });
 
@@ -251,6 +372,7 @@ class DataStore {
   }
 
   getWarningTickets(hostelId?: string): WarningTicket[] {
+    this.initWarningTickets();
     if (!hostelId) return [...this.warningTickets];
     return this.warningTickets.filter((t) => t.hostelId === hostelId);
   }
@@ -282,6 +404,64 @@ class DataStore {
 
   isPastDefaulterTime(): boolean {
     return clockTimeToSeconds(this.virtualTime) >= clockTimeToSeconds(this.defaulterFlagTime);
+  }
+
+  isHoliday(date: string): boolean {
+    return this.holidays.some((holiday) => holiday.startDate <= date && date <= holiday.endDate);
+  }
+
+  applyHoliday(startDate: string, endDate: string, reason: string) {
+    const holiday: HolidayRecord = {
+      id: `holiday-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      startDate,
+      endDate,
+      reason,
+      createdBy: '',
+      createdAt: `${this.virtualDate} ${this.virtualTime} IST`
+    };
+    this.holidays.push(holiday);
+    for (let current = startDate; current <= endDate; current = this.addDate(current, 1)) {
+      for (const student of this.students.filter((s) => s.verificationStatus === 'verified' && s.checkoutStatus === 'active')) {
+        let record = this.attendance.find((a) => a.studentId === student.id && a.date === current);
+        if (record) this.holidayAttendanceSnapshots.set(record.id, { ...record });
+        else {
+          record = {
+            id: `att-${student.id}-${current}`, studentId: student.id, enrollmentNo: student.enrollmentNo,
+            studentName: student.name, hostelId: student.hostelId, block: student.block,
+            roomNumber: student.roomNumber, date: current, status: 'holiday', isDefaulter: false,
+            remarks: `${reason} — attendance not required.`
+          };
+          this.attendance.push(record);
+        }
+        record.status = 'holiday';
+        record.isDefaulter = false;
+        record.remarks = `${reason} — attendance not required.`;
+      }
+    }
+    this.tokenHistory = this.tokenHistory.filter((entry) => entry.date < startDate || entry.date > endDate);
+    this.initWarningTickets();
+    return holiday;
+  }
+
+  private addDate(date: string, days: number): string {
+    const value = new Date(`${date}T00:00:00.000Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
+  }
+
+  removeHoliday(id: string) {
+    const holiday = this.holidays.find((item) => item.id === id);
+    if (!holiday) return;
+    this.holidays = this.holidays.filter((item) => item.id !== id);
+    this.attendance = this.attendance.filter((record) => {
+      if (record.date < holiday.startDate || record.date > holiday.endDate || record.status !== 'holiday') return true;
+      const snapshot = this.holidayAttendanceSnapshots.get(record.id);
+      if (snapshot) Object.assign(record, snapshot);
+      else return false;
+      return true;
+    });
+    for (const record of this.attendance.filter((a) => a.date >= holiday.startDate && a.date <= holiday.endDate)) this.holidayAttendanceSnapshots.delete(record.id);
+    this.initWarningTickets();
   }
 
   classifyPunch(punchTime: string) {
@@ -342,7 +522,7 @@ class DataStore {
     let defaultersCount = 0;
 
     const activeStudents = this.students.filter(
-      (s) => s.verificationStatus === 'verified' && s.checkoutStatus === 'active'
+      (s) => s.verificationStatus === 'verified' && s.checkoutStatus === 'active' && !this.isHoliday(targetDate)
     );
 
     for (const student of activeStudents) {

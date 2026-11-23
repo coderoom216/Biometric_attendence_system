@@ -4,7 +4,33 @@ import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/a
 
 const router = Router();
 
-// GET /api/system/audit-logs
+// Semester settings are visible to institutional leadership and editable by the Chief Warden.
+router.get(
+  '/semester-settings',
+  authenticate,
+  (_req: AuthenticatedRequest, res: Response) => res.json({ success: true, settings: store.getSemesterSettings() })
+);
+
+router.put(
+  '/semester-settings',
+  authenticate,
+  requireRole(['chief_warden']),
+  (req: AuthenticatedRequest, res: Response) => {
+    const { startDate, endDate } = req.body;
+    const isValidDate = (value: unknown): value is string => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+    };
+    if (!isValidDate(startDate) || !isValidDate(endDate) || startDate > endDate) {
+      return res.status(400).json({ success: false, message: 'Enter a valid semester start date and an end date on or after it.' });
+    }
+    store.setSemesterSettings(startDate, endDate);
+    store.logAudit('SEMESTER_SETTINGS_UPDATED', req.user!, 'SemesterSettings', `${startDate}:${endDate}`, `Set active semester from ${startDate} through ${endDate}.`);
+    return res.json({ success: true, settings: store.getSemesterSettings(), message: 'Semester dates saved. Warning totals now use this date range.' });
+  }
+);
+
 router.get(
   '/audit-logs',
   authenticate,

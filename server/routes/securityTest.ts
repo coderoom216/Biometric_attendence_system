@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { store } from '../data/store';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
+import { authenticate, AuthenticatedRequest, requireRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ export interface SecurityTestCaseResult {
 
 // GET /api/security-test/run
 // Runs the 10 mandatory security tests against the live authorization logic
-router.get('/run', authenticate, (req: AuthenticatedRequest, res: Response) => {
+router.get('/run', authenticate, requireRole(['director', 'chief_warden']), (req: AuthenticatedRequest, res: Response) => {
   const results: SecurityTestCaseResult[] = [];
 
   // Test 1: Student A attempts to access Student B's attendance

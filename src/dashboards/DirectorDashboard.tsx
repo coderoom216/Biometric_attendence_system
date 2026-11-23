@@ -15,17 +15,34 @@ import {
   Filter,
   RefreshCw,
   Search,
-  X
+  X,
+  CalendarRange
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { AttendanceRecord, ScheduledJobLog, NotificationLog, Student } from '../types';
+import { AttendanceRecord, ScheduledJobLog, NotificationLog, SemesterSettings, Student } from '../types';
 import { HostelAttendanceBarChart } from '../components/dashboard/HostelAttendanceBarChart';
 import { WarningTicketsTable } from '../components/dashboard/WarningTicketsTable';
 import { DefaultersRoster } from '../components/dashboard/DefaultersRoster';
 import { LatePunchesRoster } from '../components/dashboard/LatePunchesRoster';
 
 type AttendanceDrilldownCategory = 'all' | 'present' | 'late' | 'approved_leave' | 'defaulters' | 'compliant';
+const LOCAL_SEMESTER_SETTINGS_KEY = 'hostel_local_semester_settings';
+
+const readLocalSemesterSettings = (): SemesterSettings | null => {
+  try {
+    const stored = localStorage.getItem(LOCAL_SEMESTER_SETTINGS_KEY);
+    return stored ? JSON.parse(stored) as SemesterSettings : null;
+  } catch {
+    return null;
+  }
+};
+
+const countInclusiveDays = (startDate: string, endDate: string) => {
+  const start = new Date(`${startDate}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
+  return Math.max(0, Math.floor((end - start) / 86400000) + 1);
+};
 
 interface AttendanceDrilldownProps {
   category: AttendanceDrilldownCategory;
@@ -376,6 +393,50 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
   const [isLoading, setIsLoading] = useState(true);
   const [expandedNotificationHostels, setExpandedNotificationHostels] = useState<Set<string>>(new Set());
   const [expandedNotificationStudent, setExpandedNotificationStudent] = useState<string | null>(null);
+  const [semesterSettings, setSemesterSettings] = useState<SemesterSettings | null>(readLocalSemesterSettings);
+  const [semesterStartDate, setSemesterStartDate] = useState(() => readLocalSemesterSettings()?.startDate || '');
+  const [semesterEndDate, setSemesterEndDate] = useState(() => readLocalSemesterSettings()?.endDate || '');
+  const [semesterFeedback, setSemesterFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (officeRole !== 'chief_warden') return;
+    apiService.getSemesterSettings().then((response) => {
+      setSemesterSettings(response.settings);
+      setSemesterStartDate(response.settings.startDate);
+      setSemesterEndDate(response.settings.endDate);
+      localStorage.setItem(LOCAL_SEMESTER_SETTINGS_KEY, JSON.stringify(response.settings));
+    }).catch((error) => {
+      console.error('Failed to load semester settings:', error);
+      const localSettings = readLocalSemesterSettings();
+      if (localSettings) {
+        setSemesterSettings(localSettings);
+        setSemesterStartDate(localSettings.startDate);
+        setSemesterEndDate(localSettings.endDate);
+      }
+    });
+  }, [officeRole]);
+
+  const saveSemesterSettings = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSemesterFeedback(null);
+    try {
+      const response = await apiService.saveSemesterSettings(semesterStartDate, semesterEndDate);
+      setSemesterSettings(response.settings);
+      localStorage.setItem(LOCAL_SEMESTER_SETTINGS_KEY, JSON.stringify(response.settings));
+      setSemesterFeedback(response.message);
+    } catch (error: any) {
+      const localSettings: SemesterSettings = {
+        startDate: semesterStartDate,
+        endDate: semesterEndDate,
+        durationDays: countInclusiveDays(semesterStartDate, semesterEndDate)
+      };
+      setSemesterSettings(localSettings);
+      localStorage.setItem(LOCAL_SEMESTER_SETTINGS_KEY, JSON.stringify(localSettings));
+      setSemesterFeedback(error.response?.data?.message
+        ? `Dates shown in this browser, but the server did not save them: ${error.response.data.message}`
+        : 'Dates shown in this browser only. Server connection is unavailable, so warnings have not been updated system-wide.');
+    }
+  };
 
   const loadDataForDate = async (date: string) => {
     setIsLoading(true);
@@ -551,6 +612,35 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           </div>
         </div>
       </div>
+
+      {officeRole === 'chief_warden' && (
+        <section className="rounded-xl border border-indigo-200 bg-white p-5 shadow-xs">
+          <div className="mb-4 flex items-start gap-3">
+            <CalendarRange className="mt-0.5 h-5 w-5 text-indigo-600" />
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Semester Settings</h2>
+              <p className="mt-1 text-[11px] text-slate-600">The default semester is six months. Set the start and end dates here; warning tokens and attendance warning summaries count events within this inclusive date range.</p>
+            </div>
+          </div>
+          <form onSubmit={saveSemesterSettings} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <label className="text-[10px] font-semibold uppercase text-slate-600">Semester Start Date
+              <input type="date" required value={semesterStartDate} onChange={(event) => setSemesterStartDate(event.target.value)} className="mt-1 block w-full rounded-lg border border-slate-300 p-2 text-xs" />
+            </label>
+            <label className="text-[10px] font-semibold uppercase text-slate-600">Semester End Date
+              <input type="date" required min={semesterStartDate || undefined} value={semesterEndDate} onChange={(event) => setSemesterEndDate(event.target.value)} className="mt-1 block w-full rounded-lg border border-slate-300 p-2 text-xs" />
+            </label>
+            <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700">Save Semester Dates</button>
+          </form>
+          <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/70 p-3">
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-indigo-800">Active Semester</div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
+              <span className="font-semibold text-slate-800">{semesterSettings ? `${semesterSettings.startDate} to ${semesterSettings.endDate}` : 'Loading semester dates…'}</span>
+              {semesterSettings && <span>{semesterSettings.durationDays} days</span>}
+            </div>
+            {semesterFeedback && <span className="font-medium text-indigo-700">{semesterFeedback}</span>}
+          </div>
+        </section>
+      )}
 
       {/* High-level Director KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">

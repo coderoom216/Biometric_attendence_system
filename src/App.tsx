@@ -95,7 +95,7 @@ const AuthenticatedApp: React.FC = () => {
         <Route path="/hostels" element={<HostelManagementPage />} />
         <Route path="/biometrics" element={<CaretakerBiometricDashboard />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/security-audit" element={<SecurityAuditPage />} />
+        <Route path="/security-audit" element={['director', 'chief_warden'].includes(user?.role || '') ? <SecurityAuditPage /> : <Navigate to="/" replace />} />
         <Route path="/system-health" element={<SystemHealthPage />} />
         <Route path="/registration" element={<StudentRegistrationPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

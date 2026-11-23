@@ -242,6 +242,7 @@ export const ReportsPage: React.FC = () => {
                           Approved Leave
                         </span>
                       )}
+                      {h.status === 'holiday' && <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800">Official Holiday</span>}
                       {h.status === 'absent' && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800">
                           Defaulter

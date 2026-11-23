@@ -2,7 +2,7 @@
 
 A full-stack web application for managing hostel residents, room allocations, biometric attendance, leave records, defaulter alerts, and administrative reports. It provides role-based dashboards for students and hostel staff.
 
-> **Project status:** This repository currently runs with sample data held in server memory. It does not yet connect to a persistent database. Changes made during a run are lost when the server restarts. The included accounts and data are for demonstration only.
+> **Project status:** Most sample data is held in server memory and resets when the server restarts. Student leave applications and their warden decisions are stored persistently in a local SQLite database at `server/data/leave-applications.sqlite`. The included accounts and data are for demonstration only.
 
 ## Features
 
@@ -113,7 +113,7 @@ DATABASE_LAYOUT.md  Proposed relational database design
 
 ## Data and security notes
 
-- The backend uses a process-local in-memory store. It is intended for demonstration and development, not durable record keeping.
+- Most backend data uses a process-local in-memory store and is intended for demonstration and development, not durable record keeping. Leave applications are stored separately in SQLite so student submissions and warden decisions survive reloads and server restarts.
 - `server/data/seed.ts` contains demonstration accounts and student/attendance data. The passwords are plain demo values in the seed and are not suitable for production.
 - Before deployment, connect a persistent database, use securely hashed passwords, configure secrets outside source control, and review access controls and personal-data handling.
 - Biometric, notification, and scheduler flows are represented by application records and simulation logic; configure and validate real external services/devices before relying on them.

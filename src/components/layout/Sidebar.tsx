@@ -7,9 +7,7 @@ import {
   CalendarCheck,
   FileText,
   AlertOctagon,
-  Cpu,
   Bell,
-  ShieldCheck,
   Activity,
   UserCheck,
   UserPlus,
@@ -28,6 +26,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const role = user?.role;
+  const isHostelWarden = role === 'residential_warden' || role === 'warden';
   const isMehraDashboard = role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'mehra';
   const sidebarRole = isMehraDashboard ? 'mehra' : role;
 
@@ -43,25 +42,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         ];
 
       case 'residential_warden':
+      case 'warden':
         return [
           { name: 'Dashboard', path: '/', icon: LayoutDashboard },
           { name: 'Student List', path: '/students', icon: Users },
-         
           { name: 'Defaulters List (10:00 PM)', path: '/defaulters', icon: AlertOctagon },
-          { name: 'Enter Approved Leave', path: '/leaves', icon: FileText },
-          { name: 'Assigned Hostel Rooms', path: '/hostels', icon: Building2 },
-          { name: 'Reports & Exports', path: '/reports', icon: BarChart3 }
-        ];
-
-      case 'warden':
-        return [
-          { name: 'Hostel Dashboard', path: '/', icon: LayoutDashboard },
-          { name: 'Student Directory', path: '/students', icon: Users },
-          { name: 'Hostel Defaulters Roster', path: '/defaulters', icon: AlertOctagon },
-          { name: 'Hostel & Room Capacity', path: '/hostels', icon: Building2 },
           { name: 'Approved Leaves', path: '/leaves', icon: FileText },
-          { name: 'Daily Reports', path: '/reports', icon: BarChart3 },
-          { name: 'Security Verification', path: '/security-audit', icon: ShieldCheck }
+          { name: 'Hostel & Room Capacity', path: '/hostels', icon: Building2 },
+          { name: 'Reports & Exports', path: '/reports', icon: BarChart3 }
         ];
 
       case 'chief_warden':
@@ -147,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div className="sticky top-0 z-10 px-4 py-3 mx-3 my-3 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs backdrop-blur-sm">
           <div className="text-[10px] uppercase font-semibold text-slate-400">{isMehraDashboard ? 'Operator' : 'Current Scope'}</div>
           <div className="font-semibold text-white mt-0.5 capitalize">
-            {isMehraDashboard ? 'Mr. Mehra Sir · Biometric Sync' : role?.replace('_', ' ')}
+            {isMehraDashboard ? 'Mr. Mehra Sir · Biometric Sync' : isHostelWarden ? 'Residential Warden' : role?.replace('_', ' ')}
           </div>
           {user?.hostelId && (
             <div className="text-[11px] text-indigo-300 mt-0.5">
@@ -183,18 +171,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           ))}
         </nav>
 
-        {/* Bottom Directive & Institutional badge */}
-        <div className="p-4 border-t border-slate-800 text-[11px] text-slate-400 bg-slate-950/40">
-          <div className="flex items-center space-x-2 text-indigo-400 font-semibold mb-1">
-            {isMehraDashboard ? <Cpu className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-            <span>{isMehraDashboard ? 'Biometric Operations' : "Director's Directive"}</span>
-          </div>
-          <p className="text-[10px] text-slate-400 leading-tight">
-            {isMehraDashboard
-              ? 'Sync offline terminal punches and maintain verified student biometric records.'
-              : '7:00 PM IST Attendance Cutoff. Sequentially escalated absence notifications to 6 tiers.'}
-          </p>
-        </div>
       </aside>
     </>
   );

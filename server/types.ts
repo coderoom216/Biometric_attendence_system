@@ -82,15 +82,31 @@ export interface TokenHistoryEntry {
 }
 
 export interface StudentTokenSummary {
-  currentMonth: string;
-  currentMonthTokens: number;
+  semesterStartDate: string;
+  semesterEndDate: string;
+  semesterTokens: number;
   lifetimeTokens: number;
   disciplinaryStatus: DisciplinaryCardStatus;
   isBlacklisted: boolean;
   history: TokenHistoryEntry[];
 }
 
-export type AttendanceStatus = 'present' | 'late' | 'approved_leave' | 'absent';
+export interface SemesterSettings {
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+}
+
+export type AttendanceStatus = 'present' | 'late' | 'approved_leave' | 'absent' | 'holiday';
+
+export interface HolidayRecord {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  createdBy: string;
+  createdAt: string;
+}
 
 export interface AttendanceRecord {
   id: string;
@@ -129,6 +145,26 @@ export interface LeaveRecord {
   residentialWardenName: string;
   createdAt: string;
   notes?: string;
+}
+
+export interface LeaveApplication {
+  id: string;
+  studentId: string;
+  enrollmentNo: string;
+  studentName: string;
+  hostelId: string;
+  block: string;
+  roomNumber: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'denied';
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
+  approvedLeaveId?: string;
+  approvedLeaveRecord?: LeaveRecord;
 }
 
 export type NotificationTier = 1 | 2 | 3 | 4 | 5 | 6;
