@@ -82,6 +82,8 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSyncingDevice, setIsSyncingDevice] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
   const [registrationMode, setRegistrationMode] = useState<
     'device' | 'manual'
   >('device');
@@ -154,9 +156,34 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     }
   };
 
+  const handleSyncFromMachine = async () => {
+    setIsSyncingDevice(true);
+    setSyncFeedback('Device ko fetch command bheja gaya... 6 seconds me update ho raha hai.');
+
+    try {
+      await apiService.triggerBiometricUserFetch(DEVICE_SERIAL);
+
+      // 6 seconds delay allows device full heartbeat + template processing cycle
+      setTimeout(async () => {
+        await loadEnrolledUsers();
+        setIsSyncingDevice(false);
+        setSyncFeedback('Machine se naye enrollments successfully sync ho gaye!');
+        setTimeout(() => setSyncFeedback(null), 5000);
+      }, 6000);
+    } catch (error: any) {
+      setIsSyncingDevice(false);
+      setSyncFeedback(
+        error.response?.data?.message || 'Sync command send nahi ho saka.'
+      );
+    }
+  };
+
   const refreshAllData = async () => {
     setIsLoading(true);
     setPageError(null);
+
+    // Trigger sync in background so device responds on next 3s ping
+    apiService.triggerBiometricUserFetch(DEVICE_SERIAL).catch(() => {});
 
     await Promise.all([
       loadHostels(),
@@ -230,13 +257,14 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
       if (response.success) {
         setOnboardFeedback(
-          'Student registration successfully submit ho gaya. Approval ke baad student verified hoga.'
+          'Student registration verified & Active Resident me successfully add ho gaya!'
         );
 
         setSelectedMachineUserId('');
         setStudentForm(createInitialForm(studentForm.hostelId));
 
         await loadEnrolledUsers();
+        await loadLivePunches();
       } else {
         setOnboardFeedback(
           response.message || 'Student registration submit nahi hua.'
@@ -438,7 +466,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
       {/* Enrolled Machine Users */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Fingerprint className="w-5 h-5 text-indigo-600" />
             <h2 className="font-bold text-sm text-slate-800">
@@ -446,10 +474,35 @@ export const CaretakerBiometricDashboard: React.FC = () => {
             </h2>
           </div>
 
-          <span className="text-xs text-slate-500">
-            Auto refresh: 10 seconds
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSyncFromMachine}
+              disabled={isSyncingDevice}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 transition cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDevice ? 'animate-spin' : ''}`} />
+              <span>{isSyncingDevice ? 'Syncing Machine...' : 'Pull Latest from Machine'}</span>
+            </button>
+
+            <span className="text-xs text-slate-500">
+              Auto refresh: 10 seconds
+            </span>
+          </div>
         </div>
+
+        {syncFeedback && (
+          <div className="p-2.5 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-between">
+            <span>{syncFeedback}</span>
+            <button
+              type="button"
+              onClick={() => setSyncFeedback(null)}
+              className="text-emerald-600 hover:text-emerald-900 font-bold ml-2 text-sm leading-none"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {enrolledUsers.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-500">
@@ -966,7 +1019,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
             {isSubmitting
               ? 'Submitting...'
               : registrationMode === 'device'
-                ? 'Submit for Warden Verification'
+                ? 'Register & Verify Active Resident'
                 : 'Onboard & Verify Student'}
           </button>
 

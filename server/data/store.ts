@@ -88,7 +88,104 @@ class DataStore {
     }
     this.seedTokenHistory();
     this.initWarningTickets();
+
+    // Trigger initial background sync with MongoDB biometric records
+    this.syncBiometricData().catch((err) => {
+      console.warn('Initial syncBiometricData failed:', err);
+    });
   }
+
+  async syncBiometricData(): Promise<void> {
+    try {
+      const { getBiometricNamedCollection } = await import('../services/biometricMongo');
+
+      // 1. Load explicitly registered students from MongoDB
+      const regCollection = await getBiometricNamedCollection('registered_students');
+      const savedStudents = await regCollection.find({}).toArray();
+
+      for (const ss of savedStudents as any[]) {
+        const existingIndex = this.students.findIndex(
+          (s) =>
+            (ss.enrollmentNo && s.enrollmentNo.toLowerCase() === ss.enrollmentNo.toLowerCase()) ||
+            (s.biometricId && ss.biometricId && s.biometricId.replace(/^0+/, '') === ss.biometricId.replace(/^0+/, ''))
+        );
+        if (existingIndex >= 0) {
+          this.students[existingIndex] = { ...this.students[existingIndex], ...ss };
+        } else {
+          this.students.push(ss as Student);
+        }
+      }
+
+      // 2. Discover machine enrolled users with confirmed templates who aren't registered yet
+      const userInfoCollection = await getBiometricNamedCollection('user_info_result');
+      const infoRecords = await userInfoCollection.find({}).sort({ created_at: -1 }).toArray();
+
+      for (const rec of infoRecords as any[]) {
+        const rawUid = String(rec.user_id ?? '').trim();
+        if (!rawUid || rawUid === '0') continue;
+        const cleanUid = rawUid.replace(/^0+/, '') || rawUid;
+
+        let info = rec.info;
+        if (typeof info === 'string') {
+          try {
+            info = JSON.parse(info);
+          } catch {}
+        }
+
+        const alreadyExists = this.students.some(
+          (s) =>
+            s.biometricId === rawUid ||
+            s.biometricId?.replace(/^0+/, '') === cleanUid ||
+            s.enrollmentNo === `BIO-${cleanUid.padStart(4, '0')}`
+        );
+
+        if (!alreadyExists) {
+          const machineName = info?.user_name || rec.name || `Resident ${cleanUid}`;
+          const newResident: Student = {
+            id: `stu-bio-${cleanUid}`,
+            enrollmentNo: `BIO-${cleanUid.padStart(4, '0')}`,
+            name: machineName,
+            course: 'B.Tech CSE',
+            semester: 1,
+            gender: 'male',
+            hostelId: 'h-shivalik',
+            block: 'Block A',
+            roomNumber: '101',
+            bedNumber: 'A',
+            biometricId: rawUid,
+            studentEmail: `resident${cleanUid}@student.edu.in`,
+            studentPhone: '',
+            parentName: '',
+            parentEmail: '',
+            parentPhone: '',
+            verificationStatus: 'verified',
+            verifiedBy: 'Biometric Machine Enrollment',
+            verifiedAt: `${this.virtualDate} ${this.virtualTime} IST`,
+            allotmentDate: this.virtualDate,
+            checkoutStatus: 'active'
+          };
+          this.students.push(newResident);
+        }
+      }
+
+      // 3. Recalculate room occupancy dynamically
+      for (const room of this.rooms) {
+        const occ = this.students.filter(
+          (s) =>
+            s.hostelId === room.hostelId &&
+            s.block === room.block &&
+            s.roomNumber === room.roomNumber &&
+            s.checkoutStatus === 'active' &&
+            s.verificationStatus === 'verified'
+        ).length;
+        room.currentOccupancy = occ;
+        room.status = occ >= room.capacity ? 'full' : 'available';
+      }
+    } catch (err) {
+      console.warn('syncBiometricData failed:', err);
+    }
+  }
+
 
   private getDisciplinaryCardStatus(tokens: number): DisciplinaryCardStatus {
     if (tokens > 10) return 'red_card_blacklist';

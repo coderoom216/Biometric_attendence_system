@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 import {
   User,
   Hostel,
@@ -225,6 +225,17 @@ export const apiService = {
         fingerprintCount: number;
       }>;
     }>('/biometric/enrolled-users');
+
+    return res.data;
+  },
+
+  async triggerBiometricUserFetch(deviceId = 'RSS20241199684') {
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      transId?: string;
+      pending?: boolean;
+    }>('/biometric/trigger-user-fetch', { deviceId });
 
     return res.data;
   },

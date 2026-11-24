@@ -1,4 +1,4 @@
-﻿import { Router, Response } from 'express';
+import { Router, Response } from 'express';
 import { store } from '../data/store';
 import { authenticate, requireRole, requireStudentOwnership, AuthenticatedRequest } from '../middleware/auth';
 import { Student, UserRole } from '../types';
@@ -9,8 +9,12 @@ const officialRoles: UserRole[] = ['caretaker_operator', 'residential_warden', '
 const router = Router();
 
 // GET /api/students (scoped)
-router.get('/', authenticate, (req: AuthenticatedRequest, res: Response) => {
+router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
+
+  // Sync with MongoDB registered students and machine enrollments
+  await store.syncBiometricData();
+
   let list = [...store.students];
 
   // Student scope isolation
@@ -236,7 +240,7 @@ router.post(
   '/onboard',
   authenticate,
   requireRole(['caretaker_operator', 'residential_warden', 'warden', 'chief_warden', 'director']),
-  (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     const user = req.user!;
     const {
       enrollmentNo,
@@ -297,6 +301,19 @@ router.post(
 
     store.students.push(newStudent);
 
+    // Persist to MongoDB registered_students collection so it is never lost on server reload
+    try {
+      const { getBiometricNamedCollection } = await import('../services/biometricMongo');
+      const regCollection = await getBiometricNamedCollection('registered_students');
+      await regCollection.updateOne(
+        { enrollmentNo: newStudent.enrollmentNo },
+        { $set: newStudent },
+        { upsert: true }
+      );
+    } catch (saveErr) {
+      console.warn('Could not persist student to MongoDB:', saveErr);
+    }
+
     // Also update room occupancy
     const room = store.rooms.find((r) => r.hostelId === hostelId && r.block === block && r.roomNumber === roomNumber);
     if (room) {
@@ -349,6 +366,20 @@ router.post(
         student.id,
         `Formally verified student registration for ${student.name} (${student.enrollmentNo})`
       );
+
+      // Persist status change to MongoDB registered_students
+      (async () => {
+        try {
+          const { getBiometricNamedCollection } = await import('../services/biometricMongo');
+          const regCollection = await getBiometricNamedCollection('registered_students');
+          await regCollection.updateOne(
+            { enrollmentNo: student.enrollmentNo },
+            { $set: { verificationStatus: 'verified', verifiedBy: student.verifiedBy, verifiedAt: student.verifiedAt } }
+          );
+        } catch (e) {
+          console.warn('Could not update student status in MongoDB:', e);
+        }
+      })();
 
       return res.json({
         success: true,
@@ -537,7 +568,10 @@ router.post(
 
       const duplicateEnrollment = store.students.some(
         (s) =>
-          s.enrollmentNo.toLowerCase() === cleanEnrollmentNo.toLowerCase()
+          !s.enrollmentNo.startsWith('BIO-') &&
+          s.enrollmentNo.toLowerCase() === cleanEnrollmentNo.toLowerCase() &&
+          s.biometricId !== cleanBiometricId &&
+          s.biometricId?.replace(/^0+/, '') !== cleanBiometricId.replace(/^0+/, '')
       );
 
       if (duplicateEnrollment) {
@@ -547,18 +581,7 @@ router.post(
         });
       }
 
-      const duplicateBiometric = store.students.some(
-        (s) => s.biometricId === cleanBiometricId
-      );
-
-      if (duplicateBiometric) {
-        return res.status(409).json({
-          success: false,
-          message: `Biometric User ID ${cleanBiometricId} is already linked to a student.`
-        });
-      }
-
-      // Confirm that this user ID actually exists in the device SDK collection.
+      // Check if user exists on device
       const deviceUsersCollection =
         await getBiometricNamedCollection('get_user_id');
 
@@ -592,25 +615,67 @@ router.post(
         parentName: String(parentName || '').trim(),
         parentEmail: String(parentEmail || '').trim().toLowerCase(),
         parentPhone: String(parentPhone || '').trim(),
-        verificationStatus: 'pending_verification',
+        verificationStatus: 'verified',
+        verifiedBy: `${user.name} (${user.role})`,
+        verifiedAt: `${store.virtualDate} ${store.virtualTime} IST`,
         allotmentDate: store.virtualDate,
         checkoutStatus: 'active'
       };
 
-      store.students.push(newStudent);
+      // Check if there was already an entry with this biometric ID or placeholder enrollment
+      const existingBioIndex = store.students.findIndex(
+        (s) =>
+          s.biometricId === cleanBiometricId ||
+          (s.biometricId && s.biometricId.replace(/^0+/, '') === cleanBiometricId.replace(/^0+/, '')) ||
+          s.enrollmentNo === cleanEnrollmentNo.toUpperCase()
+      );
+
+      if (existingBioIndex >= 0) {
+        store.students[existingBioIndex] = { ...store.students[existingBioIndex], ...newStudent };
+      } else {
+        store.students.push(newStudent);
+      }
+
+      // Persist to MongoDB registered_students collection so it is never lost on server reload
+      try {
+        const { getBiometricNamedCollection } = await import('../services/biometricMongo');
+        const regCollection = await getBiometricNamedCollection('registered_students');
+        await regCollection.updateOne(
+          {
+            $or: [
+              { enrollmentNo: newStudent.enrollmentNo },
+              { biometricId: cleanBiometricId },
+              { biometricId: cleanBiometricId.replace(/^0+/, '') }
+            ]
+          },
+          { $set: newStudent },
+          { upsert: true }
+        );
+      } catch (saveErr) {
+        console.warn('Could not persist student to MongoDB:', saveErr);
+      }
+
+      // Update room occupancy
+      const room = store.rooms.find((r) => r.hostelId === cleanHostelId && r.block === cleanBlock && r.roomNumber === cleanRoomNumber);
+      if (room) {
+        room.currentOccupancy = Math.min(room.capacity, room.currentOccupancy + 1);
+        if (room.currentOccupancy >= room.capacity) {
+          room.status = 'full';
+        }
+      }
 
       store.logAudit(
-        'STUDENT_DEVICE_REGISTRATION_SUBMITTED',
+        'STUDENT_DEVICE_REGISTRATION_VERIFIED',
         user,
         'Student',
         newStudent.id,
-        `Device-linked student registration submitted: ${newStudent.name} (${newStudent.enrollmentNo}), Device User ID ${cleanBiometricId}, Device ${cleanDeviceSerial}. Awaiting Warden verification.`
+        `Device-linked student registration verified and activated: ${newStudent.name} (${newStudent.enrollmentNo}), Device User ID ${cleanBiometricId}, Device ${cleanDeviceSerial}. Added to Active Residents.`
       );
 
       return res.status(201).json({
         success: true,
         message:
-          'Device-linked student registration submitted successfully. It is now pending Warden verification.',
+          'Device-linked student registration verified and added to Active Residents successfully.',
         student: newStudent
       });
     } catch (error) {
