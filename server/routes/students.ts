@@ -1,7 +1,10 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { store } from '../data/store';
 import { authenticate, requireRole, requireStudentOwnership, AuthenticatedRequest } from '../middleware/auth';
-import { Student } from '../types';
+import { Student, UserRole } from '../types';
+import { getBiometricNamedCollection } from '../services/biometricMongo';
+
+const officialRoles: UserRole[] = ['caretaker_operator', 'residential_warden', 'warden', 'chief_warden', 'director'];
 
 const router = Router();
 
@@ -185,7 +188,7 @@ router.get(
         `"${s.studentPhone || ''}"`,
         `"${s.studentEmail || ''}"`,
         `"${attStatusLabel}"`,
-        `"${att?.punchTime || '—'}"`,
+        `"${att?.punchTime || 'â€”'}"`,
         `"${severityLabel}"`,
         `"${ticket ? ticket.latePunchesCount : 0}"`,
         `"${ticket ? ticket.missedCheckInsCount : 0}"`,
@@ -424,4 +427,206 @@ router.post('/submit-registration', authenticate, (req: AuthenticatedRequest, re
   });
 });
 
+// POST /api/students/device-registration
+// Registers a device-enrolled user as a pending student.
+router.post(
+  '/device-registration',
+  authenticate,
+  requireRole(officialRoles),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const user = req.user!;
+
+    try {
+      const {
+        enrollmentNo,
+        name,
+        course,
+        semester,
+        gender,
+        hostelId,
+        block,
+        roomNumber,
+        bedNumber,
+        biometricId,
+        deviceSerial,
+        studentEmail,
+        studentPhone,
+        parentName,
+        parentEmail,
+        parentPhone
+      } = req.body || {};
+
+      const cleanEnrollmentNo = String(enrollmentNo || '').trim();
+      const cleanName = String(name || '').trim();
+      const cleanHostelInput = String(hostelId || '').trim();
+      const cleanBlock = String(block || '').trim();
+      const cleanRoomNumber = String(roomNumber || '').trim();
+      const cleanBiometricId = String(biometricId || '').trim();
+      const cleanDeviceSerial = String(deviceSerial || '').trim();
+      const cleanStudentEmail = String(studentEmail || '').trim().toLowerCase();
+
+      if (
+        !cleanEnrollmentNo ||
+        !cleanName ||
+        !cleanHostelInput ||
+        !cleanBlock ||
+        !cleanRoomNumber ||
+        !cleanBiometricId ||
+        !cleanDeviceSerial ||
+        !cleanStudentEmail
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Enrollment Number, Name, Hostel, Block, Room, Biometric User ID, Device Serial and Student Email are required.'
+        });
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanStudentEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter a valid student email address.'
+        });
+      }
+
+      const cleanGender =
+        gender === 'female' || gender === 'other' || gender === 'male'
+          ? gender
+          : 'male';
+
+      const cleanSemester = Number(semester);
+
+      if (
+        !Number.isInteger(cleanSemester) ||
+        cleanSemester < 1 ||
+        cleanSemester > 12
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter a valid semester.'
+        });
+      }
+
+      // Accept either the actual hostel ID or its displayed name.
+      const selectedHostel = store.hostels.find(
+        (h) =>
+          h.id === cleanHostelInput ||
+          h.name.toLowerCase() === cleanHostelInput.toLowerCase()
+      );
+
+      if (!selectedHostel) {
+        return res.status(400).json({
+          success: false,
+          message: 'Selected hostel was not found.'
+        });
+      }
+
+      const cleanHostelId = selectedHostel.id;
+
+      // Warden can register students only in their assigned hostel.
+      if (
+        (user.role === 'residential_warden' || user.role === 'warden') &&
+        user.hostelId &&
+        user.hostelId !== cleanHostelId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'You cannot register a student for another hostel.'
+        });
+      }
+
+      const duplicateEnrollment = store.students.some(
+        (s) =>
+          s.enrollmentNo.toLowerCase() === cleanEnrollmentNo.toLowerCase()
+      );
+
+      if (duplicateEnrollment) {
+        return res.status(409).json({
+          success: false,
+          message: `Enrollment number ${cleanEnrollmentNo} is already registered.`
+        });
+      }
+
+      const duplicateBiometric = store.students.some(
+        (s) => s.biometricId === cleanBiometricId
+      );
+
+      if (duplicateBiometric) {
+        return res.status(409).json({
+          success: false,
+          message: `Biometric User ID ${cleanBiometricId} is already linked to a student.`
+        });
+      }
+
+      // Confirm that this user ID actually exists in the device SDK collection.
+      const deviceUsersCollection =
+        await getBiometricNamedCollection('get_user_id');
+
+      const machineUser = await deviceUsersCollection.findOne({
+        dev_id: cleanDeviceSerial,
+        user_id: cleanBiometricId
+      });
+
+      if (!machineUser) {
+        return res.status(404).json({
+          success: false,
+          message:
+            'This User ID was not found for the selected device. Please refresh the enrolled users list and try again.'
+        });
+      }
+
+      const newStudent: Student = {
+        id: `stu-${Date.now()}`,
+        enrollmentNo: cleanEnrollmentNo.toUpperCase(),
+        name: cleanName,
+        course: String(course || 'B.Tech CSE').trim(),
+        semester: cleanSemester,
+        gender: cleanGender,
+        hostelId: cleanHostelId,
+        block: cleanBlock,
+        roomNumber: cleanRoomNumber,
+        bedNumber: String(bedNumber || 'A').trim(),
+        biometricId: cleanBiometricId,
+        studentEmail: cleanStudentEmail,
+        studentPhone: String(studentPhone || '').trim(),
+        parentName: String(parentName || '').trim(),
+        parentEmail: String(parentEmail || '').trim().toLowerCase(),
+        parentPhone: String(parentPhone || '').trim(),
+        verificationStatus: 'pending_verification',
+        allotmentDate: store.virtualDate,
+        checkoutStatus: 'active'
+      };
+
+      store.students.push(newStudent);
+
+      store.logAudit(
+        'STUDENT_DEVICE_REGISTRATION_SUBMITTED',
+        user,
+        'Student',
+        newStudent.id,
+        `Device-linked student registration submitted: ${newStudent.name} (${newStudent.enrollmentNo}), Device User ID ${cleanBiometricId}, Device ${cleanDeviceSerial}. Awaiting Warden verification.`
+      );
+
+      return res.status(201).json({
+        success: true,
+        message:
+          'Device-linked student registration submitted successfully. It is now pending Warden verification.',
+        student: newStudent
+      });
+    } catch (error) {
+      console.error('Device student registration error:', error);
+
+      return res.status(503).json({
+        success: false,
+        message:
+          'Could not verify the biometric device user. Please check MongoDB connection and try again.'
+      });
+    }
+  }
+);
+
+
+
 export default router;
+
+
