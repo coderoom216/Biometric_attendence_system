@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Student extends Model
 {
+    use HasFactory;
+
     public const STATUS_PENDING_VERIFICATION = 'pending_verification';
     public const STATUS_VERIFIED = 'verified';
     public const STATUS_REJECTED = 'rejected';

@@ -355,7 +355,7 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({
 };
 
 interface DirectorDashboardProps {
-  officeRole?: 'director' | 'chief_warden';
+  officeRole?: 'director' | 'chief_warden' | 'admin';
 }
 
 export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole = 'director' }) => {

@@ -17,7 +17,7 @@ function DashboardContent() {
         case 'residential_warden': return <ResidentialWardenDashboard />;
         case 'warden': return <WardenDashboard />;
         case 'chief_warden': return <ChiefWardenDashboard />;
-        case 'admin': return <ChiefWardenDashboard />;
+        case 'admin': return <DirectorDashboard officeRole="admin" />;
         case 'director': return <DirectorDashboard />;
         case 'caretaker_operator':
             return localStorage.getItem('demo_dashboard') === 'caretaker'
