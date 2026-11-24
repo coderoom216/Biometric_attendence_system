@@ -270,6 +270,9 @@ Route::middleware('auth:sanctum')->group(function () {
     */
 
     Route::get('/biometric/devices', [BiometricController::class, 'devices']);
+    Route::get('/biometric/enrolled-users', [BiometricController::class, 'enrolledUsers']);
+    Route::post('/biometric/trigger-user-fetch', [BiometricController::class, 'triggerUserFetch']);
+    Route::get('/biometric/live', [BiometricController::class, 'live']);
     Route::post('/biometric/sync', [BiometricController::class, 'sync']);
     Route::get('/biometric/health', [BiometricController::class, 'health']);
 
@@ -282,6 +285,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/students', [StudentController::class, 'index']);
     Route::get('/students/warning-tickets', [StudentController::class, 'warningTickets']);
     Route::post('/students/onboard', [StudentController::class, 'store']);
+    Route::post('/students/device-registration', [StudentController::class, 'deviceRegistration']);
     Route::post('/students/verify', [StudentController::class, 'verify']);
     Route::post('/students/submit-registration', [StudentController::class, 'submitRegistration']);
 

@@ -589,4 +589,58 @@ class StudentController extends Controller
             'student' => $student->fresh()->load('user', 'hostel', 'room'),
         ]);
     }
+
+    public function deviceRegistration(Request $request)
+    {
+        $data = $request->validate([
+            'enrollmentNo' => ['required', 'string'],
+            'name' => ['required', 'string'],
+            'course' => ['nullable', 'string'],
+            'hostelId' => ['required'],
+            'roomNumber' => ['required', 'string'],
+            'biometricId' => ['required', 'string'],
+            'deviceSerial' => ['required', 'string'],
+            'studentEmail' => ['required', 'email'],
+        ]);
+
+        $hostelId = is_numeric($data['hostelId']) ? (int) $data['hostelId'] : 1;
+        $room = Room::firstOrCreate(
+            ['hostel_id' => $hostelId, 'room_number' => $data['roomNumber']],
+            ['capacity' => 3]
+        );
+
+        $studentRole = Role::firstOrCreate(['name' => 'Student'], ['description' => 'Student role']);
+
+        $user = User::updateOrCreate(
+            ['email' => $data['studentEmail']],
+            [
+                'name' => $data['name'],
+                'password' => Hash::make(Str::random(32)),
+                'role_id' => $studentRole->id,
+                'hostel_id' => $hostelId,
+                'is_active' => true,
+            ]
+        );
+
+        $student = Student::updateOrCreate(
+            ['biometric_id' => $data['biometricId']],
+            [
+                'user_id' => $user->id,
+                'hostel_id' => $hostelId,
+                'room_id' => $room->id,
+                'enrollment_no' => strtoupper($data['enrollmentNo']),
+                'course' => $data['course'] ?? 'B.Tech CSE',
+                'bed_number' => $request->input('bedNumber', 'A'),
+                'parent_guardian_name' => $request->input('parentName'),
+                'parent_email' => $request->input('parentEmail'),
+                'verification_status' => 'verified',
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device-linked student registration verified and added to Active Residents successfully.',
+            'student' => $this->formatStudentResponse($student),
+        ], 201);
+    }
 }

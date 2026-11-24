@@ -10,10 +10,11 @@ class AuditController extends Controller
 {
     private function checkAdmin(Request $request)
     {
-        if ($request->user()->role?->name !== 'Admin') {
+        $role = $request->user()->role?->name;
+        if (!in_array($role, ['Admin', 'Director', 'Chief Warden'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Only Admin can access audit logs.',
+                'message' => 'Unauthorized. Admin or executive access required for audit logs.',
             ], 403);
         }
 
