@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 import {
   User,
   Hostel,
@@ -6,15 +6,12 @@ import {
   Student,
   AttendanceRecord,
   LeaveRecord,
-  LeaveApplication,
-  HolidayRecord,
   NotificationLog,
   ScheduledJobLog,
   BiometricDevice,
   AuditLog,
   SecurityTestCaseResult,
-  StudentTokenSummary,
-  SemesterSettings
+  StudentTokenSummary
 } from '../types';
 
 const api = axios.create({
@@ -162,30 +159,6 @@ export const apiService = {
     const res = await api.post<{ success: boolean; message: string; leave: LeaveRecord }>('/leaves/enter', payload);
     return res.data;
   },
-  async getLeaveApplications() {
-    const res = await api.get<{ success: boolean; applications: LeaveApplication[] }>('/leaves/applications');
-    return res.data;
-  },
-  async submitLeaveApplication(payload: { startDate: string; endDate: string; reason: string }) {
-    const res = await api.post<{ success: boolean; application: LeaveApplication; message: string }>('/leaves/applications', payload);
-    return res.data;
-  },
-  async reviewLeaveApplication(id: string, decision: 'approved' | 'denied', reviewNote?: string) {
-    const res = await api.patch<{ success: boolean; application: LeaveApplication; message: string }>(`/leaves/applications/${id}`, { decision, reviewNote });
-    return res.data;
-  },
-  async getHolidays() {
-    const res = await api.get<{ success: boolean; holidays: HolidayRecord[] }>('/leaves/holidays');
-    return res.data;
-  },
-  async addHoliday(startDate: string, endDate: string, reason: string) {
-    const res = await api.post<{ success: boolean; holiday: HolidayRecord; message: string }>('/leaves/holidays', { startDate, endDate, reason });
-    return res.data;
-  },
-  async removeHoliday(id: string) {
-    const res = await api.delete<{ success: boolean; message: string }>(`/leaves/holidays/${id}`);
-    return res.data;
-  },
 
   // Students
   async getStudents() {
@@ -236,11 +209,56 @@ export const apiService = {
     const res = await api.get<{ success: boolean; authorizedAdministrator: string; devices: BiometricDevice[] }>('/biometric/devices');
     return res.data;
   },
-  async updateBiometricDevice(deviceId: string, data: Partial<BiometricDevice>) {
-    const res = await api.patch<{ success: boolean; message: string; device: BiometricDevice }>(`/biometric/devices/${deviceId}`, data);
+  async getBiometricEnrolledUsers() {
+    const res = await api.get<{
+      success: boolean;
+      total: number;
+      users: Array<{
+        userId: string;
+        deviceSerial: string;
+        name: string | null;
+        privilege: string | null;
+        enabled: boolean | null;
+        hasInfo: boolean;
+        infoFetchedAt: string | null;
+        fingerprintEnrolled: boolean;
+        fingerprintCount: number;
+      }>;
+    }>('/biometric/enrolled-users');
+
     return res.data;
   },
-  async syncBiometricLogs(deviceId: string, punches: { biometricId: string; punchTime?: string; punchTimestamp?: string }[]) {
+
+  // Device-linked student registration
+  async submitDeviceStudentRegistration(payload: {
+    enrollmentNo: string;
+    name: string;
+    course: string;
+    semester: number;
+    gender: 'male' | 'female' | 'other';
+    hostelId: string;
+    block: string;
+    roomNumber: string;
+    bedNumber: string;
+    biometricId: string;
+    deviceSerial: string;
+    studentEmail: string;
+    studentPhone: string;
+    parentName: string;
+    parentEmail: string;
+    parentPhone: string;
+  }) {
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      student?: Student;
+    }>('/students/device-registration', payload);
+
+    return res.data;
+  },
+
+
+    async syncBiometricLogs(deviceId: string, punches: { biometricId: string; punchTime?: string; punchTimestamp?: string }[]) {
     const res = await api.post<{
       success: boolean;
       message: string;
@@ -252,7 +270,32 @@ export const apiService = {
     }>('/biometric/sync', { deviceId, punches });
     return res.data;
   },
-  async getBiometricHealth() {
+  async getLiveBiometricPunches() {
+    const res = await api.get<{
+      success: boolean;
+      mongo: {
+        connected: boolean;
+        database: string;
+        collection: string;
+        totalRecords?: number;
+        error?: string;
+      };
+      total: number;
+      punches: Array<{
+        id: string;
+        biometricId: string;
+        studentName: string | null;
+        enrollmentNo: string | null;
+        deviceSerial: string | null;
+        direction: string;
+        punchTime: string | null;
+        recognized: boolean;
+      }>;
+    }>('/biometric/live');
+    return res.data;
+  },
+
+    async getBiometricHealth() {
     const res = await api.get<{
       success: boolean;
       systemHealth: string;
@@ -366,13 +409,7 @@ export const apiService = {
       stats: any;
     }>('/system/overview');
     return res.data;
-  },
-  async getSemesterSettings() {
-    const res = await api.get<{ success: boolean; settings: SemesterSettings }>('/system/semester-settings');
-    return res.data;
-  },
-  async saveSemesterSettings(startDate: string, endDate: string) {
-    const res = await api.put<{ success: boolean; settings: SemesterSettings; message: string }>('/system/semester-settings', { startDate, endDate });
-    return res.data;
   }
 };
+
+

@@ -1,526 +1,1062 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Cpu,
   UserPlus,
   CheckCircle2,
+  AlertTriangle,
   RefreshCw,
+  Database,
+  Fingerprint,
+  Users,
+  Activity,
+  Clock,
+  ShieldCheck
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { BiometricDevice, Hostel, Student } from '../types';
+import { BiometricDevice, Hostel } from '../types';
+
+const DEVICE_SERIAL = 'RSS20241199684';
+
+interface EnrolledUser {
+  userId: string;
+  deviceSerial: string;
+  name: string | null;
+  privilege: string | null;
+  enabled: boolean | null;
+  hasInfo: boolean;
+  infoFetchedAt: string | null;
+  fingerprintEnrolled: boolean;
+  fingerprintCount: number;
+}
+
+interface StudentFormData {
+  enrollmentNo: string;
+  name: string;
+  course: string;
+  semester: number;
+  gender: 'male' | 'female' | 'other';
+  hostelId: string;
+  block: string;
+  roomNumber: string;
+  bedNumber: string;
+  biometricId: string;
+  studentEmail: string;
+  studentPhone: string;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string;
+}
+
+const createInitialForm = (hostelId = ''): StudentFormData => ({
+  enrollmentNo: '',
+  name: '',
+  course: 'B.Tech CSE',
+  semester: 1,
+  gender: 'male',
+  hostelId,
+  block: '',
+  roomNumber: '',
+  bedNumber: '',
+  biometricId: '',
+  studentEmail: '',
+  studentPhone: '',
+  parentName: '',
+  parentEmail: '',
+  parentPhone: ''
+});
 
 export const CaretakerBiometricDashboard: React.FC = () => {
   const [devices, setDevices] = useState<BiometricDevice[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>('bdev-shiv-01');
-  const [syncStatus, setSyncStatus] = useState<any>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [deviceForm, setDeviceForm] = useState({
-    name: '',
-    model: '',
-    serialNumber: '',
-    location: '',
-    installationDate: '',
-    installedBy: '',
-    installationNotes: ''
-  });
-  const [isSavingDevice, setIsSavingDevice] = useState(false);
-  const [deviceFeedback, setDeviceFeedback] = useState<string | null>(null);
+  const [enrolledUsers, setEnrolledUsers] = useState<EnrolledUser[]>([]);
+  const [selectedMachineUserId, setSelectedMachineUserId] = useState('');
+  const [studentForm, setStudentForm] = useState<StudentFormData>(
+    createInitialForm()
+  );
 
-  // Onboard form state (FR-02)
-  const [studentForm, setStudentForm] = useState<{
-    enrollmentNo: string;
-    name: string;
-    course: string;
-    branch: string;
-    year: number;
-    semester: number;
-    gender: 'male' | 'female' | 'other';
-    hostelId: string;
-    block: string;
-    roomNumber: string;
-    bedNumber: string;
-    biometricId: string;
-    studentEmail: string;
-    studentPhone: string;
-    parentName: string;
-    parentEmail: string;
-    parentPhone: string;
-  }>({
-    enrollmentNo: '',
-    name: '',
-    course: 'B.Tech CSE',
-    branch: 'Computer Science and Engineering',
-    year: 1,
-    semester: 1,
-    gender: 'male',
-    hostelId: 'h-shivalik',
-    block: 'Block A',
-    roomNumber: '102',
-    bedNumber: 'B',
-    biometricId: `BIO-${Math.floor(1000 + Math.random() * 9000)}`,
-    studentEmail: '',
-    studentPhone: '',
-    parentName: '',
-    parentEmail: '',
-    parentPhone: ''
-  });
+  const [liveData, setLiveData] = useState<any>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [onboardFeedback, setOnboardFeedback] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registrationMode, setRegistrationMode] = useState<
+    'device' | 'manual'
+  >('device');
+
+  const selectedMachineUser = enrolledUsers.find(
+    (user) => user.userId === selectedMachineUserId
+  );
+
+  const livePunches = Array.isArray(liveData?.punches)
+    ? liveData.punches
+    : [];
+
+  const loadHostels = async () => {
     try {
-      const devRes = await apiService.getBiometricDevices();
-      if (devRes.success) {
-        const availableDevices = devRes.devices.filter((device) => device.hostelId !== 'h-mandakini');
-        setDevices(availableDevices);
-        const selected = availableDevices.find((device) => device.id === selectedDevice) || availableDevices[0];
-        if (selected) {
-          setSelectedDevice(selected.id);
-          setDeviceForm({
-            name: selected.name || '',
-            model: selected.model || '',
-            serialNumber: selected.serialNumber || selected.deviceId || '',
-            location: selected.location || '',
-            installationDate: selected.installationDate || '',
-            installedBy: selected.installedBy || '',
-            installationNotes: selected.installationNotes || ''
-          });
+      const response = await apiService.getHostels();
+
+      if (response.success) {
+        setHostels(response.hostels);
+
+        if (response.hostels.length > 0) {
+          setStudentForm((previous) => ({
+            ...previous,
+            hostelId: previous.hostelId || response.hostels[0].id
+          }));
         }
       }
-
-      const hRes = await apiService.getHostels();
-      if (hRes.success) setHostels(hRes.hostels.filter((hostel) => hostel.id !== 'h-mandakini'));
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error('Hostel loading failed:', error);
     }
+  };
+
+  const loadDevices = async () => {
+    try {
+      const response = await apiService.getBiometricDevices();
+
+      if (response.success) {
+        setDevices(response.devices);
+      }
+    } catch (error) {
+      console.error('Device loading failed:', error);
+    }
+  };
+
+  const loadEnrolledUsers = async () => {
+    try {
+      const response = await apiService.getBiometricEnrolledUsers();
+
+      if (response.success) {
+        setEnrolledUsers(response.users || []);
+      }
+    } catch (error: any) {
+      console.error('Enrolled users loading failed:', error);
+      setPageError(
+        error.response?.data?.message ||
+          'Machine enrolled users load nahi ho pa rahe hain.'
+      );
+    }
+  };
+
+  const loadLivePunches = async () => {
+    try {
+      const response = await apiService.getLiveBiometricPunches();
+      setLiveData(response);
+      setLiveError(null);
+    } catch (error: any) {
+      setLiveError(
+        error.response?.data?.message ||
+          'MongoDB se live punches read nahi ho pa rahe hain.'
+      );
+    }
+  };
+
+  const refreshAllData = async () => {
+    setIsLoading(true);
+    setPageError(null);
+
+    await Promise.all([
+      loadHostels(),
+      loadDevices(),
+      loadEnrolledUsers(),
+      loadLivePunches()
+    ]);
+
+    setIsLoading(false);
   };
 
   useEffect(() => {
-    loadData();
+    refreshAllData();
+
+    const timer = window.setInterval(() => {
+      loadEnrolledUsers();
+      loadLivePunches();
+    }, 10000);
+
+    return () => window.clearInterval(timer);
   }, []);
 
-  const handleDeviceDetailsSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setDeviceFeedback(null);
-    setIsSavingDevice(true);
-    try {
-      const res = await apiService.updateBiometricDevice(selectedDevice, deviceForm);
-      if (res.success) {
-        setDevices((current) => current.map((device) => device.id === res.device.id ? res.device : device));
-        setDeviceFeedback(res.message);
-      }
-    } catch (err: any) {
-      setDeviceFeedback(err.response?.data?.message || 'Could not save device details.');
-    } finally {
-      setIsSavingDevice(false);
-    }
-  };
-
-  const handleDeviceSelection = (deviceId: string) => {
-    const device = devices.find((entry) => entry.id === deviceId);
-    setSelectedDevice(deviceId);
-    setDeviceFeedback(null);
-    if (device) {
-      setDeviceForm({
-        name: device.name || '',
-        model: device.model || '',
-        serialNumber: device.serialNumber || device.deviceId || '',
-        location: device.location || '',
-        installationDate: device.installationDate || '',
-        installedBy: device.installedBy || '',
-        installationNotes: device.installationNotes || ''
-      });
-    }
-  };
-
-  // Run Biometric Log Sync from Local Device (FR-01)
-  const handleSyncPunches = async () => {
-    setIsSyncing(true);
-    setSyncStatus(null);
-    try {
-      // Simulate punches fetched locally from the offline terminal
-      const simulatedLocalPunches = [
-        { biometricId: 'BIO-SHIV-01', punchTime: '18:15:22', punchTimestamp: '2026-10-27 18:15:22' },
-        { biometricId: 'BIO-SHIV-03', punchTime: '18:20:00', punchTimestamp: '2026-10-27 18:20:00' },
-      ];
-
-      const res = await apiService.syncBiometricLogs(selectedDevice, simulatedLocalPunches);
-      if (res.success) {
-        setSyncStatus(res);
-        loadData();
-      }
-    } catch (err: any) {
-      setSyncStatus({ error: err.response?.data?.message || 'Sync failed' });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Onboard verified student (FR-02)
-  const handleOnboardSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMachineUserChange = (userId: string) => {
+    setSelectedMachineUserId(userId);
     setOnboardFeedback(null);
+
+    const machineUser = enrolledUsers.find(
+      (user) => user.userId === userId
+    );
+
+    if (!machineUser) {
+      setStudentForm((previous) => ({
+        ...previous,
+        biometricId: ''
+      }));
+      return;
+    }
+
+    setStudentForm((previous) => ({
+      ...previous,
+      biometricId: machineUser.userId,
+      name: machineUser.name || previous.name
+    }));
+  };
+
+  const handleDeviceRegistration = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+    setOnboardFeedback(null);
+
+    if (!selectedMachineUser) {
+      setOnboardFeedback('Pehle biometric machine ka User ID select karein.');
+      return;
+    }
+
+    if (!studentForm.hostelId) {
+      setOnboardFeedback('Please hostel select karein.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      const res = await apiService.onboardStudent(studentForm);
-      if (res.success) {
-        setOnboardFeedback(`Student ${studentForm.name} submitted for resident warden verification.`);
-        setStudentForm({
-          enrollmentNo: '',
-          name: '',
-          course: 'B.Tech CSE',
-          branch: 'Computer Science and Engineering',
-          year: 1,
-          semester: 1,
-          gender: 'male',
-          hostelId: 'h-shivalik',
-          block: 'Block A',
-          roomNumber: '102',
-          bedNumber: 'B',
-          biometricId: `BIO-${Math.floor(1000 + Math.random() * 9000)}`,
-          studentEmail: '',
-          studentPhone: '',
-          parentName: '',
-          parentEmail: '',
-          parentPhone: ''
+      const response =
+        await apiService.submitDeviceStudentRegistration({
+          ...studentForm,
+          biometricId: selectedMachineUser.userId,
+          deviceSerial: selectedMachineUser.deviceSerial
         });
+
+      if (response.success) {
+        setOnboardFeedback(
+          'Student registration successfully submit ho gaya. Approval ke baad student verified hoga.'
+        );
+
+        setSelectedMachineUserId('');
+        setStudentForm(createInitialForm(studentForm.hostelId));
+
+        await loadEnrolledUsers();
+      } else {
+        setOnboardFeedback(
+          response.message || 'Student registration submit nahi hua.'
+        );
       }
-    } catch (err: any) {
-      setOnboardFeedback(err.response?.data?.message || 'Failed to onboard student');
+    } catch (error: any) {
+      setOnboardFeedback(
+        error.response?.data?.message ||
+          'Device-linked student registration failed.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const handleManualOnboard = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+    setOnboardFeedback(null);
+
+    if (!studentForm.biometricId.trim()) {
+      setOnboardFeedback('Manual onboarding ke liye Biometric ID enter karein.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await apiService.onboardStudent(studentForm);
+
+      if (response.success) {
+        setOnboardFeedback(
+          `Student ${studentForm.name} successfully registered and verified.`
+        );
+
+        setStudentForm(createInitialForm(studentForm.hostelId));
+        setSelectedMachineUserId('');
+      } else {
+        setOnboardFeedback(
+          response.message || 'Student onboarding failed.'
+        );
+      }
+    } catch (error: any) {
+      setOnboardFeedback(
+        error.response?.data?.message || 'Failed to onboard student.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const mongoConnected = liveData?.mongo?.connected === true;
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Biometric Offline Log Sync Interface (FR-01) */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
-          <div className="flex items-center space-x-2 text-indigo-700 font-bold text-sm border-b border-slate-100 pb-3">
-            <Cpu className="w-5 h-5 text-indigo-600" />
-            <span>Biometric Hardware Synchronization Terminal (FR-01)</span>
+
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">
+            Biometric Terminal & Student Onboarding
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Actual machine users, MongoDB connectivity and student registration
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={refreshAllData}
+          disabled={isLoading}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh Data
+        </button>
+      </div>
+
+      {/* Connection Status */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-semibold">
+                MongoDB Connection
+              </p>
+              <p className={`text-lg font-bold mt-2 ${
+                mongoConnected ? 'text-emerald-600' : 'text-rose-600'
+              }`}>
+                {mongoConnected ? 'Connected' : 'Not Connected'}
+              </p>
+            </div>
+            <Database className={`w-8 h-8 ${
+              mongoConnected ? 'text-emerald-500' : 'text-rose-500'
+            }`} />
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            Database: {liveData?.mongo?.database || 'biometric_db'}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-semibold">
+                Machine Enrolled Users
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {enrolledUsers.length}
+              </p>
+            </div>
+            <Users className="w-8 h-8 text-indigo-500" />
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            Users fetched from device records
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-semibold">
+                Punch Records
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {liveData?.total ?? 0}
+              </p>
+            </div>
+            <Activity className="w-8 h-8 text-emerald-500" />
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            Records in biometric punch collection
+          </p>
+        </div>
+
+      </div>
+
+      {/* Device Information */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <Cpu className="w-5 h-5 text-indigo-600" />
+          <h2 className="font-bold text-sm text-slate-800">
+            Biometric Device Information
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="p-3 bg-slate-50 rounded-lg">
+            <p className="text-xs text-slate-500">Device Serial Number</p>
+            <p className="font-mono font-bold text-sm text-slate-800 mt-1">
+              {DEVICE_SERIAL}
+            </p>
           </div>
 
-          <div className="space-y-3 text-xs">
+          <div className="p-3 bg-slate-50 rounded-lg">
+            <p className="text-xs text-slate-500">MongoDB Collection</p>
+            <p className="font-mono font-bold text-sm text-slate-800 mt-1">
+              {liveData?.mongo?.collection || 'glog_data'}
+            </p>
+          </div>
+        </div>
+
+        {devices.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-500">
+              Registered Devices
+            </p>
+
+            {devices.map((device) => (
+              <div
+                key={device.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border border-slate-100 rounded-lg"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {device.name}
+                  </p>
+                  <p className="text-xs text-slate-500 font-mono">
+                    {device.deviceId}
+                  </p>
+                </div>
+
+                <span className={`text-xs font-bold ${
+                  device.status === 'online_synced'
+                    ? 'text-emerald-600'
+                    : 'text-amber-600'
+                }`}>
+                  {device.status === 'online_synced'
+                    ? 'Online Synced'
+                    : 'Pending / Stale'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Enrolled Machine Users */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Fingerprint className="w-5 h-5 text-indigo-600" />
+            <h2 className="font-bold text-sm text-slate-800">
+              Actual Machine Enrolled Users
+            </h2>
+          </div>
+
+          <span className="text-xs text-slate-500">
+            Auto refresh: 10 seconds
+          </span>
+        </div>
+
+        {enrolledUsers.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500">
+            Abhi API se koi enrolled user record nahi mila.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="p-3">Machine User ID</th>
+                  <th className="p-3">Machine Name</th>
+                  <th className="p-3">Privilege</th>
+                  <th className="p-3">Fingerprint</th>
+                  <th className="p-3">Info Status</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {enrolledUsers.map((user) => (
+                  <tr
+                    key={`${user.deviceSerial}-${user.userId}`}
+                    className="border-t border-slate-100"
+                  >
+                    <td className="p-3 font-mono font-bold">
+                      {user.userId}
+                    </td>
+                    <td className="p-3">
+                      {user.name || 'Name not fetched'}
+                    </td>
+                    <td className="p-3">
+                      {user.privilege || 'Not available'}
+                    </td>
+                    <td className="p-3">
+                      {user.fingerprintEnrolled
+                        ? `Yes (${user.fingerprintCount})`
+                        : 'Not confirmed'}
+                    </td>
+                    <td className="p-3">
+                      {user.hasInfo ? (
+                        <span className="text-emerald-600 font-semibold">
+                          Fetched
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 font-semibold">
+                          Pending fetch
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="text-xs text-slate-500">
+          Note: Fingerprint status machine ke enrollment metadata par based hai.
+          Actual fingerprint template is screen par transfer ya display nahi
+          kiya ja raha.
+        </p>
+      </div>
+
+      {/* Student Registration */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5">
+
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <UserPlus className="w-5 h-5 text-indigo-600" />
+          <h2 className="font-bold text-sm text-slate-800">
+            Student Registration
+          </h2>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setRegistrationMode('device');
+              setOnboardFeedback(null);
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold ${
+              registrationMode === 'device'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            Machine Linked Registration
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setRegistrationMode('manual');
+              setSelectedMachineUserId('');
+              setStudentForm((previous) => ({
+                ...previous,
+                biometricId: ''
+              }));
+              setOnboardFeedback(null);
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold ${
+              registrationMode === 'manual'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            Manual Onboarding
+          </button>
+        </div>
+
+        {registrationMode === 'device' ? (
+          <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+            <p className="text-xs font-semibold text-indigo-900">
+              Machine-linked registration
+            </p>
+            <p className="text-xs text-indigo-800 mt-1">
+              Machine se enrolled User ID select karein. Student details
+              bharne ke baad registration pending verification mein jayega.
+            </p>
+          </div>
+        ) : (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs font-semibold text-amber-900">
+              Manual onboarding
+            </p>
+            <p className="text-xs text-amber-800 mt-1">
+              Existing manual onboarding process available hai. Is process
+              mein existing backend ke mutabik student verified create hota hai.
+            </p>
+          </div>
+        )}
+
+        {registrationMode === 'device' && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Select Machine User ID
+            </label>
+
+            <select
+              value={selectedMachineUserId}
+              onChange={(event) =>
+                handleMachineUserChange(event.target.value)
+              }
+              className="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm"
+              required
+            >
+              <option value="">Select enrolled machine user</option>
+
+              {enrolledUsers
+                .filter((user) => user.deviceSerial === DEVICE_SERIAL)
+                .map((user) => (
+                  <option key={user.userId} value={user.userId}>
+                    {user.userId} - {user.name || 'Name not fetched'}
+                  </option>
+                ))}
+            </select>
+
+            {selectedMachineUser && (
+              <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+                <p>
+                  <strong>Machine User ID:</strong>{' '}
+                  {selectedMachineUser.userId}
+                </p>
+                <p>
+                  <strong>Machine Name:</strong>{' '}
+                  {selectedMachineUser.name || 'Not available'}
+                </p>
+                <p>
+                  <strong>Fingerprint Enrolled:</strong>{' '}
+                  {selectedMachineUser.fingerprintEnrolled ? 'Yes' : 'Not confirmed'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <form
+          onSubmit={
+            registrationMode === 'device'
+              ? handleDeviceRegistration
+              : handleManualOnboard
+          }
+          className="space-y-4"
+        >
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
             <div>
-              <label className="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">
-                Select Biometric Hardware Terminal
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Academic Enrollment Number
+              </label>
+              <input
+                type="text"
+                required
+                value={studentForm.enrollmentNo}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    enrollmentNo: event.target.value
+                  })
+                }
+                placeholder="e.g. 24BCSE101"
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Student Full Name
+              </label>
+              <input
+                type="text"
+                required
+                value={studentForm.name}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    name: event.target.value
+                  })
+                }
+                placeholder="Student name"
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Course
+              </label>
+              <input
+                type="text"
+                required
+                value={studentForm.course}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    course: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Semester
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="12"
+                required
+                value={studentForm.semester}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    semester: Number(event.target.value)
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Gender
               </label>
               <select
-                value={selectedDevice}
-                onChange={(e) => handleDeviceSelection(e.target.value)}
-                className="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-xs font-medium"
+                value={studentForm.gender}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    gender: event.target.value as StudentFormData['gender']
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
               >
-                {devices.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({d.deviceId}) — {d.status === 'online_synced' ? 'Synced' : 'Stale (>24h)'}
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Biometric Machine User ID
+              </label>
+              <input
+                type="text"
+                required
+                readOnly={registrationMode === 'device'}
+                value={studentForm.biometricId}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    biometricId: event.target.value
+                  })
+                }
+                placeholder={
+                  registrationMode === 'device'
+                    ? 'Select machine user above'
+                    : 'Enter biometric ID'
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono read-only:bg-slate-100"
+              />
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Hostel
+              </label>
+              <select
+                required
+                value={studentForm.hostelId}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    hostelId: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
+              >
+                <option value="">Select Hostel</option>
+                {hostels.map((hostel) => (
+                  <option key={hostel.id} value={hostel.id}>
+                    {hostel.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            <form onSubmit={handleDeviceDetailsSubmit} className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-              <div className="text-xs font-bold text-slate-800">Device Installation Details</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
-                  Device Name
-                  <input required value={deviceForm.name} onChange={(e) => setDeviceForm({ ...deviceForm, name: e.target.value })} placeholder="e.g. Boys Hostel 1 Main Gate" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
-                </label>
-                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
-                  Device Model
-                  <input required value={deviceForm.model} onChange={(e) => setDeviceForm({ ...deviceForm, model: e.target.value })} placeholder="e.g. ESSL K30" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
-                </label>
-                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
-                  Serial Number / Device Code
-                  <input required value={deviceForm.serialNumber} onChange={(e) => setDeviceForm({ ...deviceForm, serialNumber: e.target.value })} className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-mono font-normal normal-case" />
-                </label>
-                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
-                  Installation Location
-                  <input required value={deviceForm.location} onChange={(e) => setDeviceForm({ ...deviceForm, location: e.target.value })} placeholder="e.g. Main entrance" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
-                </label>
-                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
-                  Installation Date
-                  <input required type="date" value={deviceForm.installationDate} onChange={(e) => setDeviceForm({ ...deviceForm, installationDate: e.target.value })} className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
-                </label>
-                <label className="block font-semibold text-slate-600 text-[10px] uppercase">
-                  Installed By
-                  <input required value={deviceForm.installedBy} onChange={(e) => setDeviceForm({ ...deviceForm, installedBy: e.target.value })} placeholder="Installer's full name" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
-                </label>
-              </div>
-              <label className="block font-semibold text-slate-600 text-[10px] uppercase">
-                Additional Details
-                <textarea value={deviceForm.installationNotes} onChange={(e) => setDeviceForm({ ...deviceForm, installationNotes: e.target.value })} rows={2} placeholder="Optional notes about the device or installation" className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-xs font-normal normal-case" />
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Block
               </label>
-              {deviceFeedback && (
-                <div className={`p-2 rounded-lg text-xs ${deviceFeedback.includes('saved') ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
-                  {deviceFeedback}
-                </div>
-              )}
-              <button type="submit" disabled={isSavingDevice} className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold disabled:opacity-50">
-                {isSavingDevice ? 'Saving Device Details…' : 'Save Device Details'}
-              </button>
-            </form>
+              <input
+                type="text"
+                required
+                value={studentForm.block}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    block: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
 
-            <button
-              disabled={isSyncing}
-              onClick={handleSyncPunches}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-xs transition shadow-xs disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Ingesting Punch Logs...' : 'Ingest Offline Biometric Logs to Central DB'}</span>
-            </button>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Room Number
+              </label>
+              <input
+                type="text"
+                required
+                value={studentForm.roomNumber}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    roomNumber: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
 
-            {syncStatus && !syncStatus.error && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs space-y-1 animate-in fade-in">
-                <div className="font-bold flex items-center">
-                  <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-600" />
-                  <span>{syncStatus.message}</span>
-                </div>
-                <div className="text-[11px] text-emerald-700">
-                  Processed: <strong>{syncStatus.processedCount}</strong> | Duplicates Ignored: <strong>{syncStatus.duplicateCount}</strong> | Unrecognized IDs: <strong>{syncStatus.unrecognizedCount}</strong>
-                </div>
-              </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Bed Number
+              </label>
+              <input
+                type="text"
+                value={studentForm.bedNumber}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    bedNumber: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Student Phone
+              </label>
+              <input
+                type="tel"
+                required
+                value={studentForm.studentPhone}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    studentPhone: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Student Email
+              </label>
+              <input
+                type="email"
+                required
+                value={studentForm.studentEmail}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    studentEmail: event.target.value
+                  })
+                }
+                placeholder="student@example.com"
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Parent Name
+              </label>
+              <input
+                type="text"
+                required
+                value={studentForm.parentName}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    parentName: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Parent Phone
+              </label>
+              <input
+                type="tel"
+                required
+                value={studentForm.parentPhone}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    parentPhone: event.target.value
+                  })
+                }
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Parent Email
+              </label>
+              <input
+                type="email"
+                required
+                value={studentForm.parentEmail}
+                onChange={(event) =>
+                  setStudentForm({
+                    ...studentForm,
+                    parentEmail: event.target.value
+                  })
+                }
+                placeholder="parent@example.com"
+                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+
+          </div>
+
+          {onboardFeedback && (
+            <div className={`p-3 rounded-lg text-xs border ${
+              onboardFeedback.toLowerCase().includes('successfully') ||
+              onboardFeedback.toLowerCase().includes('submit ho gaya')
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}>
+              {onboardFeedback}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={
+              isSubmitting ||
+              (registrationMode === 'device' && !selectedMachineUser)
+            }
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-sm disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : registrationMode === 'device' ? (
+              <ShieldCheck className="w-4 h-4" />
+            ) : (
+              <UserPlus className="w-4 h-4" />
             )}
 
-            {syncStatus?.error && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs">
-                {syncStatus.error}
-              </div>
-            )}
-          </div>
+            {isSubmitting
+              ? 'Submitting...'
+              : registrationMode === 'device'
+                ? 'Submit for Warden Verification'
+                : 'Onboard & Verify Student'}
+          </button>
 
-          {/* Terminal Health Cards */}
-          <div className="pt-2 border-t border-slate-100">
-            <div className="text-[10px] font-semibold uppercase text-slate-400 mb-2">Device Status Registry</div>
-            <div className="space-y-2">
-              {devices.map((d) => (
-                <div key={d.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs">
-                  <div>
-                    <div className="font-semibold text-slate-800">{d.name}</div>
-                    <div className="text-[10px] text-slate-500">{d.model || 'Model not recorded'} · {d.location}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">Last Sync: {d.lastSyncAt}</div>
-                    <div className="text-[10px] text-slate-400">Installed {d.installationDate || 'date not recorded'}{d.installedBy ? ` by ${d.installedBy}` : ''}</div>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.status === 'online_synced' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {d.status === 'online_synced' ? 'Online Synced' : 'Stale Pending Import'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Onboard Verified Student Master Record (FR-02) */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
-          <div className="flex items-center space-x-2 text-indigo-700 font-bold text-sm border-b border-slate-100 pb-3">
-            <UserPlus className="w-5 h-5 text-indigo-600" />
-            <span>Onboard Verified Student Record (FR-02)</span>
-          </div>
-
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs leading-relaxed">
-            <strong>Registration details:</strong> Enter the student's verified profile and room assignment. A resident warden will review and verify the record.
-          </div>
-
-          <form onSubmit={handleOnboardSubmit} className="space-y-3 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Enrollment Number</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 24BCSE101"
-                  value={studentForm.enrollmentNo}
-                  onChange={(e) => setStudentForm({ ...studentForm, enrollmentNo: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg uppercase font-mono"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Ankit Saxena"
-                  value={studentForm.name}
-                  onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Course</label>
-                <input
-                  type="text"
-                  required
-                  value={studentForm.course}
-                  onChange={(e) => setStudentForm({ ...studentForm, course: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Branch</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Computer Science and Engineering"
-                  value={studentForm.branch}
-                  onChange={(e) => setStudentForm({ ...studentForm, branch: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Year of Study</label>
-                <select
-                  required
-                  value={studentForm.year}
-                  onChange={(e) => setStudentForm({ ...studentForm, year: Number(e.target.value) })}
-                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  {[1, 2, 3, 4, 5, 6].map((year) => <option key={year} value={year}>Year {year}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Semester</label>
-                <select
-                  value={studentForm.semester}
-                  onChange={(e) => setStudentForm({ ...studentForm, semester: Number(e.target.value) })}
-                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((semester) => <option key={semester} value={semester}>Semester {semester}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Gender</label>
-                <select
-                  value={studentForm.gender}
-                  onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value as 'male' | 'female' | 'other' })}
-                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Biometric Hardware ID</label>
-                <input
-                  type="text"
-                  required
-                  value={studentForm.biometricId}
-                  onChange={(e) => setStudentForm({ ...studentForm, biometricId: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Hostel</label>
-                <select
-                  value={studentForm.hostelId}
-                  onChange={(e) => setStudentForm({ ...studentForm, hostelId: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  {hostels.map((h) => (
-                    <option key={h.id} value={h.id}>{h.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Block</label>
-                <input
-                  type="text"
-                  required
-                  value={studentForm.block}
-                  onChange={(e) => setStudentForm({ ...studentForm, block: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Room No</label>
-                <input
-                  type="text"
-                  required
-                  value={studentForm.roomNumber}
-                  onChange={(e) => setStudentForm({ ...studentForm, roomNumber: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Bed</label>
-                <select
-                  value={studentForm.bedNumber}
-                  onChange={(e) => setStudentForm({ ...studentForm, bedNumber: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  <option value="A">Bed A</option>
-                  <option value="B">Bed B</option>
-                  <option value="C">Bed C</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Email</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="student@university.edu.in"
-                  value={studentForm.studentEmail}
-                  onChange={(e) => setStudentForm({ ...studentForm, studentEmail: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Student Phone</label>
-                <input
-                  type="tel"
-                  value={studentForm.studentPhone}
-                  onChange={(e) => setStudentForm({ ...studentForm, studentPhone: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Parent / Guardian Name</label>
-                <input
-                  type="text"
-                  value={studentForm.parentName}
-                  onChange={(e) => setStudentForm({ ...studentForm, parentName: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block font-semibold text-slate-700 text-[10px] uppercase mb-1">Parent Email or Phone</label>
-                <input
-                  type="text"
-                  placeholder="Email address or phone number"
-                  value={studentForm.parentEmail || studentForm.parentPhone}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    setStudentForm({ ...studentForm, parentEmail: value.includes('@') ? value : '', parentPhone: value.includes('@') ? '' : value });
-                  }}
-                  className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-            </div>
-
-            {onboardFeedback && (
-              <div className={`p-2.5 rounded-lg text-xs ${onboardFeedback.includes('submitted') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
-                {onboardFeedback}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition shadow-xs mt-2"
-            >
-              Submit for Resident Warden Verification
-            </button>
-          </form>
-        </div>
+        </form>
       </div>
+
+      {/* Live Punches */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <Clock className="w-5 h-5 text-indigo-600" />
+          <h2 className="font-bold text-sm text-slate-800">
+            Live Biometric Punch Records
+          </h2>
+        </div>
+
+        {liveError && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+            {liveError}
+          </div>
+        )}
+
+        {!liveError && livePunches.length === 0 && (
+          <div className="p-6 text-center text-sm text-slate-500">
+            MongoDB se abhi koi punch record return nahi hua.
+          </div>
+        )}
+
+        {livePunches.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="p-3">Biometric ID</th>
+                  <th className="p-3">Student</th>
+                  <th className="p-3">Enrollment No</th>
+                  <th className="p-3">Punch Time</th>
+                  <th className="p-3">Direction</th>
+                  <th className="p-3">Recognition</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {livePunches.map((punch: any, index: number) => (
+                  <tr
+                    key={punch.id || index}
+                    className="border-t border-slate-100"
+                  >
+                    <td className="p-3 font-mono">
+                      {punch.biometricId || '-'}
+                    </td>
+                    <td className="p-3">
+                      {punch.studentName || 'Unrecognized'}
+                    </td>
+                    <td className="p-3">
+                      {punch.enrollmentNo || '-'}
+                    </td>
+                    <td className="p-3">
+                      {punch.punchTime || '-'}
+                    </td>
+                    <td className="p-3">
+                      {punch.direction || '-'}
+                    </td>
+                    <td className="p-3">
+                      {punch.recognized ? (
+                        <span className="text-emerald-600 font-semibold">
+                          Recognized
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 font-semibold">
+                          Not linked
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+      </div>
+
+      {pageError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+          <AlertTriangle className="w-4 h-4 inline mr-2" />
+          {pageError}
+        </div>
+      )}
+
     </div>
   );
 };
