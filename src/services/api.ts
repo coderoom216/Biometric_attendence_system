@@ -6,6 +6,8 @@ import {
   Student,
   AttendanceRecord,
   LeaveRecord,
+  LeaveApplication,
+  HolidayRecord,
   NotificationLog,
   ScheduledJobLog,
   BiometricDevice,
@@ -157,6 +159,36 @@ export const apiService = {
     notes?: string;
   }) {
     const res = await api.post<{ success: boolean; message: string; leave: LeaveRecord }>('/leaves/enter', payload);
+    return res.data;
+  },
+  async getLeaveApplications() {
+    const res = await api.get<{ success: boolean; applications: LeaveApplication[] }>('/leaves/applications');
+    return res.data;
+  },
+  async submitLeaveApplication(payload: { startDate: string; endDate: string; reason: string }) {
+    const res = await api.post<{ success: boolean; application: LeaveApplication; message: string }>('/leaves/applications', payload);
+    return res.data;
+  },
+  async reviewLeaveApplication(applicationId: string, decision: 'approved' | 'denied', reviewNote?: string) {
+    const res = await api.patch<{ success: boolean; application: LeaveApplication; message: string }>(
+      `/leaves/applications/${applicationId}`,
+      { decision, reviewNote }
+    );
+    return res.data;
+  },
+  async getHolidays() {
+    const res = await api.get<{ success: boolean; holidays: HolidayRecord[] }>('/leaves/holidays');
+    return res.data;
+  },
+  async addHoliday(startDate: string, endDate: string, reason: string) {
+    const res = await api.post<{ success: boolean; holiday: HolidayRecord; message: string }>(
+      '/leaves/holidays',
+      { startDate, endDate, reason }
+    );
+    return res.data;
+  },
+  async removeHoliday(holidayId: string) {
+    const res = await api.delete<{ success: boolean; message: string }>(`/leaves/holidays/${holidayId}`);
     return res.data;
   },
 
