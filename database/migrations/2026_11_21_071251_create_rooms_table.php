@@ -19,6 +19,10 @@ return new class extends Migration
 
             $table->string('room_number');
             $table->unsignedInteger('capacity');
+            // New columns required by factories and dashboards
+            $table->unsignedInteger('floor')->default(1);
+            $table->decimal('rent_fee', 10, 2)->default(0);
+            $table->enum('status', ['available', 'full', 'maintenance'])->default('available');
 
             $table->unique(['hostel_id', 'room_number']);
 
