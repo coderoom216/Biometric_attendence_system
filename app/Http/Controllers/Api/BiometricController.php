@@ -22,19 +22,62 @@ class BiometricController extends Controller
         private ClockService $clockService
     ) {}
 
+    private function checkDeviceHeartbeat(string $serial = 'RSS20241199684'): array
+    {
+        $logPath = 'C:/wamp64/www/SDK_Php_Mongo/SDK_Php_Mongo/request.log';
+        $isOnline = false;
+        $secondsAgo = null;
+
+        if (file_exists($logPath)) {
+            clearstatcache(true, $logPath);
+            $mtime = filemtime($logPath);
+            if ($mtime !== false) {
+                $secondsAgo = time() - $mtime;
+                // S362 machine pings index.php every 3 seconds.
+                // If last heartbeat arrived within 15 seconds, device is online.
+                $isOnline = ($secondsAgo <= 15);
+            }
+        }
+
+        try {
+            Device::where('device_serial', $serial)->update([
+                'device_status' => $isOnline ? 'online_synced' : 'offline',
+                'last_sync' => $isOnline ? now() : DB::raw('last_sync'),
+            ]);
+        } catch (\Throwable) {
+        }
+
+        return [
+            'online' => $isOnline,
+            'secondsAgo' => $secondsAgo,
+            'serial' => $serial,
+            'statusText' => $isOnline ? 'Connected (Online)' : 'Disconnected (Offline)',
+        ];
+    }
+
     public function devices(Request $request)
     {
-        $devices = Device::with('hostel')->get()->map(function ($device) {
+        $aliveInfo = $this->checkDeviceHeartbeat('RSS20241199684');
+
+        $devices = Device::with('hostel')->get()->map(function ($device) use ($aliveInfo) {
+            $isDeviceOnline = ($device->device_serial === 'RSS20241199684') ? $aliveInfo['online'] : ($device->device_status === 'online_synced');
+            $status = $isDeviceOnline ? 'online_synced' : 'offline';
+
             return [
                 'id' => (string) $device->id,
+                'deviceId' => $device->device_serial,
+                'name' => $device->device_name,
                 'deviceName' => $device->device_name,
                 'deviceSerial' => $device->device_serial,
                 'hostelId' => (string) $device->hostel_id,
                 'hostelName' => $device->hostel?->name ?? 'Unknown Hostel',
-                'status' => $device->device_status,
-                'ipAddress' => '192.168.1.'.(100 + $device->id),
-                'lastSync' => $device->last_sync?->toIso8601String(),
-                'firmware' => 'v3.2.1-thdc',
+                'status' => $status,
+                'ipAddress' => '192.168.1.22',
+                'lastSync' => $isDeviceOnline ? now()->toIso8601String() : $device->last_sync?->toIso8601String(),
+                'lastSyncAt' => $isDeviceOnline ? now()->toIso8601String() : ($device->last_sync?->toIso8601String() ?? now()->toIso8601String()),
+                'firmware' => 'S362 v3.15.630',
+                'isOnline' => $isDeviceOnline,
+                'heartbeatSecondsAgo' => $aliveInfo['secondsAgo'],
             ];
         });
 
@@ -42,6 +85,7 @@ class BiometricController extends Controller
             'success' => true,
             'authorizedAdministrator' => 'Mr. Mehra (Computer Science Dept)',
             'devices' => $devices,
+            'deviceStatus' => $aliveInfo,
         ]);
     }
 
@@ -393,9 +437,12 @@ class BiometricController extends Controller
                 ];
             }
 
+            $aliveInfo = $this->checkDeviceHeartbeat('RSS20241199684');
+
             return response()->json([
                 'success' => true,
                 'mongo' => ['connected' => true, 'database' => 'biometric_db', 'collection' => 'glog_data'],
+                'device' => $aliveInfo,
                 'total' => count($punches),
                 'punches' => $punches,
             ]);

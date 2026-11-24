@@ -11,7 +11,9 @@ import {
   Users,
   Activity,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { BiometricDevice, Hostel } from '../types';
@@ -199,9 +201,10 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     refreshAllData();
 
     const timer = window.setInterval(() => {
+      loadDevices();
       loadEnrolledUsers();
       loadLivePunches();
-    }, 10000);
+    }, 5000);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -318,6 +321,8 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   };
 
   const mongoConnected = liveData?.mongo?.connected === true;
+  const deviceOnline = liveData?.device?.online === true || devices.some((d: any) => d.isOnline === true || d.status === 'online_synced');
+  const heartbeatSeconds = liveData?.device?.secondsAgo;
 
   return (
     <div className="space-y-6">
@@ -329,7 +334,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
             Biometric Terminal & Student Onboarding
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Actual machine users, MongoDB connectivity and student registration
+            Actual machine users, real-time hardware status, and student registration
           </p>
         </div>
 
@@ -344,19 +349,53 @@ export const CaretakerBiometricDashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Connection Status */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Connection Status: 4 Cards showing Physical Device, MongoDB, Enrolled Users, Punches */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
+        {/* Physical Biometric Device Live Status */}
+        <div className={`bg-white rounded-xl border p-5 transition-all ${
+          deviceOnline ? 'border-emerald-200 bg-emerald-50/20' : 'border-rose-200 bg-rose-50/20'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+                  deviceOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+                }`} />
+                <p className="text-xs text-slate-500 font-semibold">
+                  Physical Machine (S362)
+                </p>
+              </div>
+              <p className={`text-lg font-bold mt-2 ${
+                deviceOnline ? 'text-emerald-600' : 'text-rose-600'
+              }`}>
+                {deviceOnline ? 'Connected (Live)' : 'Disconnected (Offline)'}
+              </p>
+            </div>
+            {deviceOnline ? (
+              <Wifi className="w-8 h-8 text-emerald-500" />
+            ) : (
+              <WifiOff className="w-8 h-8 text-rose-500" />
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            {deviceOnline
+              ? `Live heartbeat active (~${heartbeatSeconds ?? 3}s ago)`
+              : 'Machine power off ya Wi-Fi disconnected'}
+          </p>
+        </div>
+
+        {/* MongoDB Database Status */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-500 font-semibold">
-                MongoDB Connection
+                Database (MongoDB)
               </p>
               <p className={`text-lg font-bold mt-2 ${
                 mongoConnected ? 'text-emerald-600' : 'text-rose-600'
               }`}>
-                {mongoConnected ? 'Connected' : 'Not Connected'}
+                {mongoConnected ? 'Connected (Local)' : 'Not Connected'}
               </p>
             </div>
             <Database className={`w-8 h-8 ${
@@ -364,10 +403,11 @@ export const CaretakerBiometricDashboard: React.FC = () => {
             }`} />
           </div>
           <p className="text-xs text-slate-400 mt-2">
-            Database: {liveData?.mongo?.database || 'biometric_db'}
+            biometric_db (Port 27017)
           </p>
         </div>
 
+        {/* Machine Enrolled Users */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -385,6 +425,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           </p>
         </div>
 
+        {/* Punch Records */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -435,31 +476,33 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               Registered Devices
             </p>
 
-            {devices.map((device) => (
-              <div
-                key={device.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border border-slate-100 rounded-lg"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {device.name}
-                  </p>
-                  <p className="text-xs text-slate-500 font-mono">
-                    {device.deviceId}
-                  </p>
-                </div>
+            {devices.map((device: any) => {
+              const isDevOnline = device.isOnline === true || device.status === 'online_synced' || deviceOnline;
+              return (
+                <div
+                  key={device.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border border-slate-100 rounded-lg"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {device.name || device.deviceName || 'Biometric Terminal'}
+                    </p>
+                    <p className="text-xs text-slate-500 font-mono">
+                      Serial: {device.deviceId || device.deviceSerial || DEVICE_SERIAL} • IP: {device.ipAddress || '192.168.1.22'}
+                    </p>
+                  </div>
 
-                <span className={`text-xs font-bold ${
-                  device.status === 'online_synced'
-                    ? 'text-emerald-600'
-                    : 'text-amber-600'
-                }`}>
-                  {device.status === 'online_synced'
-                    ? 'Online Synced'
-                    : 'Pending / Stale'}
-                </span>
-              </div>
-            ))}
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                    isDevOnline
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${isDevOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                    {isDevOnline ? 'Online (Live Heartbeat)' : 'Disconnected / Offline'}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
