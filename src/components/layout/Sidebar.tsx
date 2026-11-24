@@ -116,21 +116,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Brand in Sidebar */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm">
-              HA
-            </div>
-            <div className="min-w-0 font-bold text-white text-xs tracking-wide leading-tight">
-              Hosteller Attendance
-            </div>
-          </div>
-          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">
-            v2.1
-          </span>
-        </div>
-
         {/* Role Scope Notice */}
         <div className="sticky top-0 z-10 px-4 py-3 mx-3 my-3 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs backdrop-blur-sm">
           <div className="text-[10px] uppercase font-semibold text-slate-400">{isMehraDashboard ? 'Operator' : 'Current Scope'}</div>

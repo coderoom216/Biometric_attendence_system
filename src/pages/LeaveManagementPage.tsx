@@ -269,9 +269,7 @@ export const LeaveManagementPage: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold text-slate-900">{isStudent ? 'My Approved Leaves' : 'Leave & Correction Audits'}</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-              Absence Email Suppression Active
-            </span>
+
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {isStudent ? 'Apply for leave and follow your Residential Warden’s decision.' : 'Formal leave logging by an authorized warden upon verification of the application and parent consent.'}
@@ -436,7 +434,7 @@ export const LeaveManagementPage: React.FC = () => {
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
             <input
               type="text"
-              placeholder="Search by student, gate pass..."
+              placeholder={isStudent ? 'Search leave records...' : 'Search by student, gate pass...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
@@ -448,7 +446,7 @@ export const LeaveManagementPage: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
               <tr>
-                <th className="py-2.5 px-3">Gate Pass No</th>
+                {!isStudent && <th className="py-2.5 px-3">Gate Pass No</th>}
                 <th className="py-2.5 px-3">Student Name</th>
                 <th className="py-2.5 px-3">Hostel / Room</th>
                 <th className="py-2.5 px-3">Approved Duration</th>
@@ -461,14 +459,14 @@ export const LeaveManagementPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredLeaves.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={isStudent ? 7 : 8} className="py-8 text-center text-slate-400">
                     No approved leaves found matching criteria.
                   </td>
                 </tr>
               ) : (
                 filteredLeaves.map((l) => (
                   <tr key={l.id} className="hover:bg-slate-50 transition">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{l.gatePassNo}</td>
+                    {!isStudent && <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{l.gatePassNo}</td>}
                     <td className="py-2.5 px-3">
                       <div className="font-semibold text-slate-900">{l.studentName}</div>
                       <div className="font-mono text-[10px] text-slate-500">{l.enrollmentNo}</div>
