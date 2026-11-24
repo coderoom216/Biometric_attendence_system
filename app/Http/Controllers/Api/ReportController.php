@@ -14,8 +14,7 @@ class ReportController extends Controller
 {
     public function __construct(
         private ClockService $clockService
-    ) {
-    }
+    ) {}
 
     public function summary(Request $request)
     {
@@ -46,11 +45,18 @@ class ReportController extends Controller
             return [
                 'hostelId' => (string) $hostel->id,
                 'hostelName' => $hostel->name,
+                'code' => $hostel->code ?? ('H'.$hostel->id),
                 'totalResidents' => $total,
+                'totalEnrolled' => $total,
                 'presentCount' => $pres,
+                'present' => $pres,
                 'lateCount' => $lt,
+                'late' => $lt,
                 'leaveCount' => $lv,
+                'leave' => $lv,
                 'defaulterCount' => $def,
+                'defaulters' => $def,
+                'complianceRate' => $total > 0 ? round((($pres + $lt) / $total) * 100, 1) : 0,
                 'attendancePercentage' => $total > 0 ? round((($pres + $lt) / $total) * 100, 1) : 0,
             ];
         });
@@ -60,10 +66,15 @@ class ReportController extends Controller
             'date' => $date,
             'consolidated' => [
                 'totalStudents' => $totalStudents,
+                'totalEnrolled' => $totalStudents,
                 'presentCount' => $present,
+                'totalPresent' => $present,
                 'lateCount' => $late,
+                'totalLate' => $late,
                 'leaveCount' => $leave,
+                'totalLeave' => $leave,
                 'defaultersCount' => $defaulters,
+                'totalDefaulters' => $defaulters,
                 'overallPercentage' => $totalStudents > 0 ? round((($present + $late) / $totalStudents) * 100, 1) : 0,
             ],
             'hostelReports' => $hostelReports,

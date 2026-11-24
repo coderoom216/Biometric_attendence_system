@@ -10,11 +10,10 @@ class AuditController extends Controller
 {
     private function checkAdmin(Request $request)
     {
-        $role = $request->user()->role?->name;
-        if (!in_array($role, ['Admin', 'Director', 'Chief Warden'], true)) {
+        if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Admin or executive access required for audit logs.',
+                'message' => 'Only Admin can access audit logs.',
             ], 403);
         }
 
@@ -39,23 +38,23 @@ class AuditController extends Controller
         $query = Audit::with('user')
             ->orderByDesc('activity_at');
 
-        if (!empty($filters['user_id'])) {
+        if (! empty($filters['user_id'])) {
             $query->where('user_id', $filters['user_id']);
         }
 
-        if (!empty($filters['activity'])) {
+        if (! empty($filters['activity'])) {
             $query->where('activity', $filters['activity']);
         }
 
-        if (!empty($filters['entity_type'])) {
+        if (! empty($filters['entity_type'])) {
             $query->where('entity_type', $filters['entity_type']);
         }
 
-        if (!empty($filters['from'])) {
+        if (! empty($filters['from'])) {
             $query->whereDate('activity_at', '>=', $filters['from']);
         }
 
-        if (!empty($filters['to'])) {
+        if (! empty($filters['to'])) {
             $query->whereDate('activity_at', '<=', $filters['to']);
         }
 

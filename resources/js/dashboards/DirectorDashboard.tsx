@@ -362,7 +362,10 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
   const { user } = useAuth();
   const officeTitle = officeRole === 'chief_warden' ? 'Chief Warden' : 'Director';
   const officePossessive = officeRole === 'chief_warden' ? 'Chief Warden’s' : 'Director Sir’s';
-  const [selectedDate, setSelectedDate] = useState<string>('2026-10-27');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const dayBeforeStr = new Date(Date.now() - 86400000 * 2).toISOString().slice(0, 10);
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [drilldownSelection, setDrilldownSelection] = useState<{
     category: AttendanceDrilldownCategory;
     hostelId?: string;
@@ -519,34 +522,34 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           <div className="flex items-center space-x-2 text-xs">
             <span className="text-slate-400 text-[11px] font-medium hidden sm:inline">Quick Presets:</span>
             <button
-              onClick={() => handleDateChange('2026-10-27')}
+              onClick={() => handleDateChange(todayStr)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                selectedDate === '2026-10-27'
+                selectedDate === todayStr
                   ? 'bg-indigo-600 text-white font-bold shadow-xs'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
               }`}
             >
-              Today (Oct 27)
+              Today
             </button>
             <button
-              onClick={() => handleDateChange('2026-10-26')}
+              onClick={() => handleDateChange(yesterdayStr)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                selectedDate === '2026-10-26'
+                selectedDate === yesterdayStr
                   ? 'bg-indigo-600 text-white font-bold shadow-xs'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
               }`}
             >
-              Yesterday (Oct 26)
+              Yesterday
             </button>
             <button
-              onClick={() => handleDateChange('2026-10-25')}
+              onClick={() => handleDateChange(dayBeforeStr)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                selectedDate === '2026-10-25'
+                selectedDate === dayBeforeStr
                   ? 'bg-indigo-600 text-white font-bold shadow-xs'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
               }`}
             >
-              Oct 25
+              2 Days Ago
             </button>
           </div>
         </div>
@@ -561,7 +564,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           aria-label="View all active residents"
         >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Active Residents</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{consolidated?.totalEnrolled || 0}</div>
+          <div className="text-2xl font-bold text-slate-900 mt-1">{consolidated?.totalEnrolled ?? consolidated?.totalStudents ?? 0}</div>
           <div className="text-[10px] text-slate-500 mt-0.5">3 Hostels Active</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>
@@ -573,7 +576,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           aria-label="View students present on time"
         >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Present Rate</div>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">{consolidated?.totalPresent || 0}</div>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">{consolidated?.totalPresent ?? consolidated?.presentCount ?? 0}</div>
           <div className="text-[10px] text-slate-400 mt-0.5">On-time biometric</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>
@@ -585,7 +588,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           aria-label="View students with late punches"
         >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Late Punches</div>
-          <div className="text-2xl font-bold text-amber-600 mt-1">{consolidated?.totalLate || 0}</div>
+          <div className="text-2xl font-bold text-amber-600 mt-1">{consolidated?.totalLate ?? consolidated?.lateCount ?? 0}</div>
           <div className="text-[10px] text-slate-400 mt-0.5">Pre-cutoff entry</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>
@@ -597,7 +600,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           aria-label="View students on approved leave"
         >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Approved Leave</div>
-          <div className="text-2xl font-bold text-blue-600 mt-1">{consolidated?.totalLeave || 0}</div>
+          <div className="text-2xl font-bold text-blue-600 mt-1">{consolidated?.totalLeave ?? consolidated?.leaveCount ?? 0}</div>
           <div className="text-[10px] text-blue-600 mt-0.5">Alerts suppressed</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>
@@ -609,7 +612,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           aria-label="View defaulters"
         >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Defaulters (After 10:00 PM / No-Punch Check)</div>
-          <div className="text-2xl font-bold text-rose-600 mt-1">{consolidated?.totalDefaulters || 0}</div>
+          <div className="text-2xl font-bold text-rose-600 mt-1">{consolidated?.totalDefaulters ?? consolidated?.defaultersCount ?? 0}</div>
           <div className="text-[10px] text-rose-600 font-semibold mt-0.5">Missing students</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>

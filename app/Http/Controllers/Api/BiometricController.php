@@ -3,21 +3,24 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
 use App\Models\Device;
+use App\Models\Notification;
 use App\Models\Punch;
 use App\Models\Student;
-use App\Models\Notification;
 use App\Services\ClockService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use MongoDB\Driver\BulkWrite;
+use MongoDB\Driver\Manager;
+use MongoDB\Driver\Query;
 
 class BiometricController extends Controller
 {
     public function __construct(
         private ClockService $clockService
-    ) {
-    }
+    ) {}
 
     public function devices(Request $request)
     {
@@ -29,7 +32,7 @@ class BiometricController extends Controller
                 'hostelId' => (string) $device->hostel_id,
                 'hostelName' => $device->hostel?->name ?? 'Unknown Hostel',
                 'status' => $device->device_status,
-                'ipAddress' => '192.168.1.' . (100 + $device->id),
+                'ipAddress' => '192.168.1.'.(100 + $device->id),
                 'lastSync' => $device->last_sync?->toIso8601String(),
                 'firmware' => 'v3.2.1-thdc',
             ];
@@ -56,7 +59,7 @@ class BiometricController extends Controller
             ->orWhere('device_serial', $data['deviceId'])
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'success' => false,
                 'message' => 'Specified biometric device not found.',
@@ -72,12 +75,13 @@ class BiometricController extends Controller
             foreach ($data['punches'] as $punchItem) {
                 $student = Student::where('biometric_id', $punchItem['biometricId'])->first();
 
-                if (!$student) {
+                if (! $student) {
                     $unrecognized++;
+
                     continue;
                 }
 
-                $punchTime = $punchItem['punchTimestamp'] ?? ($current->toDateString() . ' ' . ($punchItem['punchTime'] ?? $current->format('H:i:s')));
+                $punchTime = $punchItem['punchTimestamp'] ?? ($current->toDateString().' '.($punchItem['punchTime'] ?? $current->format('H:i:s')));
                 $parsedTime = Carbon::parse($punchTime, ClockService::TIMEZONE);
 
                 $exists = Punch::where('student_id', $student->id)
@@ -86,6 +90,7 @@ class BiometricController extends Controller
 
                 if ($exists) {
                     $duplicates++;
+
                     continue;
                 }
 
@@ -119,7 +124,7 @@ class BiometricController extends Controller
         $totalDevices = $devices->count();
         $staleThreshold = Carbon::now()->subHours(24);
 
-        $staleDevices = $devices->filter(fn ($d) => !$d->last_sync || $d->last_sync < $staleThreshold)->values();
+        $staleDevices = $devices->filter(fn ($d) => ! $d->last_sync || $d->last_sync < $staleThreshold)->values();
         $syncedDevices = $totalDevices - $staleDevices->count();
 
         $missingParentEmails = Student::whereNull('parent_email')
@@ -128,7 +133,7 @@ class BiometricController extends Controller
             ->get()
             ->map(fn ($s) => [
                 'id' => (string) $s->id,
-                'name' => $s->user?->name ?? 'Student ' . $s->enrollment_no,
+                'name' => $s->user?->name ?? 'Student '.$s->enrollment_no,
                 'enrollmentNo' => $s->enrollment_no,
                 'hostel' => $s->hostel?->name ?? '',
                 'room' => $s->room?->room_number ?? '',
@@ -157,25 +162,27 @@ class BiometricController extends Controller
     {
         try {
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
-            $manager = new \MongoDB\Driver\Manager($mongoUri);
+            $manager = new Manager($mongoUri);
 
-            $idQuery = new \MongoDB\Driver\Query([], ['sort' => ['user_id' => 1]]);
+            $idQuery = new Query([], ['sort' => ['user_id' => 1]]);
             $idDocs = iterator_to_array($manager->executeQuery('biometric_db.get_user_id', $idQuery));
 
-            $infoQuery = new \MongoDB\Driver\Query([], ['sort' => ['created_at' => -1]]);
+            $infoQuery = new Query([], ['sort' => ['created_at' => -1]]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
 
             $infoMap = [];
             foreach ($infoDocs as $doc) {
                 $uid = trim((string) ($doc->user_id ?? ''));
-                if (!$uid) continue;
+                if (! $uid) {
+                    continue;
+                }
                 $infoObj = is_string($doc->info ?? null) ? json_decode($doc->info) : ($doc->info ?? null);
-                if (!isset($infoMap[$uid])) {
+                if (! isset($infoMap[$uid])) {
                     $infoMap[$uid] = [
                         'name' => $infoObj->user_name ?? ($doc->name ?? null),
                         'privilege' => $infoObj->privilege ?? ($doc->privilege ?? 'User'),
-                        'hasFingerprint' => !empty($doc->backup_number) || !empty($doc->raw_size) || !empty($doc->fp_template_size),
-                        'fingerprintCount' => !empty($doc->backup_number) || !empty($doc->raw_size) ? 1 : 0,
+                        'hasFingerprint' => ! empty($doc->backup_number) || ! empty($doc->raw_size) || ! empty($doc->fp_template_size),
+                        'fingerprintCount' => ! empty($doc->backup_number) || ! empty($doc->raw_size) ? 1 : 0,
                         'hasInfo' => true,
                     ];
                 }
@@ -184,7 +191,9 @@ class BiometricController extends Controller
             $users = [];
             foreach ($idDocs as $doc) {
                 $uid = trim((string) ($doc->user_id ?? ''));
-                if (!$uid || $uid === '0') continue;
+                if (! $uid || $uid === '0') {
+                    continue;
+                }
                 $info = $infoMap[$uid] ?? [
                     'name' => null,
                     'privilege' => 'User',
@@ -212,7 +221,7 @@ class BiometricController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'MongoDB connection failed: ' . $e->getMessage(),
+                'message' => 'MongoDB connection failed: '.$e->getMessage(),
             ], 503);
         }
     }
@@ -222,9 +231,9 @@ class BiometricController extends Controller
         try {
             $devId = $request->input('deviceId', 'RSS20241199684');
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
-            $manager = new \MongoDB\Driver\Manager($mongoUri);
+            $manager = new Manager($mongoUri);
 
-            $bulk = new \MongoDB\Driver\BulkWrite();
+            $bulk = new BulkWrite;
             $transId = (string) rand(10000, 99999);
             $nextId = (int) (round(microtime(true) * 1000) % 100000000);
 
@@ -239,14 +248,14 @@ class BiometricController extends Controller
                 'id' => $nextId,
             ]);
 
-            $idQuery = new \MongoDB\Driver\Query(['dev_id' => $devId]);
+            $idQuery = new Query(['dev_id' => $devId]);
             $idDocs = iterator_to_array($manager->executeQuery('biometric_db.get_user_id', $idQuery));
 
-            $infoQuery = new \MongoDB\Driver\Query(['dev_id' => $devId]);
+            $infoQuery = new Query(['dev_id' => $devId]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
             $confirmed = [];
             foreach ($infoDocs as $inf) {
-                if (!empty($inf->raw_size) || !empty($inf->backup_number)) {
+                if (! empty($inf->raw_size) || ! empty($inf->backup_number)) {
                     $confirmed[(string) $inf->user_id] = true;
                 }
             }
@@ -280,7 +289,7 @@ class BiometricController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to queue sync command: ' . $e->getMessage(),
+                'message' => 'Failed to queue sync command: '.$e->getMessage(),
             ], 503);
         }
     }
@@ -289,9 +298,9 @@ class BiometricController extends Controller
     {
         try {
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
-            $manager = new \MongoDB\Driver\Manager($mongoUri);
+            $manager = new Manager($mongoUri);
 
-            $glogQuery = new \MongoDB\Driver\Query([], ['sort' => ['id' => -1], 'limit' => 100]);
+            $glogQuery = new Query([], ['sort' => ['id' => -1], 'limit' => 100]);
             $records = iterator_to_array($manager->executeQuery('biometric_db.glog_data', $glogQuery));
 
             $students = Student::with('user', 'hostel')->get();
@@ -303,14 +312,16 @@ class BiometricController extends Controller
                 $studentsByBioId[$clean] = $s;
             }
 
-            $infoQuery = new \MongoDB\Driver\Query([], ['sort' => ['created_at' => -1]]);
+            $infoQuery = new Query([], ['sort' => ['created_at' => -1]]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
             $machineNames = [];
             foreach ($infoDocs as $rec) {
                 $uid = trim((string) ($rec->user_id ?? ''));
-                if (!$uid) continue;
+                if (! $uid) {
+                    continue;
+                }
                 $infoObj = is_string($rec->info ?? null) ? json_decode($rec->info) : ($rec->info ?? null);
-                if (!isset($machineNames[$uid]) && !empty($infoObj->user_name)) {
+                if (! isset($machineNames[$uid]) && ! empty($infoObj->user_name)) {
                     $machineNames[$uid] = (string) $infoObj->user_name;
                     $machineNames[ltrim($uid, '0') ?: $uid] = (string) $infoObj->user_name;
                 }
@@ -327,10 +338,10 @@ class BiometricController extends Controller
                 $machineName = $machineNames[$bioId] ?? ($machineNames[$cleanId] ?? null);
 
                 $studentName = $student?->user?->name ?? ($machineName ?? null);
-                $enrollmentNo = $student?->enrollment_no ?? ($machineName ? 'BIO-' . str_pad($cleanId, 4, '0', STR_PAD_LEFT) : null);
+                $enrollmentNo = $student?->enrollment_no ?? ($machineName ? 'BIO-'.str_pad($cleanId, 4, '0', STR_PAD_LEFT) : null);
                 $isRecognized = ($student !== null || $machineName !== null);
 
-                if ($student && !empty($record->io_time)) {
+                if ($student && ! empty($record->io_time)) {
                     try {
                         $punchAt = Carbon::parse($record->io_time, ClockService::TIMEZONE);
                         Punch::firstOrCreate(
@@ -343,7 +354,25 @@ class BiometricController extends Controller
                                 'synced_at' => now(),
                             ]
                         );
-                    } catch (\Throwable) {}
+
+                        $attDate = $punchAt->toDateString();
+                        $cutoff = Carbon::parse($attDate.' 21:00:00', ClockService::TIMEZONE);
+                        $status = $punchAt->gt($cutoff) ? 'late' : 'present';
+
+                        Attendance::updateOrCreate(
+                            [
+                                'student_id' => $student->id,
+                                'attendance_date' => $attDate,
+                            ],
+                            [
+                                'punch_time' => $punchAt->toTimeString(),
+                                'status' => $status,
+                                'is_defaulter' => false,
+                                'remarks' => 'Biometric machine punch',
+                            ]
+                        );
+                    } catch (\Throwable) {
+                    }
                 }
 
                 $ioMode = (string) ($record->io_mode ?? '');
@@ -373,7 +402,7 @@ class BiometricController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to read biometric records: ' . $e->getMessage(),
+                'message' => 'Unable to read biometric records: '.$e->getMessage(),
             ], 503);
         }
     }

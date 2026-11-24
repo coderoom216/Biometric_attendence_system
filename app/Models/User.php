@@ -2,30 +2,34 @@
 
 namespace App\Models;
 
+use App\Notifications\ApiResetPasswordNotification;
 use Database\Factories\UserFactory;
-use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable([
-    'name',
-    'email',
-    'password',
-    'role_id',
-    'hostel_id',
-    'is_active',
-])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'role_id',
+        'hostel_id',
+        'is_active',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     protected function casts(): array
     {
@@ -39,7 +43,7 @@ class User extends Authenticatable
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(
-            new \App\Notifications\ApiResetPasswordNotification($token)
+            new ApiResetPasswordNotification($token)
         );
     }
 
@@ -54,11 +58,13 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Hostel::class, 'hostel_id');
     }
-// User has one Student profile
-public function student(): HasOne
-{
-    return $this->hasOne(Student::class, 'user_id');
-}
+
+    // User has one Student profile
+    public function student(): HasOne
+    {
+        return $this->hasOne(Student::class, 'user_id');
+    }
+
     // User can perform multiple Actions
     public function actions(): HasMany
     {
