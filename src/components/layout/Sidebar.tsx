@@ -122,8 +122,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm">
               HA
             </div>
-            <div className="font-bold text-white text-sm tracking-wide">
-              Hostel Attendance
+            <div className="min-w-0 font-bold text-white text-xs tracking-wide leading-tight">
+              Hosteller Attendance
             </div>
           </div>
           <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">

@@ -74,7 +74,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-white">
-          Hostel Attendance Management System
+          Hosteller Attendance Monitoring System
         </h2>
         <p className="mt-1 text-center text-xs text-slate-400">
           Spiders Student Development Team • Educational Institution Oversight

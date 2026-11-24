@@ -89,21 +89,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                 {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
-              <div className="flex items-center space-x-2.5">
+              <div className="flex min-w-0 items-center space-x-2.5">
                 <div className="w-9 h-9 rounded-lg bg-indigo-700 text-white flex items-center justify-center font-bold shadow-xs">
                   <Building2 className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-slate-900 tracking-tight text-base sm:text-lg">
-                      Hostel Attendance Portal
-                    </span>
-                    <span className="hidden sm:inline-flex text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">
-                  
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center space-x-2">
+                    <span className="min-w-0 break-words font-bold text-slate-900 tracking-tight text-xs sm:text-base leading-tight">
+                      Hosteller Attendance Monitoring System
                     </span>
                   </div>
                   <p className="hidden md:block text-xs text-slate-500">
-                    Institutional Attendance Management System
+                    Attendance Monitoring System
                   </p>
                 </div>
               </div>
@@ -112,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
             {/* Right: Clock Simulator Pill, Switcher, and User Profile */}
             <div className="flex items-center space-x-2 sm:space-x-3">
               {/* Virtual Clock Pill */}
-              <button
+              {user?.role !== 'student' && <button
                 onClick={() => setIsClockModalOpen(true)}
                 className="flex items-center space-x-2 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-mono transition shadow-xs hover:border-slate-300 bg-slate-50 border-slate-200 text-slate-700"
                 title="Adjust the simulated clock or run 10:00 PM defaulter evaluation"
@@ -138,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                   </span>
                 )}
                 <Sliders className="w-3 h-3 text-slate-400 hidden md:inline ml-1" />
-              </button>
+              </button>}
 
               {/* Demo Role Switcher Quick Pill */}
               <div className="relative">
