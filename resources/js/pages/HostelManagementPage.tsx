@@ -180,7 +180,7 @@ export const HostelManagementPage: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-xs font-semibold text-slate-500 uppercase">Total Capacity</div>
           <div className="text-2xl font-bold text-slate-900 mt-1">{selectedHostel?.capacity || 0} Beds</div>
-          <div className="text-[11px] text-slate-400 mt-1">{selectedHostel?.totalRooms || 0} Rooms across {selectedHostel?.blocks.join(', ')}</div>
+          <div className="text-[11px] text-slate-400 mt-1">{selectedHostel?.totalRooms || 0} Rooms across {selectedHostel?.blocks?.join(', ') || 'Block A, Block B'}</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
