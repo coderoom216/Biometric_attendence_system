@@ -3,22 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Role;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
+use App\Models\User;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
     // Check whether logged-in user is Admin
     private function checkAdmin(Request $request)
     {
-        if (!$request->user() ||
+        if (! $request->user() ||
             $request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Unauthorized. Admin access required.'
+                'message' => 'Unauthorized. Admin access required.',
             ], 403);
         }
 
@@ -44,7 +43,7 @@ class AdminController extends Controller
                         'Admin',
                         'Residential Warden',
                         'Chief Warden',
-                        'Director'
+                        'Director',
                     ]
                 ),
             ],
@@ -58,7 +57,7 @@ class AdminController extends Controller
             empty($data['hostel_id'])
         ) {
             return response()->json([
-                'message' => 'Residential Warden must be assigned a hostel.'
+                'message' => 'Residential Warden must be assigned a hostel.',
             ], 422);
         }
 
@@ -72,13 +71,14 @@ class AdminController extends Controller
                 : null,
             'is_active' => true,
         ]);
-         app(AuditService::class)->log(
-        'Staff Account Created',
-        'User',
-         $user->id,
-        'Created staff account for ' . $user->email,
-        $request->user()->id
+        app(AuditService::class)->log(
+            'Staff Account Created',
+            'User',
+            $user->id,
+            'Created staff account for '.$user->email,
+            $request->user()->id
         );
+
         return response()->json([
             'message' => 'Staff account created successfully.',
             'user' => $user->load('role', 'hostel'),
@@ -98,13 +98,13 @@ class AdminController extends Controller
                     'Admin',
                     'Residential Warden',
                     'Chief Warden',
-                    'Director'
+                    'Director',
                 ]);
             })
             ->get();
 
         return response()->json([
-            'users' => $users
+            'users' => $users,
         ]);
     }
 
@@ -121,9 +121,9 @@ class AdminController extends Controller
 
         $user = User::findOrFail($id);
 
-        if (!$user->role || $user->role->name === 'Student') {
+        if (! $user->role || $user->role->name === 'Student') {
             return response()->json([
-                'message' => 'Invalid staff account.'
+                'message' => 'Invalid staff account.',
             ], 422);
         }
 
@@ -131,11 +131,11 @@ class AdminController extends Controller
             'is_active' => $data['is_active'],
         ]);
         app(AuditService::class)->log(
-        $data['is_active'] ? 'Account Activated' : 'Account Deactivated',
-        'User',
-        $user->id,
-        'Account status changed to ' . ($data['is_active'] ? 'Active' : 'Inactive'),
-        $request->user()->id
+            $data['is_active'] ? 'Account Activated' : 'Account Deactivated',
+            'User',
+            $user->id,
+            'Account status changed to '.($data['is_active'] ? 'Active' : 'Inactive'),
+            $request->user()->id
         );
 
         return response()->json([

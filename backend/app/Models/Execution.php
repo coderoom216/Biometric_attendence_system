@@ -1,16 +1,18 @@
 <?php
 
 namespace App\Models;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Execution extends Model
 {
     public function evaluations(): HasMany
-{
-    return $this->hasMany(Evaluation::class, 'execution_id');
-}
+    {
+        return $this->hasMany(Evaluation::class, 'execution_id');
+    }
+
     public $timestamps = false;
 
     protected $fillable = [

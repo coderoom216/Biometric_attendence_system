@@ -13,11 +13,11 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('student_id')
-                  ->constrained('students');
+                ->constrained('students');
 
             $table->foreignId('approved_by')
-                  ->nullable()
-                  ->constrained('users');
+                ->nullable()
+                ->constrained('users');
 
             $table->date('start_date');
             $table->date('end_date');

@@ -53,11 +53,11 @@ Artisan::command(
             );
 
             return 0;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             report($exception);
 
             $this->error(
-                'Attendance evaluation failed: ' . $exception->getMessage()
+                'Attendance evaluation failed: '.$exception->getMessage()
             );
 
             return 1;

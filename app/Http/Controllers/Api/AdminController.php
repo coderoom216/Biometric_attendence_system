@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Role;
+use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class AdminController extends Controller
 {
@@ -22,7 +22,7 @@ class AdminController extends Controller
     private function checkAdmin(Request $request)
     {
         if (
-            !$request->user() ||
+            ! $request->user() ||
             $request->user()->role?->name !== 'Admin'
         ) {
             return response()->json([
@@ -79,7 +79,7 @@ class AdminController extends Controller
             'Staff Account Created',
             'User',
             $user->id,
-            'Created staff account for ' . $user->email,
+            'Created staff account for '.$user->email,
             $request->user()->id
         );
 
@@ -120,7 +120,7 @@ class AdminController extends Controller
         $user = User::with('role')->findOrFail($id);
 
         if (
-            !$user->role ||
+            ! $user->role ||
             $user->role->name === 'Student'
         ) {
             return response()->json([
@@ -130,7 +130,7 @@ class AdminController extends Controller
 
         if (
             $user->id === $request->user()->id &&
-            !$data['is_active']
+            ! $data['is_active']
         ) {
             return response()->json([
                 'message' => 'You cannot deactivate your own account.',
@@ -145,7 +145,7 @@ class AdminController extends Controller
             $data['is_active'] ? 'Account Activated' : 'Account Deactivated',
             'User',
             $user->id,
-            'Account status changed to ' .
+            'Account status changed to '.
                 ($data['is_active'] ? 'Active' : 'Inactive'),
             $request->user()->id
         );

@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Evaluation;
 use App\Models\Execution;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class EvaluationController extends Controller
 {
@@ -57,7 +57,7 @@ class EvaluationController extends Controller
             'Evaluation Created',
             'Evaluation',
             $evaluation->id,
-            'Created evaluation for execution ID ' . $evaluation->execution_id,
+            'Created evaluation for execution ID '.$evaluation->execution_id,
             $request->user()->id
         );
 
@@ -85,7 +85,7 @@ class EvaluationController extends Controller
         $query = Evaluation::with('execution.scheduledTask')
             ->latest('created_at');
 
-        if (!empty($filters['execution_id'])) {
+        if (! empty($filters['execution_id'])) {
             $query->where('execution_id', $filters['execution_id']);
         }
 
@@ -135,7 +135,7 @@ class EvaluationController extends Controller
             'Evaluation Updated',
             'Evaluation',
             $evaluation->id,
-            'Updated evaluation. Current status: ' . $evaluation->result_status,
+            'Updated evaluation. Current status: '.$evaluation->result_status,
             $request->user()->id
         );
 

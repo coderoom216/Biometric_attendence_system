@@ -12,12 +12,12 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
 
             $table->foreignId('role_id')
-                  ->nullable()
-                  ->constrained('roles');
+                ->nullable()
+                ->constrained('roles');
 
             $table->foreignId('hostel_id')
-                  ->nullable()
-                  ->constrained('hostels');
+                ->nullable()
+                ->constrained('hostels');
 
             $table->boolean('is_active')->default(true);
 
@@ -34,7 +34,7 @@ return new class extends Migration
             $table->dropColumn([
                 'role_id',
                 'hostel_id',
-                'is_active'
+                'is_active',
             ]);
 
         });

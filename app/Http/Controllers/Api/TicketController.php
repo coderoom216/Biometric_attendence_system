@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
-use Illuminate\Http\Request;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 
 class TicketController extends Controller
 {
@@ -14,7 +14,7 @@ class TicketController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
@@ -119,8 +119,8 @@ class TicketController extends Controller
             'Ticket Status Updated',
             'Ticket',
             $ticket->id,
-            'Ticket status changed from ' . $oldStatus .
-                ' to ' . $ticket->warning_status,
+            'Ticket status changed from '.$oldStatus.
+                ' to '.$ticket->warning_status,
             $user->id
         );
 

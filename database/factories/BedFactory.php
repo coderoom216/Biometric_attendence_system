@@ -14,7 +14,7 @@ class BedFactory extends Factory
         return [
             // room_id will be set in the seeder via create([...])
             'bed_identifier' => $this->faker->lexify('Bed ?'),
-            'is_occupied'    => $this->faker->boolean(30), // 30% occupied by default
+            'is_occupied' => $this->faker->boolean(30), // 30% occupied by default
         ];
     }
 }

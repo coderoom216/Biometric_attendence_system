@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
-use App\Models\Violation;
 use App\Models\Ticket;
+use App\Models\Violation;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\AuditService;
 
 class ViolationController extends Controller
 {
@@ -17,14 +17,14 @@ class ViolationController extends Controller
     {
         $role = $request->user()->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
-            'Director'
+            'Director',
         ])) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -54,7 +54,7 @@ class ViolationController extends Controller
             $student->hostel_id != $user->hostel_id
         ) {
             return response()->json([
-                'message' => 'You cannot create violations for another hostel.'
+                'message' => 'You cannot create violations for another hostel.',
             ], 403);
         }
 
@@ -80,7 +80,7 @@ class ViolationController extends Controller
             'Violation Created',
             'Violation',
             $result['violation']->id,
-            'Violation recorded and warning ticket generated for student ID ' . $result['violation']->student_id,
+            'Violation recorded and warning ticket generated for student ID '.$result['violation']->student_id,
             $user->id
         );
 
@@ -109,7 +109,7 @@ class ViolationController extends Controller
         }
 
         return response()->json([
-            'violations' => $query->latest()->get()
+            'violations' => $query->latest()->get(),
         ]);
     }
 
@@ -132,12 +132,12 @@ class ViolationController extends Controller
             $violation->student->hostel_id != $user->hostel_id
         ) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
         return response()->json([
-            'violation' => $violation
+            'violation' => $violation,
         ]);
     }
 }

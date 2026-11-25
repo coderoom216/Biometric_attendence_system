@@ -13,13 +13,13 @@ class TicketFactory extends Factory
     public function definition(): array
     {
         // Must associate with a violation that doesn't already have a ticket if possible
-        $violation = Violation::doesntHave('ticket')->inRandomOrder()->first() 
+        $violation = Violation::doesntHave('ticket')->inRandomOrder()->first()
             ?? Violation::factory()->create();
 
         return [
-            'violation_id'   => $violation->id,
+            'violation_id' => $violation->id,
             'warning_status' => $this->faker->randomElement(['issued', 'resolved', 'escalated']),
-            'issue_date'     => $this->faker->dateTimeBetween('-20 days', 'now')->format('Y-m-d'),
+            'issue_date' => $this->faker->dateTimeBetween('-20 days', 'now')->format('Y-m-d'),
         ];
     }
 }

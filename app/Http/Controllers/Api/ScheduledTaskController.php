@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ScheduledTask;
-use Illuminate\Http\Request;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 
 class ScheduledTaskController extends Controller
 {
@@ -39,7 +39,7 @@ class ScheduledTaskController extends Controller
             'Scheduled Task Created',
             'ScheduledTask',
             $task->id,
-            'Created scheduled task: ' . $task->name,
+            'Created scheduled task: '.$task->name,
             $request->user()->id
         );
 
@@ -84,7 +84,7 @@ class ScheduledTaskController extends Controller
             'Scheduled Task Updated',
             'ScheduledTask',
             $task->id,
-            'Updated scheduled task: ' . $task->name,
+            'Updated scheduled task: '.$task->name,
             $request->user()->id
         );
 
@@ -119,7 +119,7 @@ class ScheduledTaskController extends Controller
             'Scheduled Task Deleted',
             'ScheduledTask',
             $taskId,
-            'Deleted scheduled task: ' . $taskName,
+            'Deleted scheduled task: '.$taskName,
             $request->user()->id
         );
 

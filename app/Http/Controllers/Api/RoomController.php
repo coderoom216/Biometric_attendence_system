@@ -1,10 +1,11 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
-use Illuminate\Http\Request;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 
 class RoomController extends Controller
 {
@@ -12,7 +13,7 @@ class RoomController extends Controller
     {
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Only Admin can manage rooms.'
+                'message' => 'Only Admin can manage rooms.',
             ], 403);
         }
 
@@ -31,15 +32,15 @@ class RoomController extends Controller
             'Caretaker Operator',
         ];
 
-        if (!in_array($role, $allowedRoles, true)) {
+        if (! in_array($role, $allowedRoles, true)) {
             return response()->json([
-                'message' => 'Unauthorized.'
+                'message' => 'Unauthorized.',
             ], 403);
         }
 
-        if ($role === 'Residential Warden' && !$request->user()->hostel_id) {
+        if ($role === 'Residential Warden' && ! $request->user()->hostel_id) {
             return response()->json([
-                'message' => 'No hostel is assigned to this warden.'
+                'message' => 'No hostel is assigned to this warden.',
             ], 403);
         }
 
@@ -65,7 +66,7 @@ class RoomController extends Controller
 
         if ($exists) {
             return response()->json([
-                'message' => 'This room number already exists in this hostel.'
+                'message' => 'This room number already exists in this hostel.',
             ], 422);
         }
 
@@ -75,7 +76,7 @@ class RoomController extends Controller
             'Room Created',
             'Room',
             $room->id,
-            'Created room ' . $room->room_number,
+            'Created room '.$room->room_number,
             $request->user()->id
         );
 
@@ -130,7 +131,7 @@ class RoomController extends Controller
             (int) $room->hostel_id !== (int) $request->user()->hostel_id
         ) {
             return response()->json([
-                'message' => 'You can only access rooms in your assigned hostel.'
+                'message' => 'You can only access rooms in your assigned hostel.',
             ], 403);
         }
 
@@ -165,7 +166,7 @@ class RoomController extends Controller
 
         if ($duplicate) {
             return response()->json([
-                'message' => 'This room number already exists in this hostel.'
+                'message' => 'This room number already exists in this hostel.',
             ], 422);
         }
 
@@ -186,7 +187,7 @@ class RoomController extends Controller
             'Room Updated',
             'Room',
             $room->id,
-            'Updated room ' . $room->room_number,
+            'Updated room '.$room->room_number,
             $request->user()->id
         );
 
@@ -222,7 +223,7 @@ class RoomController extends Controller
             'Room Deleted',
             'Room',
             $roomId,
-            'Deleted room ' . $roomNumber,
+            'Deleted room '.$roomNumber,
             $request->user()->id
         );
 

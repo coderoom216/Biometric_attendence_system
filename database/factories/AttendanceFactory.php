@@ -22,13 +22,13 @@ class AttendanceFactory extends Factory
             : null;
 
         return [
-            'student_id'      => Student::inRandomOrder()->first()?->id ?? Student::factory(),
-            'marked_by'       => User::inRandomOrder()->first()?->id,
+            'student_id' => Student::inRandomOrder()->first()?->id ?? Student::factory(),
+            'marked_by' => User::inRandomOrder()->first()?->id,
             'attendance_date' => $this->faker->dateTimeBetween('-30 days', 'now')->format('Y-m-d'),
-            'punch_time'      => $punchTime,
-            'status'          => $status,
-            'is_defaulter'    => $isDefaulter,
-            'remarks'         => $isDefaulter ? 'No punch recorded' : null,
+            'punch_time' => $punchTime,
+            'status' => $status,
+            'is_defaulter' => $isDefaulter,
+            'remarks' => $isDefaulter ? 'No punch recorded' : null,
         ];
     }
 }

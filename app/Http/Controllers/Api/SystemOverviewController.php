@@ -14,11 +14,18 @@ class SystemOverviewController extends Controller
 {
     public function __construct(
         private ClockService $clockService
-    ) {
-    }
+    ) {}
 
     public function overview(Request $request)
     {
+        $role = $request->user()?->role?->name;
+        if (! in_array($role, ['Admin', 'Director', 'Chief Warden', 'Residential Warden', 'Warden', 'Caretaker Operator'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access.',
+            ], 403);
+        }
+
         $current = $this->clockService->current();
         $date = $current->toDateString();
 

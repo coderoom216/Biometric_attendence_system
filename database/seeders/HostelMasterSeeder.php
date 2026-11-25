@@ -59,7 +59,7 @@ class HostelMasterSeeder extends Seeder
             for ($r = 1; $r <= $totalRooms; $r++) {
                 $floor = (int) ceil($r / 20);
                 $roomOnFloor = (($r - 1) % 20) + 1;
-                $roomNumber = $floor . str_pad((string) $roomOnFloor, 2, '0', STR_PAD_LEFT);
+                $roomNumber = $floor.str_pad((string) $roomOnFloor, 2, '0', STR_PAD_LEFT);
 
                 $room = Room::firstOrCreate(
                     [
@@ -77,16 +77,39 @@ class HostelMasterSeeder extends Seeder
             }
         }
 
-        // 4. Ensure Biometric Device
-        Device::firstOrCreate(
-            ['device_serial' => 'RSS20241199684'],
+        // 4. Ensure Biometric Devices for all 3 Hostels (BH1, GH, BH2)
+        $devicesList = [
             [
                 'hostel_id' => $h1->id,
-                'device_name' => 'Boys Hostel 1 Biometric Terminal (S362)',
-                'device_status' => 'active',
-                'last_sync' => now(),
-            ]
-        );
+                'device_serial' => 'RSS20241199684',
+                'device_name' => 'Boys Hostel 1 Terminal (BH1 - S362)',
+                'device_status' => 'online_synced',
+            ],
+            [
+                'hostel_id' => $h2->id,
+                'device_serial' => 'RSS20241199685',
+                'device_name' => 'Girls Hostel Terminal (GH - S362)',
+                'device_status' => 'standby',
+            ],
+            [
+                'hostel_id' => $h3->id,
+                'device_serial' => 'RSS20241199686',
+                'device_name' => 'Boys Hostel 2 Terminal (BH2 - S362)',
+                'device_status' => 'standby',
+            ],
+        ];
+
+        foreach ($devicesList as $devItem) {
+            Device::updateOrCreate(
+                ['device_serial' => $devItem['device_serial']],
+                [
+                    'hostel_id' => $devItem['hostel_id'],
+                    'device_name' => $devItem['device_name'],
+                    'device_status' => $devItem['device_status'],
+                    'last_sync' => now(),
+                ]
+            );
+        }
 
         // 5. Ensure Staff Users
         $staffUsers = [
@@ -161,21 +184,23 @@ class HostelMasterSeeder extends Seeder
 
             foreach ($cursor as $doc) {
                 $rawUid = trim((string) ($doc->user_id ?? ''));
-                if (!$rawUid || $rawUid === '0') continue;
+                if (! $rawUid || $rawUid === '0') {
+                    continue;
+                }
                 $cleanUid = ltrim($rawUid, '0') ?: $rawUid;
 
-                $name = 'Resident ' . $cleanUid;
-                if (!empty($doc->info)) {
+                $name = 'Resident '.$cleanUid;
+                if (! empty($doc->info)) {
                     $info = is_string($doc->info) ? json_decode($doc->info) : $doc->info;
-                    if (!empty($info->user_name)) {
+                    if (! empty($info->user_name)) {
                         $name = (string) $info->user_name;
                     }
-                } elseif (!empty($doc->name)) {
+                } elseif (! empty($doc->name)) {
                     $name = (string) $doc->name;
                 }
 
-                $enrollmentNo = 'BIO-' . str_pad($cleanUid, 4, '0', STR_PAD_LEFT);
-                $email = 'resident' . $cleanUid . '@student.edu.in';
+                $enrollmentNo = 'BIO-'.str_pad($cleanUid, 4, '0', STR_PAD_LEFT);
+                $email = 'resident'.$cleanUid.'@student.edu.in';
 
                 $user = User::firstOrCreate(
                     ['email' => $email],
@@ -202,7 +227,7 @@ class HostelMasterSeeder extends Seeder
                 );
             }
         } catch (\Throwable $e) {
-            echo "Notice: MongoDB sync skipped during seeder: " . $e->getMessage() . PHP_EOL;
+            echo 'Notice: MongoDB sync skipped during seeder: '.$e->getMessage().PHP_EOL;
         }
     }
 }

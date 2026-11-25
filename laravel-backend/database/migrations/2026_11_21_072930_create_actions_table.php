@@ -13,10 +13,10 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('ticket_id')
-                  ->constrained('tickets');
+                ->constrained('tickets');
 
             $table->foreignId('user_id')
-                  ->constrained('users');
+                ->constrained('users');
 
             $table->text('action_taken');
             $table->dateTime('action_date');

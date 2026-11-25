@@ -13,10 +13,10 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('student_id')
-                  ->constrained('students');
+                ->constrained('students');
 
             $table->foreignId('tier_id')
-                  ->constrained('alert_tiers');
+                ->constrained('alert_tiers');
 
             $table->string('alert_type');
             $table->string('alert_status')->default('active');

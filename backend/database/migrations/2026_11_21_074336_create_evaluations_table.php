@@ -13,7 +13,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('execution_id')
-                  ->constrained('executions');
+                ->constrained('executions');
 
             $table->string('result_status');
             $table->text('result_details')->nullable();

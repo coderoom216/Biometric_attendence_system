@@ -57,11 +57,20 @@ class BiometricController extends Controller
 
     public function devices(Request $request)
     {
+        $role = $request->user()?->role?->name;
+        if (! in_array($role, ['Admin', 'Director', 'Chief Warden', 'Residential Warden', 'Warden', 'Caretaker Operator'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access.',
+            ], 403);
+        }
+
         $aliveInfo = $this->checkDeviceHeartbeat('RSS20241199684');
 
         $devices = Device::with('hostel')->get()->map(function ($device) use ($aliveInfo) {
-            $isDeviceOnline = ($device->device_serial === 'RSS20241199684') ? $aliveInfo['online'] : ($device->device_status === 'online_synced');
-            $status = $isDeviceOnline ? 'online_synced' : 'offline';
+            $isDeviceOnline = ($device->device_serial === 'RSS20241199684') ? $aliveInfo['online'] : false;
+            $status = $isDeviceOnline ? 'online_synced' : ($device->device_status ?: 'standby');
+            $studentCount = Student::where('hostel_id', $device->hostel_id)->count();
 
             return [
                 'id' => (string) $device->id,
@@ -71,13 +80,15 @@ class BiometricController extends Controller
                 'deviceSerial' => $device->device_serial,
                 'hostelId' => (string) $device->hostel_id,
                 'hostelName' => $device->hostel?->name ?? 'Unknown Hostel',
+                'hostelCode' => $device->hostel?->code ?? '',
                 'status' => $status,
-                'ipAddress' => '192.168.1.22',
+                'ipAddress' => ($device->device_serial === 'RSS20241199684') ? '192.168.1.22' : '192.168.1.'.(22 + (int) $device->id),
                 'lastSync' => $isDeviceOnline ? now()->toIso8601String() : $device->last_sync?->toIso8601String(),
                 'lastSyncAt' => $isDeviceOnline ? now()->toIso8601String() : ($device->last_sync?->toIso8601String() ?? now()->toIso8601String()),
                 'firmware' => 'S362 v3.15.630',
                 'isOnline' => $isDeviceOnline,
-                'heartbeatSecondsAgo' => $aliveInfo['secondsAgo'],
+                'heartbeatSecondsAgo' => $isDeviceOnline ? $aliveInfo['secondsAgo'] : null,
+                'studentCount' => $studentCount,
             ];
         });
 
@@ -204,6 +215,24 @@ class BiometricController extends Controller
 
     public function enrolledUsers(Request $request)
     {
+        // 1. Fetch devices and hostels from MySQL
+        $allDevices = Device::with('hostel')->get();
+        $deviceBySerial = $allDevices->keyBy('device_serial');
+        $deviceByHostelId = $allDevices->keyBy('hostel_id');
+
+        // 2. Fetch all registered students from MySQL
+        $students = Student::with('user', 'hostel', 'room')->get();
+        $studentsByBioId = [];
+        foreach ($students as $s) {
+            $raw = trim((string) $s->biometric_id);
+            $clean = ltrim($raw, '0') ?: $raw;
+            $studentsByBioId[$raw] = $s;
+            $studentsByBioId[$clean] = $s;
+        }
+
+        $idDocs = [];
+        $infoMap = [];
+
         try {
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
             $manager = new Manager($mongoUri);
@@ -214,7 +243,6 @@ class BiometricController extends Controller
             $infoQuery = new Query([], ['sort' => ['created_at' => -1]]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
 
-            $infoMap = [];
             foreach ($infoDocs as $doc) {
                 $uid = trim((string) ($doc->user_id ?? ''));
                 if (! $uid) {
@@ -222,8 +250,9 @@ class BiometricController extends Controller
                 }
                 $infoObj = is_string($doc->info ?? null) ? json_decode($doc->info) : ($doc->info ?? null);
                 if (! isset($infoMap[$uid])) {
+                    $mName = $infoObj->user_name ?? ($doc->name ?? null);
                     $infoMap[$uid] = [
-                        'name' => $infoObj->user_name ?? ($doc->name ?? null),
+                        'name' => (! empty(trim((string) $mName))) ? trim((string) $mName) : null,
                         'privilege' => $infoObj->privilege ?? ($doc->privilege ?? 'User'),
                         'hasFingerprint' => ! empty($doc->backup_number) || ! empty($doc->raw_size) || ! empty($doc->fp_template_size),
                         'fingerprintCount' => ! empty($doc->backup_number) || ! empty($doc->raw_size) ? 1 : 0,
@@ -231,43 +260,112 @@ class BiometricController extends Controller
                     ];
                 }
             }
+        } catch (\Throwable $e) {
+            \Log::warning('MongoDB read skipped in enrolledUsers: '.$e->getMessage());
+        }
 
-            $users = [];
-            foreach ($idDocs as $doc) {
-                $uid = trim((string) ($doc->user_id ?? ''));
-                if (! $uid || $uid === '0') {
-                    continue;
-                }
-                $info = $infoMap[$uid] ?? [
-                    'name' => null,
-                    'privilege' => 'User',
-                    'hasFingerprint' => false,
-                    'fingerprintCount' => 0,
-                    'hasInfo' => false,
-                ];
+        $users = [];
+        $seenUserIds = [];
 
-                $users[] = [
-                    'userId' => $uid,
-                    'deviceSerial' => $doc->dev_id ?? 'RSS20241199684',
-                    'name' => $info['name'],
-                    'privilege' => $info['privilege'],
-                    'fingerprintEnrolled' => $info['hasFingerprint'],
-                    'fingerprintCount' => $info['fingerprintCount'],
-                    'hasInfo' => $info['hasInfo'],
-                ];
+        // Process machine users from MongoDB
+        foreach ($idDocs as $doc) {
+            $uid = trim((string) ($doc->user_id ?? ''));
+            if (! $uid || $uid === '0') {
+                continue;
+            }
+            $cleanUid = ltrim($uid, '0') ?: $uid;
+            $seenUserIds[$uid] = true;
+            $seenUserIds[$cleanUid] = true;
+
+            $student = $studentsByBioId[$uid] ?? ($studentsByBioId[$cleanUid] ?? null);
+            $info = $infoMap[$uid] ?? ($infoMap[$cleanUid] ?? [
+                'name' => null,
+                'privilege' => 'User',
+                'hasFingerprint' => false,
+                'fingerprintCount' => 0,
+                'hasInfo' => false,
+            ]);
+
+            $devSerial = $doc->dev_id ?? 'RSS20241199684';
+            $matchedDev = $deviceBySerial->get($devSerial);
+
+            // Determine hostel: student's hostel takes priority, then device's hostel
+            $hostelId = $student ? (string) $student->hostel_id : ($matchedDev ? (string) $matchedDev->hostel_id : '1');
+            $hostelName = $student?->hostel?->name ?? ($matchedDev?->hostel?->name ?? 'Boys Hostel 1');
+            $hostelCode = $student?->hostel?->code ?? ($matchedDev?->hostel?->code ?? 'BH1');
+
+            // Determine resolved name: MySQL student user name takes priority over raw machine string
+            $resolvedName = ($student && $student->user && ! empty(trim((string) $student->user->name)))
+                ? trim($student->user->name)
+                : $info['name'];
+
+            $users[] = [
+                'userId' => $uid,
+                'deviceSerial' => $devSerial,
+                'deviceName' => $matchedDev?->device_name ?? 'Biometric Terminal',
+                'name' => $resolvedName,
+                'hostelId' => $hostelId,
+                'hostelName' => $hostelName,
+                'hostelCode' => $hostelCode,
+                'privilege' => $info['privilege'],
+                'fingerprintEnrolled' => $info['hasFingerprint'] || ($student !== null),
+                'fingerprintCount' => $info['fingerprintCount'] > 0 ? $info['fingerprintCount'] : ($student ? 1 : 0),
+                'hasInfo' => $info['hasInfo'] || ($student !== null),
+                'isRegistered' => ($student !== null),
+                'studentId' => $student ? (string) $student->id : null,
+                'enrollmentNo' => $student?->enrollment_no,
+                'roomNumber' => $student?->room?->room_number,
+                'bedNumber' => $student?->bed_number,
+            ];
+        }
+
+        // Also include registered students from MySQL that were not in MongoDB get_user_id yet
+        foreach ($students as $student) {
+            $raw = trim((string) $student->biometric_id);
+            $clean = ltrim($raw, '0') ?: $raw;
+
+            if (isset($seenUserIds[$raw]) || isset($seenUserIds[$clean])) {
+                continue;
             }
 
-            return response()->json([
-                'success' => true,
-                'count' => count($users),
-                'users' => $users,
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'MongoDB connection failed: '.$e->getMessage(),
-            ], 503);
+            $seenUserIds[$raw] = true;
+            $seenUserIds[$clean] = true;
+
+            $matchedDev = $deviceByHostelId->get($student->hostel_id) ?? $allDevices->first();
+
+            $users[] = [
+                'userId' => $raw,
+                'deviceSerial' => $matchedDev?->device_serial ?? 'RSS20241199684',
+                'deviceName' => $matchedDev?->device_name ?? 'Biometric Terminal',
+                'name' => $student->user?->name ?? "Student {$student->enrollment_no}",
+                'hostelId' => (string) $student->hostel_id,
+                'hostelName' => $student->hostel?->name ?? 'Boys Hostel 1',
+                'hostelCode' => $student->hostel?->code ?? 'BH1',
+                'privilege' => 'User',
+                'fingerprintEnrolled' => true,
+                'fingerprintCount' => 1,
+                'hasInfo' => true,
+                'isRegistered' => true,
+                'studentId' => (string) $student->id,
+                'enrollmentNo' => $student->enrollment_no,
+                'roomNumber' => $student->room?->room_number,
+                'bedNumber' => $student->bed_number,
+            ];
         }
+
+        // Sort users numerically by userId
+        usort($users, function ($a, $b) {
+            $numA = (int) $a['userId'];
+            $numB = (int) $b['userId'];
+
+            return $numA <=> $numB;
+        });
+
+        return response()->json([
+            'success' => true,
+            'count' => count($users),
+            'users' => $users,
+        ]);
     }
 
     public function triggerUserFetch(Request $request)
@@ -295,19 +393,10 @@ class BiometricController extends Controller
             $idQuery = new Query(['dev_id' => $devId]);
             $idDocs = iterator_to_array($manager->executeQuery('biometric_db.get_user_id', $idQuery));
 
-            $infoQuery = new Query(['dev_id' => $devId]);
-            $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
-            $confirmed = [];
-            foreach ($infoDocs as $inf) {
-                if (! empty($inf->raw_size) || ! empty($inf->backup_number)) {
-                    $confirmed[(string) $inf->user_id] = true;
-                }
-            }
-
             $queuedCount = 0;
             foreach ($idDocs as $doc) {
                 $uid = trim((string) ($doc->user_id ?? ''));
-                if ($uid && $uid !== '0' && empty($confirmed[$uid])) {
+                if ($uid && $uid !== '0') {
                     $queuedCount++;
                     $bulk->insert([
                         'trans_id' => (string) rand(10000, 99999),
@@ -371,7 +460,8 @@ class BiometricController extends Controller
                 }
             }
 
-            $device = Device::first();
+            $allDevices = Device::with('hostel')->get();
+            $deviceBySerial = $allDevices->keyBy('device_serial');
 
             $punches = [];
             foreach ($records as $record) {
@@ -380,6 +470,13 @@ class BiometricController extends Controller
 
                 $student = $studentsByBioId[$bioId] ?? ($studentsByBioId[$cleanId] ?? null);
                 $machineName = $machineNames[$bioId] ?? ($machineNames[$cleanId] ?? null);
+
+                $devSerial = $record->dev_id ?? 'RSS20241199684';
+                $matchedDev = $deviceBySerial->get($devSerial) ?? $allDevices->first();
+
+                $hostelId = $student ? (string) $student->hostel_id : ($matchedDev ? (string) $matchedDev->hostel_id : '1');
+                $hostelName = $student?->hostel?->name ?? ($matchedDev?->hostel?->name ?? 'Boys Hostel 1');
+                $hostelCode = $student?->hostel?->code ?? ($matchedDev?->hostel?->code ?? 'BH1');
 
                 $studentName = $student?->user?->name ?? ($machineName ?? null);
                 $enrollmentNo = $student?->enrollment_no ?? ($machineName ? 'BIO-'.str_pad($cleanId, 4, '0', STR_PAD_LEFT) : null);
@@ -394,7 +491,7 @@ class BiometricController extends Controller
                                 'punched_at' => $punchAt,
                             ],
                             [
-                                'device_id' => $device?->id ?? 1,
+                                'device_id' => $matchedDev?->id ?? 1,
                                 'synced_at' => now(),
                             ]
                         );
@@ -427,8 +524,11 @@ class BiometricController extends Controller
                     'biometricId' => $bioId,
                     'studentName' => $studentName,
                     'enrollmentNo' => $enrollmentNo,
-                    'hostelId' => $student ? (string) $student->hostel_id : '1',
-                    'deviceSerial' => $record->dev_id ?? 'RSS20241199684',
+                    'hostelId' => $hostelId,
+                    'hostelName' => $hostelName,
+                    'hostelCode' => $hostelCode,
+                    'deviceName' => $matchedDev?->device_name ?? 'Biometric Terminal',
+                    'deviceSerial' => $devSerial,
                     'verifyMode' => $record->verify_mode ?? null,
                     'ioMode' => $record->io_mode ?? null,
                     'direction' => $direction,

@@ -1,32 +1,30 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\AdminController;
-use App\Http\Controllers\Api\StudentController;
-use App\Http\Controllers\Api\LeaveController;
-use App\Http\Controllers\Api\ViolationController;
-use App\Http\Controllers\Api\TokenController;
-use App\Http\Controllers\Api\AlertController;
-use App\Http\Controllers\Api\NotificationController;
-use App\Http\Controllers\Api\ScheduledTaskController;
-use App\Http\Controllers\Api\ExecutionController;
-use App\Http\Controllers\Api\EvaluationController;
-use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\ActionController;
-use App\Http\Controllers\Api\TicketController;
-use App\Http\Controllers\Api\HostelController;
-use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\AuditController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BiometricController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceWebhookController;
-use App\Http\Controllers\Api\AttendanceController;
-use App\Http\Controllers\Api\SchedulerController;
-use App\Http\Controllers\Api\BiometricController;
-use App\Http\Controllers\Api\SecurityTestController;
+use App\Http\Controllers\Api\EvaluationController;
+use App\Http\Controllers\Api\ExecutionController;
+use App\Http\Controllers\Api\HostelController;
+use App\Http\Controllers\Api\LeaveController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\Api\ScheduledTaskController;
+use App\Http\Controllers\Api\SchedulerController;
+use App\Http\Controllers\Api\SecurityTestController;
+use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\SystemOverviewController;
+use App\Http\Controllers\Api\TicketController;
+use App\Http\Controllers\Api\TokenController;
+use App\Http\Controllers\Api\ViolationController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------

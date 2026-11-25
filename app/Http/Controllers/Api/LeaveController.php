@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Leave;
+use App\Models\Student;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class LeaveController extends Controller
 {
@@ -16,9 +17,10 @@ class LeaveController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
         ])) {
@@ -28,7 +30,7 @@ class LeaveController extends Controller
         }
 
         if (
-            $role === 'Residential Warden' &&
+            in_array($role, ['Residential Warden', 'Warden'], true) &&
             empty($user->hostel_id)
         ) {
             return response()->json([
@@ -52,7 +54,7 @@ class LeaveController extends Controller
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'message' => 'Student profile not found.',
             ], 404);
@@ -69,7 +71,7 @@ class LeaveController extends Controller
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],
             'reason' => $data['reason'],
-            'gate_pass_no' => 'GP-' . strtoupper(Str::random(10)),
+            'gate_pass_no' => 'GP-'.strtoupper(Str::random(10)),
             'approval_status' => 'pending',
         ]);
 
@@ -77,8 +79,8 @@ class LeaveController extends Controller
             'Leave Applied',
             'Leave',
             $leave->id,
-            'Student applied for leave from ' .
-                $leave->start_date . ' to ' . $leave->end_date,
+            'Student applied for leave from '.
+                $leave->start_date.' to '.$leave->end_date,
             $user->id
         );
 
@@ -147,21 +149,21 @@ class LeaveController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $student = \App\Models\Student::findOrFail($data['studentId']);
+        $student = Student::findOrFail($data['studentId']);
         $user = $request->user();
 
         if ($user->role?->name === 'Residential Warden' && (int) $student->hostel_id !== (int) $user->hostel_id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized hostel access.'], 403);
         }
 
-        $gatePassNo = $data['gatePassNo'] ?? ('GP-' . strtoupper(Str::random(8)));
+        $gatePassNo = $data['gatePassNo'] ?? ('GP-'.strtoupper(Str::random(8)));
 
         $leave = Leave::create([
             'student_id' => $student->id,
             'approved_by' => $user->id,
             'start_date' => $data['startDate'],
             'end_date' => $data['endDate'],
-            'reason' => $data['reason'] . (!empty($data['notes']) ? ' (' . $data['notes'] . ')' : ''),
+            'reason' => $data['reason'].(! empty($data['notes']) ? ' ('.$data['notes'].')' : ''),
             'gate_pass_no' => $gatePassNo,
             'approval_status' => 'approved',
             'approved_at' => now(),
@@ -171,7 +173,7 @@ class LeaveController extends Controller
             'Leave Entered by Warden',
             'Leave',
             $leave->id,
-            'Approved leave entered for ' . $student->enrollment_no . ' from ' . $leave->start_date . ' to ' . $leave->end_date,
+            'Approved leave entered for '.$student->enrollment_no.' from '.$leave->start_date.' to '.$leave->end_date,
             $user->id
         );
 
@@ -240,7 +242,7 @@ class LeaveController extends Controller
                 : 'Leave Rejected',
             'Leave',
             $leave->id,
-            'Leave request ' . $data['approval_status'],
+            'Leave request '.$data['approval_status'],
             $user->id
         );
 
@@ -263,7 +265,7 @@ class LeaveController extends Controller
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'message' => 'Student profile not found.',
             ], 404);

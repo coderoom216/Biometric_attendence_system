@@ -28,7 +28,7 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (!Auth::attempt($credentials)) {
+        if (! Auth::attempt($credentials)) {
             throw ValidationException::withMessages([
                 'email' => 'Invalid email or password.',
             ]);
@@ -36,7 +36,7 @@ class AuthController extends Controller
 
         $user = User::findOrFail(Auth::id());
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

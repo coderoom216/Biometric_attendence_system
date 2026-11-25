@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
-use Illuminate\Http\Request;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 
 class AlertController extends Controller
 {
@@ -14,14 +14,14 @@ class AlertController extends Controller
     {
         $role = $request->user()->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
-            'Director'
+            'Director',
         ])) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -37,7 +37,7 @@ class AlertController extends Controller
 
         $query = Alert::with([
             'student.user',
-            'alertTier'
+            'alertTier',
         ]);
 
         $user = $request->user();
@@ -50,7 +50,7 @@ class AlertController extends Controller
         }
 
         return response()->json([
-            'alerts' => $query->latest('triggered_at')->get()
+            'alerts' => $query->latest('triggered_at')->get(),
         ]);
     }
 
@@ -61,15 +61,15 @@ class AlertController extends Controller
 
         if ($user->role?->name !== 'Student') {
             return response()->json([
-                'message' => 'Only students can view their alerts.'
+                'message' => 'Only students can view their alerts.',
             ], 403);
         }
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
-                'message' => 'Student profile not found.'
+                'message' => 'Student profile not found.',
             ], 404);
         }
 
@@ -77,7 +77,7 @@ class AlertController extends Controller
             'alerts' => Alert::where('student_id', $student->id)
                 ->with('alertTier')
                 ->latest('triggered_at')
-                ->get()
+                ->get(),
         ]);
     }
 
@@ -101,20 +101,21 @@ class AlertController extends Controller
             $alert->student->hostel_id != $user->hostel_id
         ) {
             return response()->json([
-                'message' => 'You cannot update another hostel student alert.'
+                'message' => 'You cannot update another hostel student alert.',
             ], 403);
         }
 
         $alert->update([
             'alert_status' => $data['alert_status'],
         ]);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Alert Status Updated',
             'Alert',
             $alert->id,
-            'Alert status changed to ' . $data['alert_status'],
+            'Alert status changed to '.$data['alert_status'],
             $user->id
         );
+
         return response()->json([
             'message' => 'Alert status updated successfully.',
             'alert' => $alert->load('alertTier', 'student.user'),

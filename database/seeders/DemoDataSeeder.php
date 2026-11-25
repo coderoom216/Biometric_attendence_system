@@ -2,25 +2,25 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Hostel;
-use App\Models\Room;
-use App\Models\Bed;
-use App\Models\Student;
-use App\Models\Device;
-use App\Models\Punch;
-use App\Models\Leave;
-use App\Models\Violation;
-use App\Models\Ticket;
-use App\Models\Alert;
-use App\Models\Notification;
 use App\Models\Action;
-use App\Models\VirtualClock;
+use App\Models\Alert;
 use App\Models\Attendance;
 use App\Models\Audit;
+use App\Models\Bed;
+use App\Models\Device;
+use App\Models\Hostel;
+use App\Models\Leave;
+use App\Models\Notification;
+use App\Models\Punch;
+use App\Models\Room;
+use App\Models\Student;
+use App\Models\Ticket;
 use App\Models\Token;
 use App\Models\User;
+use App\Models\Violation;
+use App\Models\VirtualClock;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class DemoDataSeeder extends Seeder
 {
@@ -44,20 +44,20 @@ class DemoDataSeeder extends Seeder
         });
 
         // Devices – 2 per hostel
-        $hostels->each(fn($h) => Device::factory()->count(2)->create(['hostel_id' => $h->id]));
+        $hostels->each(fn ($h) => Device::factory()->count(2)->create(['hostel_id' => $h->id]));
 
         // Students – 15‑25 per hostel
         $hostels->each(function (Hostel $hostel) {
             $rooms = $hostel->rooms;
             Student::factory()->count(rand(15, 25))->create([
                 'hostel_id' => $hostel->id,
-                'room_id' => fn() => $rooms->random()->id,
+                'room_id' => fn () => $rooms->random()->id,
             ]);
         });
 
         $devices = Device::all();
         $students = Student::all();
-        $adminUser = User::whereHas('role', fn($q) => $q->whereIn('name', ['Admin', 'Director', 'Chief Warden']))->first();
+        $adminUser = User::whereHas('role', fn ($q) => $q->whereIn('name', ['Admin', 'Director', 'Chief Warden']))->first();
 
         // ── Attendance records (last 60 days, 1 per student per day) ──
         // This is the KEY table that powers all dashboard panels
@@ -76,18 +76,18 @@ class DemoDataSeeder extends Seeder
                 $isDefaulter = $status === 'absent';
                 $punchTime = match ($status) {
                     'present' => fake()->time('H:i:s', '19:00:00'),
-                    'late'    => fake()->time('H:i:s', '22:00:00'),
-                    default   => null,
+                    'late' => fake()->time('H:i:s', '22:00:00'),
+                    default => null,
                 };
 
                 Attendance::create([
-                    'student_id'      => $student->id,
-                    'marked_by'       => $adminUser?->id,
+                    'student_id' => $student->id,
+                    'marked_by' => $adminUser?->id,
                     'attendance_date' => $date,
-                    'punch_time'      => $punchTime,
-                    'status'          => $status,
-                    'is_defaulter'    => $isDefaulter,
-                    'remarks'         => $isDefaulter ? 'No punch recorded' : null,
+                    'punch_time' => $punchTime,
+                    'status' => $status,
+                    'is_defaulter' => $isDefaulter,
+                    'remarks' => $isDefaulter ? 'No punch recorded' : null,
                 ]);
             });
         }
@@ -104,7 +104,7 @@ class DemoDataSeeder extends Seeder
                     ->count(rand(10, 20))
                     ->create([
                         'student_id' => $student->id,
-                        'device_id'  => $deviceId,
+                        'device_id' => $deviceId,
                     ]);
             }
         });
@@ -145,7 +145,7 @@ class DemoDataSeeder extends Seeder
         $students->random(min(30, $students->count()))->each(function (Student $student) use ($adminUser) {
             Token::factory()->count(rand(1, 3))->create([
                 'student_id' => $student->id,
-                'issued_by'  => $adminUser?->id,
+                'issued_by' => $adminUser?->id,
             ]);
         });
 
@@ -156,8 +156,8 @@ class DemoDataSeeder extends Seeder
         VirtualClock::create([
             'virtual_date' => $today->toDateString(),
             'virtual_time' => $today->toTimeString(),
-            'is_enabled'   => false,
-            'updated_by'   => $adminUser?->id,
+            'is_enabled' => false,
+            'updated_by' => $adminUser?->id,
         ]);
     }
 }

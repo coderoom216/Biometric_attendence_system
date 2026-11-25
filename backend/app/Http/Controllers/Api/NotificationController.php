@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Alert;
 use App\Models\Notification;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class NotificationController extends Controller
 {
@@ -14,14 +15,14 @@ class NotificationController extends Controller
     {
         $role = $request->user()->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
-            'Director'
+            'Director',
         ])) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -41,7 +42,7 @@ class NotificationController extends Controller
             'recipient' => ['required', 'string', 'max:255'],
         ]);
 
-        $alert = \App\Models\Alert::with('student')
+        $alert = Alert::with('student')
             ->findOrFail($data['alert_id']);
 
         $role = $request->user()->role?->name;
@@ -51,7 +52,7 @@ class NotificationController extends Controller
             $alert->student->hostel_id !== $request->user()->hostel_id
         ) {
             return response()->json([
-                'message' => 'You cannot access alerts from another hostel.'
+                'message' => 'You cannot access alerts from another hostel.',
             ], 403);
         }
 
@@ -61,13 +62,14 @@ class NotificationController extends Controller
             'recipient' => $data['recipient'],
             'delivery_status' => 'pending',
         ]);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Notification Attempt Created',
             'Notification',
             $notification->id,
-            'Notification attempt created through ' . $notification->channel,
+            'Notification attempt created through '.$notification->channel,
             $request->user()->id
         );
+
         return response()->json([
             'message' => 'Notification attempt recorded.',
             'notification' => $notification,
@@ -83,7 +85,7 @@ class NotificationController extends Controller
 
         $query = Notification::with([
             'alert.student.user',
-            'alert.alertTier'
+            'alert.alertTier',
         ])->latest('created_at');
 
         if ($request->user()->role?->name === 'Residential Warden') {
@@ -107,7 +109,7 @@ class NotificationController extends Controller
         $data = $request->validate([
             'delivery_status' => [
                 'required',
-                Rule::in(['sent', 'failed'])
+                Rule::in(['sent', 'failed']),
             ],
             'error_message' => ['nullable', 'string'],
         ]);
@@ -120,7 +122,7 @@ class NotificationController extends Controller
             $notification->alert->student->hostel_id !== $request->user()->hostel_id
         ) {
             return response()->json([
-                'message' => 'You cannot update notifications from another hostel.'
+                'message' => 'You cannot update notifications from another hostel.',
             ], 403);
         }
 
@@ -133,13 +135,14 @@ class NotificationController extends Controller
             : null;
 
         $notification->save();
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Notification Status Updated',
             'Notification',
             $notification->id,
-            'Notification delivery status changed to ' . $notification->delivery_status,
+            'Notification delivery status changed to '.$notification->delivery_status,
             $request->user()->id
         );
+
         return response()->json([
             'message' => 'Notification status updated.',
             'notification' => $notification,

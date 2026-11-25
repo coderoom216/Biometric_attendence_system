@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ScheduledTask;
 use App\Models\Execution;
 use App\Services\ClockService;
 use App\Services\DefaulterEvaluationService;
@@ -14,8 +13,7 @@ class SchedulerController extends Controller
     public function __construct(
         private ClockService $clockService,
         private DefaulterEvaluationService $evaluationService
-    ) {
-    }
+    ) {}
 
     public function status(Request $request)
     {
@@ -87,7 +85,7 @@ class SchedulerController extends Controller
             'success' => true,
             'message' => 'Attendance evaluation completed successfully.',
             'jobLog' => [
-                'id' => 'exec-' . time(),
+                'id' => 'exec-'.time(),
                 'jobName' => 'Attendance Cutoff Evaluation',
                 'executedAt' => now()->toIso8601String(),
                 'status' => 'success',

@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Notification;
 use App\Models\Alert;
+use App\Models\Notification;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class NotificationController extends Controller
 {
@@ -16,7 +16,7 @@ class NotificationController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
@@ -71,7 +71,7 @@ class NotificationController extends Controller
             'Notification Attempt Created',
             'Notification',
             $notification->id,
-            'Notification attempt created through ' . $notification->channel,
+            'Notification attempt created through '.$notification->channel,
             $user->id
         );
 
@@ -146,7 +146,7 @@ class NotificationController extends Controller
             'Notification Status Updated',
             'Notification',
             $notification->id,
-            'Notification delivery status changed to ' .
+            'Notification delivery status changed to '.
                 $notification->delivery_status,
             $user->id
         );
@@ -166,7 +166,7 @@ class NotificationController extends Controller
 
         $notification = Notification::findOrFail($data['notificationId']);
 
-        if (!empty($data['overrideEmail'])) {
+        if (! empty($data['overrideEmail'])) {
             $notification->recipient = $data['overrideEmail'];
         }
 

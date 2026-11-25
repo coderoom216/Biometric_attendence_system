@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\AlertTier;
+use Illuminate\Database\Seeder;
 
 class AlertTierSeeder extends Seeder
 {

@@ -13,8 +13,8 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('violation_id')
-                  ->unique()
-                  ->constrained('violations');
+                ->unique()
+                ->constrained('violations');
 
             $table->string('warning_status')->default('issued');
             $table->date('issue_date');

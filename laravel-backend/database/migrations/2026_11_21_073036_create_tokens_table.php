@@ -13,10 +13,10 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('student_id')
-                  ->constrained('students');
+                ->constrained('students');
 
             $table->foreignId('issued_by')
-                  ->constrained('users');
+                ->constrained('users');
 
             $table->unsignedInteger('token_count')->default(1);
 

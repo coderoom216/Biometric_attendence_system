@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Evaluation;
 use App\Models\Execution;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class EvaluationController extends Controller
 {
@@ -15,7 +15,7 @@ class EvaluationController extends Controller
     {
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Only Admin can manage evaluations.'
+                'message' => 'Only Admin can manage evaluations.',
             ], 403);
         }
 
@@ -33,7 +33,7 @@ class EvaluationController extends Controller
             'execution_id' => ['required', 'exists:executions,id'],
             'result_status' => [
                 'required',
-                Rule::in(['passed', 'failed', 'warning'])
+                Rule::in(['passed', 'failed', 'warning']),
             ],
             'result_details' => ['nullable', 'string'],
         ]);
@@ -42,18 +42,19 @@ class EvaluationController extends Controller
 
         if ($execution->status === 'running') {
             return response()->json([
-                'message' => 'Cannot evaluate an execution that is still running.'
+                'message' => 'Cannot evaluate an execution that is still running.',
             ], 422);
         }
 
         $evaluation = Evaluation::create($data);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Evaluation Created',
             'Evaluation',
             $evaluation->id,
-            'Created evaluation for execution ID ' . $evaluation->execution_id,
+            'Created evaluation for execution ID '.$evaluation->execution_id,
             $request->user()->id
         );
+
         return response()->json([
             'message' => 'Evaluation created successfully.',
             'evaluation' => $evaluation,
@@ -103,19 +104,20 @@ class EvaluationController extends Controller
         $data = $request->validate([
             'result_status' => [
                 'sometimes',
-                Rule::in(['passed', 'failed', 'warning'])
+                Rule::in(['passed', 'failed', 'warning']),
             ],
             'result_details' => ['sometimes', 'nullable', 'string'],
         ]);
 
         $evaluation->update($data);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Evaluation Updated',
             'Evaluation',
             $evaluation->id,
-            'Updated evaluation. Current status: ' . $evaluation->result_status,
+            'Updated evaluation. Current status: '.$evaluation->result_status,
             $request->user()->id
         );
+
         return response()->json([
             'message' => 'Evaluation updated successfully.',
             'evaluation' => $evaluation,

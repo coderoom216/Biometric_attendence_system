@@ -34,11 +34,11 @@ class AlertService
                 ->where('tier_id', $tier->id)
                 ->whereBetween('triggered_at', [
                     $monthStart,
-                    $monthEnd . ' 23:59:59'
+                    $monthEnd.' 23:59:59',
                 ])
                 ->exists();
 
-            if (!$alreadyExists) {
+            if (! $alreadyExists) {
                 Alert::create([
                     'student_id' => $student->id,
                     'tier_id' => $tier->id,

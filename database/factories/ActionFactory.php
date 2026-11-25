@@ -14,10 +14,10 @@ class ActionFactory extends Factory
     public function definition(): array
     {
         return [
-            'ticket_id'    => Ticket::inRandomOrder()->first()?->id ?? Ticket::factory(),
-            'user_id'      => User::inRandomOrder()->first()?->id ?? User::factory(),
+            'ticket_id' => Ticket::inRandomOrder()->first()?->id ?? Ticket::factory(),
+            'user_id' => User::inRandomOrder()->first()?->id ?? User::factory(),
             'action_taken' => $this->faker->randomElement(['Parent Called', 'Fine Issued', 'Counseling Session Conducted', 'Written Warning Issued', 'Suspension Recommendation']),
-            'action_date'  => $this->faker->dateTimeBetween('-10 days', 'now'),
+            'action_date' => $this->faker->dateTimeBetween('-10 days', 'now'),
         ];
     }
 }

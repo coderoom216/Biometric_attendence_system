@@ -19,8 +19,7 @@ class DefaulterEvaluationService
     public function __construct(
         private ClockService $clockService,
         private AlertService $alertService
-    ) {
-    }
+    ) {}
 
     /**
      * Evaluate all students for the selected date.
@@ -35,7 +34,7 @@ class DefaulterEvaluationService
             : $this->clockService->current();
 
         if (
-            !$force &&
+            ! $force &&
             $current->format('H:i:s') < ClockService::DEFAULTER_TIME
         ) {
             throw new RuntimeException(
@@ -73,7 +72,7 @@ class DefaulterEvaluationService
                             ->lockForUpdate()
                             ->first();
 
-                        if (!$student) {
+                        if (! $student) {
                             continue;
                         }
 
@@ -108,6 +107,7 @@ class DefaulterEvaluationService
                             );
 
                             $summary['leaveCount']++;
+
                             continue;
                         }
 
@@ -206,7 +206,7 @@ class DefaulterEvaluationService
                             $blacklist->total_tokens = $monthlyTotal;
                             $blacklist->status = 'active';
 
-                            if (!$blacklist->blacklisted_at) {
+                            if (! $blacklist->blacklisted_at) {
                                 $blacklist->blacklisted_at = $current;
                             }
 

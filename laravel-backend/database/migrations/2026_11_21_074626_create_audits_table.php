@@ -13,8 +13,8 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('user_id')
-                  ->nullable()
-                  ->constrained('users');
+                ->nullable()
+                ->constrained('users');
 
             $table->string('activity');
             $table->string('entity_type');

@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Leave;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class LeaveController extends Controller
 {
@@ -18,15 +18,15 @@ class LeaveController extends Controller
 
         if ($user->role?->name !== 'Student') {
             return response()->json([
-                'message' => 'Only students can apply for leave.'
+                'message' => 'Only students can apply for leave.',
             ], 403);
         }
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
-                'message' => 'Student profile not found.'
+                'message' => 'Student profile not found.',
             ], 404);
         }
 
@@ -41,16 +41,17 @@ class LeaveController extends Controller
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],
             'reason' => $data['reason'],
-            'gate_pass_no' => 'GP-' . strtoupper(Str::random(10)),
+            'gate_pass_no' => 'GP-'.strtoupper(Str::random(10)),
             'approval_status' => 'pending',
         ]);
-             app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Leave Applied',
             'Leave',
             $leave->id,
-            'Student applied for leave from ' . $leave->start_date . ' to ' . $leave->end_date,
+            'Student applied for leave from '.$leave->start_date.' to '.$leave->end_date,
             $request->user()->id
         );
+
         return response()->json([
             'message' => 'Leave request submitted successfully.',
             'leave' => $leave,
@@ -62,14 +63,14 @@ class LeaveController extends Controller
     {
         $user = $request->user();
 
-        if (!in_array($user->role?->name, [
+        if (! in_array($user->role?->name, [
             'Residential Warden',
             'Chief Warden',
             'Director',
-            'Admin'
+            'Admin',
         ])) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -82,7 +83,7 @@ class LeaveController extends Controller
         }
 
         return response()->json([
-            'leaves' => $query->latest()->get()
+            'leaves' => $query->latest()->get(),
         ]);
     }
 
@@ -91,14 +92,14 @@ class LeaveController extends Controller
     {
         $user = $request->user();
 
-        if (!in_array($user->role?->name, [
+        if (! in_array($user->role?->name, [
             'Residential Warden',
             'Chief Warden',
             'Director',
-            'Admin'
+            'Admin',
         ])) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -116,13 +117,13 @@ class LeaveController extends Controller
             $leave->student->hostel_id != $user->hostel_id
         ) {
             return response()->json([
-                'message' => 'You cannot manage leaves of another hostel.'
+                'message' => 'You cannot manage leaves of another hostel.',
             ], 403);
         }
 
         if ($leave->approval_status !== 'pending') {
             return response()->json([
-                'message' => 'This leave request has already been processed.'
+                'message' => 'This leave request has already been processed.',
             ], 422);
         }
 
@@ -131,15 +132,16 @@ class LeaveController extends Controller
             'approved_by' => $user->id,
             'approved_at' => now(),
         ]);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             $data['approval_status'] === 'approved'
                 ? 'Leave Approved'
                 : 'Leave Rejected',
             'Leave',
             $leave->id,
-            'Leave request ' . $data['approval_status'],
+            'Leave request '.$data['approval_status'],
             $user->id
         );
+
         return response()->json([
             'message' => 'Leave request status updated successfully.',
             'leave' => $leave->fresh()->load('student.user', 'approvedBy'),
@@ -153,22 +155,22 @@ class LeaveController extends Controller
 
         if ($user->role?->name !== 'Student') {
             return response()->json([
-                'message' => 'Only students can view their leave history.'
+                'message' => 'Only students can view their leave history.',
             ], 403);
         }
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
-                'message' => 'Student profile not found.'
+                'message' => 'Student profile not found.',
             ], 404);
         }
 
         return response()->json([
             'leaves' => Leave::where('student_id', $student->id)
                 ->latest()
-                ->get()
+                ->get(),
         ]);
     }
 }

@@ -14,8 +14,8 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('hostel_id')
-                  ->constrained('hostels')
-                  ->cascadeOnDelete();
+                ->constrained('hostels')
+                ->cascadeOnDelete();
 
             $table->string('room_number');
             $table->unsignedInteger('capacity');

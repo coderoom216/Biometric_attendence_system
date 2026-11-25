@@ -183,17 +183,41 @@ class HostelController extends Controller
         $rooms = Room::where('hostel_id', $hostel->id)
             ->with(['students.user'])
             ->withCount('students')
+            ->orderByRaw('CAST(room_number AS UNSIGNED) ASC, room_number ASC')
             ->get()
             ->map(function ($r) {
+                $capacity = max(1, (int) $r->capacity);
+                $occupiedCount = (int) $r->students_count;
+                $availableBeds = max(0, $capacity - $occupiedCount);
+                $isFull = $occupiedCount >= $capacity;
+
+                // Standard bed labels for capacity: ['A', 'B', 'C']
+                $standardBeds = array_map(fn ($idx) => chr(65 + $idx), range(0, $capacity - 1));
+
+                // Beds already occupied in this room
+                $takenBeds = $r->students
+                    ->pluck('bed_number')
+                    ->map(fn ($b) => strtoupper(trim(str_replace(['Bed', 'bed', ' '], '', (string) $b))))
+                    ->filter()
+                    ->all();
+
+                // Compute vacant beds
+                $vacantBeds = array_values(array_filter($standardBeds, fn ($b) => ! in_array($b, $takenBeds, true)));
+                if (empty($vacantBeds) && $availableBeds > 0) {
+                    $vacantBeds = array_slice($standardBeds, $occupiedCount, $availableBeds);
+                }
+
                 return [
                     'id' => (string) $r->id,
                     'hostelId' => (string) $r->hostel_id,
                     'block' => 'Block A',
                     'roomNumber' => $r->room_number,
-                    'capacity' => $r->capacity,
-                    'currentOccupancy' => $r->students_count,
-                    'availableBeds' => max(0, $r->capacity - $r->students_count),
-                    'isFull' => $r->students_count >= $r->capacity,
+                    'capacity' => $capacity,
+                    'currentOccupancy' => $occupiedCount,
+                    'availableBeds' => $availableBeds,
+                    'isFull' => $isFull,
+                    'isVacant' => ! $isFull && $availableBeds > 0,
+                    'vacantBeds' => $vacantBeds,
                     'occupants' => $r->students->map(fn ($s) => [
                         'id' => (string) $s->id,
                         'name' => $s->user?->name ?? 'Student '.$s->enrollment_no,

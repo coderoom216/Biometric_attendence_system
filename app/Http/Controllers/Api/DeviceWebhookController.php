@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
-use App\Models\Student;
 use App\Models\Punch;
+use App\Models\Student;
 use App\Services\DevicePayloadParser;
+use DateTimeImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use DateTimeImmutable;
 use Throwable;
 
 class DeviceWebhookController extends Controller
@@ -62,7 +62,7 @@ class DeviceWebhookController extends Controller
             $data = $parsed['data'];
 
             // Validate required punch fields.
-            if (!$parser->validatePunch($data)) {
+            if (! $parser->validatePunch($data)) {
                 return $this->deviceResponse('ERROR', 422);
             }
 
@@ -86,7 +86,7 @@ class DeviceWebhookController extends Controller
                 ->where('device_status', 'active')
                 ->first();
 
-            if (!$device) {
+            if (! $device) {
                 Log::warning('Unknown or inactive biometric device.', [
                     'dev_id' => $deviceId,
                 ]);
@@ -100,7 +100,7 @@ class DeviceWebhookController extends Controller
                 $biometricId
             )->first();
 
-            if (!$student) {
+            if (! $student) {
                 Log::warning('Biometric student ID not found.', [
                     'biometric_id' => $biometricId,
                     'device_id' => $device->id,
@@ -173,7 +173,7 @@ class DeviceWebhookController extends Controller
      */
     private function normalizeDeviceDateTime($value): ?string
     {
-        if (!is_string($value) && !is_numeric($value)) {
+        if (! is_string($value) && ! is_numeric($value)) {
             return null;
         }
 

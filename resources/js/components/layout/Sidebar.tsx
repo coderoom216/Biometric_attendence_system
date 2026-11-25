@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           { name: 'Hostel & Room Capacity', path: '/hostels', icon: Building2 },
           { name: 'Approved Leaves', path: '/leaves', icon: FileText },
           { name: 'Daily Reports', path: '/reports', icon: BarChart3 },
-          { name: 'Security Verification', path: '/security-audit', icon: ShieldCheck }
+          { name: 'Security Verification', path: '/security', icon: ShieldCheck }
         ];
 
       case 'chief_warden':
@@ -74,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           { name: 'Leave & Correction Audits', path: '/leaves', icon: FileText },
           { name: 'Consolidated Reports', path: '/reports', icon: BarChart3 },
           { name: 'Biometric Devices', path: '/biometrics', icon: Cpu },
-          { name: 'Security Verification', path: '/security-audit', icon: ShieldCheck },
+          { name: 'Security Verification', path: '/security', icon: ShieldCheck },
           { name: 'System Health', path: '/system-health', icon: Activity }
         ];
 
@@ -133,16 +133,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         }`}
       >
         {/* Brand in Sidebar */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm">
-              HA
-            </div>
-            <div className="font-bold text-white text-sm tracking-wide">
-              Hostel Attendance
+        <div className="h-16 px-4 flex items-center justify-between border-b border-slate-800">
+          <div className="flex items-center space-x-2 min-w-0">
+            <img
+              src="/images/thdc-ihet-logo.jpg"
+              alt="THDC IHET"
+              className="w-8 h-8 rounded-full object-contain bg-white p-0.5 shadow-xs shrink-0"
+            />
+            <img
+              src="/images/spiders-logo.jpg"
+              alt="SPIDERS"
+              className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 shadow-xs shrink-0"
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-white text-xs truncate">Hostel Portal</span>
+              <span className="text-[9px] font-bold text-indigo-300 tracking-tight truncate">
+                THDC IHET × SPIDERS
+              </span>
             </div>
           </div>
-          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">
+          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700 shrink-0">
             v2.1
           </span>
         </div>

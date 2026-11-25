@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ScheduledTask;
-use Illuminate\Http\Request;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 
 class ScheduledTaskController extends Controller
 {
@@ -13,7 +13,7 @@ class ScheduledTaskController extends Controller
     {
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Only Admin can manage scheduled tasks.'
+                'message' => 'Only Admin can manage scheduled tasks.',
             ], 403);
         }
 
@@ -34,11 +34,11 @@ class ScheduledTaskController extends Controller
         ]);
 
         $task = ScheduledTask::create($data);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Scheduled Task Created',
             'ScheduledTask',
             $task->id,
-            'Created scheduled task: ' . $task->name,
+            'Created scheduled task: '.$task->name,
             $request->user()->id
         );
 
@@ -76,13 +76,14 @@ class ScheduledTaskController extends Controller
         ]);
 
         $task->update($data);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Scheduled Task Updated',
             'ScheduledTask',
             $task->id,
-            'Updated scheduled task: ' . $task->name,
+            'Updated scheduled task: '.$task->name,
             $request->user()->id
         );
+
         return response()->json([
             'message' => 'Scheduled task updated successfully.',
             'task' => $task,
@@ -102,14 +103,15 @@ class ScheduledTaskController extends Controller
             'Scheduled Task Deleted',
             'ScheduledTask',
             $task->id,
-            'Deleted scheduled task: ' . $task->name,
+            'Deleted scheduled task: '.$task->name,
             $request->user()->id
         );
 
-        $task->delete();        $task->delete();
+        $task->delete();
+        $task->delete();
 
         return response()->json([
-            'message' => 'Scheduled task deleted successfully.'
+            'message' => 'Scheduled task deleted successfully.',
         ]);
     }
 }

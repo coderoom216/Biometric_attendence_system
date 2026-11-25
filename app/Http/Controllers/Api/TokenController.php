@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Token;
-use App\Models\Student;
 use App\Models\Blacklist;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Models\Student;
+use App\Models\Token;
 use App\Services\AlertService;
 use App\Services\AuditService;
 use App\Services\ClockService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TokenController extends Controller
 {
@@ -19,7 +19,7 @@ class TokenController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
@@ -105,7 +105,7 @@ class TokenController extends Controller
                 $blacklist->total_tokens = $totalTokens;
                 $blacklist->status = 'active';
 
-                if (!$blacklist->blacklisted_at) {
+                if (! $blacklist->blacklisted_at) {
                     $blacklist->blacklisted_at = $current;
                 }
 
@@ -123,8 +123,8 @@ class TokenController extends Controller
             'Token Issued',
             'Token',
             $result['token']->id,
-            'Issued ' . $result['token']->token_count .
-                ' token(s) to student ID ' . $result['token']->student_id,
+            'Issued '.$result['token']->token_count.
+                ' token(s) to student ID '.$result['token']->student_id,
             $user->id
         );
 
@@ -135,8 +135,8 @@ class TokenController extends Controller
                     : 'Blacklist Updated',
                 'Blacklist',
                 $result['blacklist']->id,
-                'Student ID ' . $result['blacklist']->student_id .
-                    ' reached ' . $result['total_tokens'] . ' monthly tokens.',
+                'Student ID '.$result['blacklist']->student_id.
+                    ' reached '.$result['total_tokens'].' monthly tokens.',
                 $user->id
             );
         }
@@ -185,7 +185,7 @@ class TokenController extends Controller
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'message' => 'Student profile not found.',
             ], 404);

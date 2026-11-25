@@ -66,8 +66,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const roleCredentials: Record<UserRole, { email: string; pass: string }> = {
       director: { email: 'director@university.edu.in', pass: 'director123' },
       chief_warden: { email: 'chiefwarden@university.edu.in', pass: 'chief123' },
-      residential_warden: { email: 'rw.shivalik@university.edu.in', pass: 'rw123' },
-      warden: { email: 'warden.mandakini@university.edu.in', pass: 'warden123' },
+      residential_warden: { email: 'warden.bh1@university.edu.in', pass: 'warden123' },
+      warden: { email: 'warden.gh@university.edu.in', pass: 'warden123' },
       caretaker_operator: { email: 'vmehra@university.edu.in', pass: 'mehra123' },
       student: { email: 'rahul.sharma@student.edu.in', pass: 'student123' }
     };
@@ -80,11 +80,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const quickLoginAsAccount = async (email: string) => {
     const accountCredentials: Record<string, string> = {
+      'admin@university.edu.in': 'admin123',
       'director@university.edu.in': 'director123',
       'chiefwarden@university.edu.in': 'chief123',
-      'rw.shivalik@university.edu.in': 'rw123',
+      'warden.bh1@university.edu.in': 'warden123',
+      'warden.gh@university.edu.in': 'warden123',
+      'warden.bh2@university.edu.in': 'warden123',
+      'rw.shivalik@university.edu.in': 'warden123',
       'warden.mandakini@university.edu.in': 'warden123',
-      'rw.nilgiri@university.edu.in': 'pathak123',
+      'rw.nilgiri@university.edu.in': 'warden123',
       'vmehra@university.edu.in': 'mehra123',
       'rahul.sharma@student.edu.in': 'student123'
     };

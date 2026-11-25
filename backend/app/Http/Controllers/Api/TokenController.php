@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Token;
-use App\Models\Student;
 use App\Models\Blacklist;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Models\Student;
+use App\Models\Token;
 use App\Services\AlertService;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TokenController extends Controller
 {
@@ -18,14 +18,14 @@ class TokenController extends Controller
     {
         $role = $request->user()->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
-            'Director'
+            'Director',
         ])) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -79,7 +79,7 @@ class TokenController extends Controller
             $totalTokens = Token::where('student_id', $student->id)
                 ->where('month_start', $monthStart)
                 ->sum('token_count');
-                app(AlertService::class)->checkStudentAlerts($student);
+            app(AlertService::class)->checkStudentAlerts($student);
 
             $blacklist = null;
 
@@ -87,18 +87,18 @@ class TokenController extends Controller
             if ($totalTokens > 10) {
 
                 $blacklist = Blacklist::firstOrNew([
-    'student_id' => $student->id,
-    'month_start' => $monthStart,
-]);
+                    'student_id' => $student->id,
+                    'month_start' => $monthStart,
+                ]);
 
-$blacklist->total_tokens = $totalTokens;
-$blacklist->status = 'active';
+                $blacklist->total_tokens = $totalTokens;
+                $blacklist->status = 'active';
 
-if (!$blacklist->blacklisted_at) {
-    $blacklist->blacklisted_at = now();
-}
+                if (! $blacklist->blacklisted_at) {
+                    $blacklist->blacklisted_at = now();
+                }
 
-$blacklist->save();
+                $blacklist->save();
             }
 
             return [
@@ -107,25 +107,26 @@ $blacklist->save();
                 'blacklist' => $blacklist,
             ];
         });
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Token Issued',
             'Token',
             $result['token']->id,
-            'Issued ' . $result['token']->token_count . ' token(s) to student ID ' . $result['token']->student_id,
+            'Issued '.$result['token']->token_count.' token(s) to student ID '.$result['token']->student_id,
             $user->id
         );
-                if ($result['blacklist']) {
+        if ($result['blacklist']) {
             app(AuditService::class)->log(
                 $result['blacklist']->wasRecentlyCreated
                     ? 'Blacklist Created'
                     : 'Blacklist Updated',
                 'Blacklist',
                 $result['blacklist']->id,
-                'Student ID ' . $result['blacklist']->student_id .
-                    ' reached ' . $result['total_tokens'] . ' monthly tokens.',
+                'Student ID '.$result['blacklist']->student_id.
+                    ' reached '.$result['total_tokens'].' monthly tokens.',
                 $user->id
             );
         }
+
         return response()->json([
             'message' => 'Token issued successfully.',
             'token' => $result['token'],
@@ -153,7 +154,7 @@ $blacklist->save();
         }
 
         return response()->json([
-            'tokens' => $query->latest('issued_date')->get()
+            'tokens' => $query->latest('issued_date')->get(),
         ]);
     }
 
@@ -164,15 +165,15 @@ $blacklist->save();
 
         if ($user->role?->name !== 'Student') {
             return response()->json([
-                'message' => 'Only students can view their token history.'
+                'message' => 'Only students can view their token history.',
             ], 403);
         }
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
-                'message' => 'Student profile not found.'
+                'message' => 'Student profile not found.',
             ], 404);
         }
 
@@ -180,7 +181,7 @@ $blacklist->save();
             'tokens' => Token::where('student_id', $student->id)
                 ->with('issuedBy')
                 ->latest('issued_date')
-                ->get()
+                ->get(),
         ]);
     }
 }

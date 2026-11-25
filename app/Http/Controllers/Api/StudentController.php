@@ -1,17 +1,22 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Role;
-use App\Models\Student;
 use App\Models\Room;
+use App\Models\Student;
+use App\Models\Ticket;
+use App\Models\Token;
+use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use MongoDB\Driver\BulkWrite;
+use MongoDB\Driver\Manager;
 
 class StudentController extends Controller
 {
@@ -20,7 +25,7 @@ class StudentController extends Controller
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Admin access required.'
+                'message' => 'Unauthorized. Admin access required.',
             ], 403);
         }
 
@@ -34,22 +39,23 @@ class StudentController extends Controller
         $allowedRoles = [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
-            'Caretaker Operator'
+            'Caretaker Operator',
         ];
 
-        if (!in_array($role, $allowedRoles, true)) {
+        if (! in_array($role, $allowedRoles, true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
-        if ($role === 'Residential Warden' && !$request->user()->hostel_id) {
+        if (in_array($role, ['Residential Warden', 'Warden'], true) && ! $request->user()->hostel_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'No hostel is assigned to this warden.'
+                'message' => 'No hostel is assigned to this warden.',
             ], 403);
         }
 
@@ -61,10 +67,10 @@ class StudentController extends Controller
     {
         $roleName = $request->user()->role?->name;
 
-        if (!in_array($roleName, ['Admin', 'Caretaker Operator'], true)) {
+        if (! in_array($roleName, ['Admin', 'Caretaker Operator'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -85,37 +91,39 @@ class StudentController extends Controller
             ->where('room_number', $data['roomNumber'])
             ->first();
 
-        if (!$room) {
+        if (! $room) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected room does not exist in this hostel.'
+                'message' => 'Selected room does not exist in this hostel.',
             ], 422);
         }
 
         if ($room->students()->count() >= $room->capacity) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected room is already full.'
+                'message' => 'Selected room is already full.',
             ], 422);
         }
 
         $studentRole = Role::where('name', 'Student')->first();
 
-        if (!$studentRole) {
+        if (! $studentRole) {
             return response()->json([
                 'success' => false,
-                'message' => 'Student role has not been configured.'
+                'message' => 'Student role has not been configured.',
             ], 422);
         }
 
-        $student = DB::transaction(function () use ($data, $room, $studentRole) {
+        $plainPassword = $request->input('password') ?: 'student123';
+
+        $student = DB::transaction(function () use ($data, $room, $studentRole, $plainPassword) {
             $user = User::create([
                 'name' => $data['name'],
                 'email' => $data['studentEmail'],
-                'password' => Hash::make(Str::random(32)),
+                'password' => Hash::make($plainPassword),
                 'role_id' => $studentRole->id,
                 'hostel_id' => $data['hostelId'],
-                'is_active' => false,
+                'is_active' => true,
             ]);
 
             return Student::create([
@@ -136,7 +144,7 @@ class StudentController extends Controller
             'Student Created',
             'Student',
             $student->id,
-            'Created student profile for enrollment number ' . $student->enrollment_no,
+            'Created student profile for enrollment number '.$student->enrollment_no,
             $request->user()->id
         );
 
@@ -144,6 +152,12 @@ class StudentController extends Controller
             'success' => true,
             'message' => 'Student submitted for verification.',
             'student' => $student->load('user', 'hostel', 'room'),
+            'credentials' => [
+                'name' => $data['name'],
+                'email' => $data['studentEmail'],
+                'password' => $plainPassword,
+                'role' => 'student',
+            ],
         ], 201);
     }
 
@@ -153,7 +167,7 @@ class StudentController extends Controller
             'id' => (string) $student->id,
             'enrollmentNo' => $student->enrollment_no,
             'enrollment_no' => $student->enrollment_no,
-            'name' => $student->user?->name ?? 'Student ' . $student->enrollment_no,
+            'name' => $student->user?->name ?? 'Student '.$student->enrollment_no,
             'course' => $student->course,
             'semester' => 1,
             'gender' => 'male',
@@ -194,7 +208,7 @@ class StudentController extends Controller
 
         $query = Student::with('user', 'hostel', 'room');
 
-        if ($role === 'Residential Warden') {
+        if ($role === 'Residential Warden' || $role === 'Warden') {
             $query->where('hostel_id', $request->user()->hostel_id);
         }
 
@@ -220,16 +234,16 @@ class StudentController extends Controller
             'Residential Warden',
             'Chief Warden',
             'Director',
-            'Caretaker Operator'
+            'Caretaker Operator',
         ];
 
         $isStaff = in_array($role, $staffRoles, true);
         $isOwner = (int) $student->user_id === (int) $request->user()->id;
 
-        if (!$isStaff && !$isOwner) {
+        if (! $isStaff && ! $isOwner) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
@@ -239,11 +253,11 @@ class StudentController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized hostel access.'
+                'message' => 'Unauthorized hostel access.',
             ], 403);
         }
 
-        $tokens = \App\Models\Token::where('student_id', $student->id)->get();
+        $tokens = Token::where('student_id', $student->id)->get();
         $currentMonthTokens = $tokens->where('month_start', now()->startOfMonth()->toDateString())->sum('token_count');
         $lifetimeTokens = $tokens->sum('token_count');
 
@@ -282,7 +296,7 @@ class StudentController extends Controller
     public function verify(Request $request)
     {
         $role = $request->user()->role?->name;
-        if (!in_array($role, ['Admin', 'Residential Warden', 'Chief Warden', 'Caretaker Operator'], true)) {
+        if (! in_array($role, ['Admin', 'Residential Warden', 'Chief Warden', 'Caretaker Operator'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
@@ -308,16 +322,16 @@ class StudentController extends Controller
         ]);
 
         app(AuditService::class)->log(
-            'Student Registration ' . ucfirst($data['action']) . 'd',
+            'Student Registration '.ucfirst($data['action']).'d',
             'Student',
             $student->id,
-            $isApproved ? 'Approved student registration' : ('Rejected: ' . ($data['rejectionReason'] ?? 'No reason provided')),
+            $isApproved ? 'Approved student registration' : ('Rejected: '.($data['rejectionReason'] ?? 'No reason provided')),
             $request->user()->id
         );
 
         return response()->json([
             'success' => true,
-            'message' => 'Student registration ' . ($isApproved ? 'approved' : 'rejected') . ' successfully.',
+            'message' => 'Student registration '.($isApproved ? 'approved' : 'rejected').' successfully.',
             'student' => $this->formatStudentResponse($student->fresh()->load('user', 'hostel', 'room')),
         ]);
     }
@@ -327,7 +341,7 @@ class StudentController extends Controller
         $user = $request->user();
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json(['success' => false, 'message' => 'Student profile not found.'], 404);
         }
 
@@ -359,12 +373,12 @@ class StudentController extends Controller
 
     public function warningTickets(Request $request)
     {
-        $tickets = \App\Models\Ticket::with(['violation.student.user', 'violation.student.hostel', 'violation.student.room'])
+        $tickets = Ticket::with(['violation.student.user', 'violation.student.hostel', 'violation.student.room'])
             ->latest('issue_date')
             ->get()
             ->map(fn ($t) => [
                 'id' => (string) $t->id,
-                'ticketNumber' => 'WT-' . str_pad($t->id, 4, '0', STR_PAD_LEFT),
+                'ticketNumber' => 'WT-'.str_pad($t->id, 4, '0', STR_PAD_LEFT),
                 'studentId' => (string) $t->violation?->student_id,
                 'studentName' => $t->violation?->student?->user?->name ?? 'Unknown Student',
                 'enrollmentNo' => $t->violation?->student?->enrollment_no ?? '',
@@ -390,10 +404,10 @@ class StudentController extends Controller
     {
         $role = $request->user()->role?->name;
 
-        if (!in_array($role, ['Admin', 'Residential Warden'], true)) {
+        if (! in_array($role, ['Admin', 'Residential Warden'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Only Admin and Residential Warden can allocate rooms.'
+                'message' => 'Only Admin and Residential Warden can allocate rooms.',
             ], 403);
         }
 
@@ -409,7 +423,7 @@ class StudentController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only allocate rooms in your assigned hostel.'
+                'message' => 'You can only allocate rooms in your assigned hostel.',
             ], 403);
         }
 
@@ -419,10 +433,10 @@ class StudentController extends Controller
             ->where('hostel_id', $data['hostel_id'])
             ->first();
 
-        if (!$room) {
+        if (! $room) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected room does not belong to the selected hostel.'
+                'message' => 'Selected room does not belong to the selected hostel.',
             ], 422);
         }
 
@@ -432,14 +446,14 @@ class StudentController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'You cannot allocate a student from another hostel.'
+                'message' => 'You cannot allocate a student from another hostel.',
             ], 403);
         }
 
         $oldRoomId = $student->room_id;
         $oldHostelId = $student->hostel_id;
 
-        DB::transaction(function () use ($student, $room, $data, $oldRoomId) {
+        DB::transaction(function () use ($student, $room, $data) {
             $lockedRoom = Room::whereKey($room->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -449,8 +463,8 @@ class StudentController extends Controller
                 ->count();
 
             if ($currentOccupancy >= $lockedRoom->capacity) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'room_id' => ['Selected room is already full.']
+                throw ValidationException::withMessages([
+                    'room_id' => ['Selected room is already full.'],
                 ]);
             }
 
@@ -469,9 +483,9 @@ class StudentController extends Controller
             'Room Allocated',
             'Student',
             $student->id,
-            'Room allocation changed from hostel ' . $oldHostelId .
-            ', room ' . $oldRoomId . ' to hostel ' . $data['hostel_id'] .
-            ', room ' . $data['room_id'],
+            'Room allocation changed from hostel '.$oldHostelId.
+            ', room '.$oldRoomId.' to hostel '.$data['hostel_id'].
+            ', room '.$data['room_id'],
             $request->user()->id
         );
 
@@ -525,10 +539,10 @@ class StudentController extends Controller
             ->where('hostel_id', $hostelId)
             ->first();
 
-        if (!$room) {
+        if (! $room) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected room does not belong to this hostel.'
+                'message' => 'Selected room does not belong to this hostel.',
             ], 422);
         }
 
@@ -538,7 +552,7 @@ class StudentController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected room is already full.'
+                'message' => 'Selected room is already full.',
             ], 422);
         }
 
@@ -570,7 +584,7 @@ class StudentController extends Controller
                 $userData['is_active'] = $data['verification_status'] === 'verified';
             }
 
-            if (!empty($userData)) {
+            if (! empty($userData)) {
                 $student->user()->update($userData);
             }
         });
@@ -579,7 +593,7 @@ class StudentController extends Controller
             'Student Updated',
             'Student',
             $student->id,
-            'Updated student profile for enrollment number ' . $student->enrollment_no,
+            'Updated student profile for enrollment number '.$student->enrollment_no,
             $request->user()->id
         );
 
@@ -611,16 +625,33 @@ class StudentController extends Controller
 
         $studentRole = Role::firstOrCreate(['name' => 'Student'], ['description' => 'Student role']);
 
-        $user = User::updateOrCreate(
-            ['email' => $data['studentEmail']],
-            [
-                'name' => $data['name'],
-                'password' => Hash::make(Str::random(32)),
-                'role_id' => $studentRole->id,
-                'hostel_id' => $hostelId,
-                'is_active' => true,
-            ]
-        );
+        $plainPassword = $request->input('password') ?: 'student123';
+
+        $existingStudent = Student::with('user')->where('biometric_id', $data['biometricId'])->first();
+
+        if ($existingStudent && $existingStudent->user) {
+            $user = $existingStudent->user;
+            $user->name = $data['name'];
+            if (! empty($data['studentEmail'])) {
+                $user->email = $data['studentEmail'];
+            }
+            $user->hostel_id = $hostelId;
+            if ($request->filled('password')) {
+                $user->password = Hash::make($plainPassword);
+            }
+            $user->save();
+        } else {
+            $user = User::updateOrCreate(
+                ['email' => $data['studentEmail']],
+                [
+                    'name' => $data['name'],
+                    'password' => Hash::make($plainPassword),
+                    'role_id' => $studentRole->id,
+                    'hostel_id' => $hostelId,
+                    'is_active' => true,
+                ]
+            );
+        }
 
         $student = Student::updateOrCreate(
             ['biometric_id' => $data['biometricId']],
@@ -637,10 +668,59 @@ class StudentController extends Controller
             ]
         );
 
+        // Sync name into MongoDB user_info_result and queue SET_USER_INFO to machine terminal
+        try {
+            $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
+            $manager = new Manager($mongoUri);
+            $bulk = new BulkWrite;
+
+            $bulk->update(
+                ['user_id' => (string) $data['biometricId']],
+                ['$set' => [
+                    'user_id' => (string) $data['biometricId'],
+                    'dev_id' => $data['deviceSerial'] ?? 'RSS20241199684',
+                    'name' => $data['name'],
+                    'info' => json_encode([
+                        'user_id' => (string) $data['biometricId'],
+                        'user_name' => $data['name'],
+                        'privilege' => 'User',
+                    ]),
+                    'updated_at' => now()->format('Y-m-d H:i:s'),
+                ]],
+                ['upsert' => true]
+            );
+
+            $transId = (string) rand(10000, 99999);
+            $nextId = (int) (round(microtime(true) * 1000) % 100000000);
+            $bulk->insert([
+                'trans_id' => $transId,
+                'dev_id' => $data['deviceSerial'] ?? 'RSS20241199684',
+                'cmd_code' => 'SET_USER_INFO',
+                'cmd_param' => json_encode([
+                    'user_id' => (string) $data['biometricId'],
+                    'user_name' => $data['name'],
+                ]),
+                'trans_status' => 'pending',
+                'trans_status_update_time' => now()->format('Y-m-d H:i:s'),
+                'result' => null,
+                'id' => $nextId,
+            ]);
+
+            $manager->executeBulkWrite('biometric_db.command_request_pending', $bulk);
+        } catch (\Throwable $e) {
+            \Log::warning('MongoDB biometric sync skipped: '.$e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Device-linked student registration verified and added to Active Residents successfully.',
             'student' => $this->formatStudentResponse($student),
+            'credentials' => [
+                'name' => $data['name'],
+                'email' => $data['studentEmail'],
+                'password' => $plainPassword,
+                'role' => 'student',
+            ],
         ], 201);
     }
 }

@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Role;
-use App\Models\Student;
 use App\Models\Room;
+use App\Models\Student;
+use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
-
 
 class StudentController extends Controller
 {
@@ -20,7 +19,7 @@ class StudentController extends Controller
     {
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Unauthorized. Admin access required.'
+                'message' => 'Unauthorized. Admin access required.',
             ], 403);
         }
 
@@ -47,7 +46,7 @@ class StudentController extends Controller
             'biometric_id' => 'required|string|unique:students,biometric_id',
             'bed_number' => 'required|string|max:255',
 
-           'parent_guardian_name' => 'sometimes|nullable|string|max:255',
+            'parent_guardian_name' => 'sometimes|nullable|string|max:255',
             'parent_email' => 'sometimes|nullable|email',
         ]);
 
@@ -56,25 +55,25 @@ class StudentController extends Controller
             ->where('hostel_id', $data['hostel_id'])
             ->first();
 
-        if (!$room) {
+        if (! $room) {
             return response()->json([
-                'message' => 'Selected room does not belong to this hostel.'
+                'message' => 'Selected room does not belong to this hostel.',
             ], 422);
         }
 
         // Check room capacity
         if ($room->students()->count() >= $room->capacity) {
             return response()->json([
-                'message' => 'Selected room is already full.'
+                'message' => 'Selected room is already full.',
             ], 422);
         }
 
         // Find Student role
         $studentRole = Role::where('name', 'Student')->first();
 
-        if (!$studentRole) {
+        if (! $studentRole) {
             return response()->json([
-                'message' => 'Student role has not been configured.'
+                'message' => 'Student role has not been configured.',
             ], 422);
         }
 
@@ -90,10 +89,10 @@ class StudentController extends Controller
                 'is_active' => true,
             ]);
 
-             return response()->json([
-            'message' => 'Student account created successfully.',
-            'student' => $student->load('user', 'hostel', 'room'),
-             ], 201);
+            return response()->json([
+                'message' => 'Student account created successfully.',
+                'student' => $student->load('user', 'hostel', 'room'),
+            ], 201);
 
             return Student::create([
                 'user_id' => $user->id,
@@ -108,7 +107,7 @@ class StudentController extends Controller
                 'verification_status' => 'pending',
             ]);
         });
-                $student = DB::transaction(function () use ($data, $studentRole) {
+        $student = DB::transaction(function () {
 
             // Existing User and Student creation code
 
@@ -119,7 +118,7 @@ class StudentController extends Controller
             'Student Created',
             'Student',
             $student->id,
-            'Created student profile for enrollment number ' . $student->enrollment_no,
+            'Created student profile for enrollment number '.$student->enrollment_no,
             $request->user()->id
         );
 
@@ -144,7 +143,7 @@ class StudentController extends Controller
         $students = Student::with('user', 'hostel', 'room')->get();
 
         return response()->json([
-            'students' => $students
+            'students' => $students,
         ]);
     }
 
@@ -157,14 +156,14 @@ class StudentController extends Controller
         $isAdmin = $request->user()->role?->name === 'Admin';
         $isOwner = $student->user_id === $request->user()->id;
 
-        if (!$isAdmin && !$isOwner) {
+        if (! $isAdmin && ! $isOwner) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 403);
         }
 
         return response()->json([
-            'student' => $student
+            'student' => $student,
         ]);
     }
 
@@ -211,9 +210,9 @@ class StudentController extends Controller
             ->where('hostel_id', $hostelId)
             ->first();
 
-        if (!$room) {
+        if (! $room) {
             return response()->json([
-                'message' => 'Selected room does not belong to this hostel.'
+                'message' => 'Selected room does not belong to this hostel.',
             ], 422);
         }
 
@@ -221,7 +220,7 @@ class StudentController extends Controller
         if ($roomId != $student->room_id &&
             $room->students()->count() >= $room->capacity) {
             return response()->json([
-                'message' => 'Selected room is already full.'
+                'message' => 'Selected room is already full.',
             ], 422);
         }
 
@@ -229,12 +228,12 @@ class StudentController extends Controller
 
             $studentData = $data;
 
-unset($studentData['name'], $studentData['email']);
+            unset($studentData['name'], $studentData['email']);
 
-$student->update(array_merge($studentData, [
-    'hostel_id' => $hostelId,
-    'room_id' => $roomId,
-]));
+            $student->update(array_merge($studentData, [
+                'hostel_id' => $hostelId,
+                'room_id' => $roomId,
+            ]));
 
             $userData = [];
 
@@ -250,15 +249,15 @@ $student->update(array_merge($studentData, [
                 $userData['hostel_id'] = $hostelId;
             }
 
-            if (!empty($userData)) {
+            if (! empty($userData)) {
                 $student->user()->update($userData);
             }
         });
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Student Updated',
             'Student',
             $student->id,
-            'Updated student profile for enrollment number ' . $student->enrollment_no,
+            'Updated student profile for enrollment number '.$student->enrollment_no,
             $request->user()->id
         );
 

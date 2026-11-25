@@ -11,8 +11,8 @@ return new class extends Migration
         Schema::create('beds', function (Blueprint $table) {
             $table->id();
             $table->foreignId('room_id')
-                  ->constrained('rooms')
-                  ->cascadeOnDelete();
+                ->constrained('rooms')
+                ->cascadeOnDelete();
             $table->string('bed_identifier');
             $table->boolean('is_occupied')->default(false);
             $table->timestamps();

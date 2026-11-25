@@ -12,8 +12,8 @@ class HostelFactory extends Factory
     public function definition()
     {
         return [
-            'name'    => $this->faker->unique()->company . ' Hostel',
-            'code'    => $this->faker->unique()->slug,
+            'name' => $this->faker->unique()->company.' Hostel',
+            'code' => $this->faker->unique()->slug,
             'address' => $this->faker->address,
         ];
     }

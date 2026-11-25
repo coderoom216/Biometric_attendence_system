@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
-use Illuminate\Http\Request;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 
 class AlertController extends Controller
 {
@@ -14,7 +14,7 @@ class AlertController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
@@ -67,7 +67,7 @@ class AlertController extends Controller
 
         $student = $user->student;
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'message' => 'Student profile not found.',
             ], 404);
@@ -111,7 +111,7 @@ class AlertController extends Controller
             'Alert Status Updated',
             'Alert',
             $alert->id,
-            'Alert status changed to ' . $data['alert_status'],
+            'Alert status changed to '.$data['alert_status'],
             $user->id
         );
 

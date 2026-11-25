@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Execution;
 use App\Models\ScheduledTask;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class ExecutionController extends Controller
 {
@@ -56,7 +56,7 @@ class ExecutionController extends Controller
 
         if (
             $data['status'] === 'running'
-            && !empty($data['completed_at'])
+            && ! empty($data['completed_at'])
         ) {
             return response()->json([
                 'success' => false,
@@ -66,7 +66,7 @@ class ExecutionController extends Controller
 
         $task = ScheduledTask::findOrFail($data['job_id']);
 
-        if (!$task->is_active) {
+        if (! $task->is_active) {
             return response()->json([
                 'message' => 'This scheduled task is inactive.',
             ], 422);
@@ -78,7 +78,7 @@ class ExecutionController extends Controller
             'Execution Created',
             'Execution',
             $execution->id,
-            'Created execution for scheduled task ID ' . $execution->job_id,
+            'Created execution for scheduled task ID '.$execution->job_id,
             $request->user()->id
         );
 
@@ -102,7 +102,7 @@ class ExecutionController extends Controller
         $query = Execution::with('scheduledTask', 'evaluations')
             ->orderByDesc('created_at');
 
-        if (!empty($filters['job_id'])) {
+        if (! empty($filters['job_id'])) {
             $query->where('job_id', $filters['job_id']);
         }
 
@@ -138,7 +138,7 @@ class ExecutionController extends Controller
                 'sometimes',
                 'nullable',
                 'date',
-                'after_or_equal:' . $execution->started_at,
+                'after_or_equal:'.$execution->started_at,
             ],
             'status' => [
                 'sometimes',
@@ -176,7 +176,7 @@ class ExecutionController extends Controller
 
         if (
             $newStatus === 'running'
-            && !empty($newCompletedAt)
+            && ! empty($newCompletedAt)
         ) {
             return response()->json([
                 'success' => false,
@@ -190,7 +190,7 @@ class ExecutionController extends Controller
             'Execution Updated',
             'Execution',
             $execution->id,
-            'Updated execution record. Current status: ' . $execution->status,
+            'Updated execution record. Current status: '.$execution->status,
             $request->user()->id
         );
 

@@ -14,7 +14,9 @@ class Student extends Model
     use HasFactory;
 
     public const STATUS_PENDING_VERIFICATION = 'pending_verification';
+
     public const STATUS_VERIFIED = 'verified';
+
     public const STATUS_REJECTED = 'rejected';
 
     protected $fillable = [

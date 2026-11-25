@@ -1,20 +1,21 @@
 <?php
+
 namespace App\Http\Controllers\Api;
+
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditService;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Validation\ValidationException;
-use App\Services\AuditService;
 
 class AuthController extends Controller
 {
     // Register API
-   
 
     // Login API
     public function login(Request $request)
@@ -24,29 +25,30 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!Auth::attempt($data)) {
+        if (! Auth::attempt($data)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid email or password.'],
             ]);
         }
 
         $user = User::where('email', $data['email'])->firstOrFail();
-        if (!$user->is_active) {
-    Auth::logout();
+        if (! $user->is_active) {
+            Auth::logout();
 
-    return response()->json([
-        'message' => 'Your account is inactive. Contact Admin.'
-    ], 403);
-}
+            return response()->json([
+                'message' => 'Your account is inactive. Contact Admin.',
+            ], 403);
+        }
 
         $token = $user->createToken('mobile-app')->plainTextToken;
         app(AuditService::class)->log(
-    'Login',
-    'User',
-    $user->id,
-    'User logged in successfully.',
-    $user->id
-);
+            'Login',
+            'User',
+            $user->id,
+            'User logged in successfully.',
+            $user->id
+        );
+
         return response()->json([
             'message' => 'Login successful',
             'user' => $user,
@@ -56,24 +58,24 @@ class AuthController extends Controller
 
     // Logout API
     // Logout API
-public function logout(Request $request)
-{
-    $user = $request->user();
+    public function logout(Request $request)
+    {
+        $user = $request->user();
 
-    $user->currentAccessToken()->delete();
+        $user->currentAccessToken()->delete();
 
-    app(AuditService::class)->log(
-        'Logout',
-        'User',
-        $user->id,
-        'User logged out successfully.',
-        $user->id
-    );
+        app(AuditService::class)->log(
+            'Logout',
+            'User',
+            $user->id,
+            'User logged out successfully.',
+            $user->id
+        );
 
-    return response()->json([
-        'message' => 'Logout successful',
-    ]);
-}
+        return response()->json([
+            'message' => 'Logout successful',
+        ]);
+    }
 
     // Forgot Password API
     public function forgotPassword(Request $request)
@@ -85,8 +87,7 @@ public function logout(Request $request)
         Password::sendResetLink($request->only('email'));
 
         return response()->json([
-            'message' =>
-                'If an account exists for this email, a reset link will be sent.',
+            'message' => 'If an account exists for this email, a reset link will be sent.',
         ]);
     }
 

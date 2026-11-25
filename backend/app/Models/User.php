@@ -2,16 +2,17 @@
 
 namespace App\Models;
 
+use App\Notifications\ApiResetPasswordNotification;
 use Database\Factories\UserFactory;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
     'name',
@@ -39,7 +40,7 @@ class User extends Authenticatable
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(
-            new \App\Notifications\ApiResetPasswordNotification($token)
+            new ApiResetPasswordNotification($token)
         );
     }
 
@@ -54,11 +55,13 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Hostel::class, 'hostel_id');
     }
-// User has one Student profile
-public function student(): HasOne
-{
-    return $this->hasOne(Student::class, 'user_id');
-}
+
+    // User has one Student profile
+    public function student(): HasOne
+    {
+        return $this->hasOne(Student::class, 'user_id');
+    }
+
     // User can perform multiple Actions
     public function actions(): HasMany
     {

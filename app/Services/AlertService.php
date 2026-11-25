@@ -14,8 +14,7 @@ class AlertService
 {
     public function __construct(
         private ClockService $clockService
-    ) {
-    }
+    ) {}
 
     public function checkStudentAlerts(Student $student): void
     {
@@ -43,12 +42,12 @@ class AlertService
             $alreadyExists = Alert::where('student_id', $student->id)
                 ->where('tier_id', $tier->id)
                 ->whereBetween('triggered_at', [
-                    $monthStart . ' 00:00:00',
-                    $monthEnd . ' 23:59:59',
+                    $monthStart.' 00:00:00',
+                    $monthEnd.' 23:59:59',
                 ])
                 ->exists();
 
-            if (!$alreadyExists) {
+            if (! $alreadyExists) {
                 $alert = Alert::create([
                     'student_id' => $student->id,
                     'tier_id' => $tier->id,
@@ -96,7 +95,7 @@ class AlertService
         }
 
         // Tier 5: Student Parents / Guardian
-        if (!empty($student->parent_email)) {
+        if (! empty($student->parent_email)) {
             $recipients[] = ['role' => 'Parent', 'email' => $student->parent_email];
         }
 

@@ -84,7 +84,7 @@ class DeviceWebhookTest extends TestCase
      */
     public function test_it_acknowledges_image_continuation_packet(): void
     {
-        $payload = pack('V', 4) . "\xFF\xD8\xFF\xD9";
+        $payload = pack('V', 4)."\xFF\xD8\xFF\xD9";
 
         $response = $this->call(
             'POST',

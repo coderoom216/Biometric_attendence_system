@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class DeviceController extends Controller
 {
@@ -15,7 +15,7 @@ class DeviceController extends Controller
     {
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Only Admin can manage biometric devices.'
+                'message' => 'Only Admin can manage biometric devices.',
             ], 403);
         }
 
@@ -47,7 +47,7 @@ class DeviceController extends Controller
             'Device Registered',
             'Device',
             $device->id,
-            'Registered biometric device ' . $device->device_name . ' for hostel ID ' . $device->hostel_id,
+            'Registered biometric device '.$device->device_name.' for hostel ID '.$device->hostel_id,
             $request->user()->id
         );
 
@@ -70,7 +70,7 @@ class DeviceController extends Controller
             ->get();
 
         return response()->json([
-            'devices' => $devices
+            'devices' => $devices,
         ]);
     }
 
@@ -86,7 +86,7 @@ class DeviceController extends Controller
             ->findOrFail($id);
 
         return response()->json([
-            'device' => $device
+            'device' => $device,
         ]);
     }
 
@@ -128,7 +128,7 @@ class DeviceController extends Controller
             'Device Updated',
             'Device',
             $device->id,
-            'Updated biometric device ' . $device->device_name,
+            'Updated biometric device '.$device->device_name,
             $request->user()->id
         );
 
@@ -164,7 +164,7 @@ class DeviceController extends Controller
             'Device Status Updated',
             'Device',
             $device->id,
-            'Device status changed from ' . $oldStatus . ' to ' . $device->device_status,
+            'Device status changed from '.$oldStatus.' to '.$device->device_status,
             $request->user()->id
         );
 
@@ -185,7 +185,7 @@ class DeviceController extends Controller
 
         if ($device->punches()->exists()) {
             return response()->json([
-                'message' => 'This device cannot be deleted because punch records are associated with it.'
+                'message' => 'This device cannot be deleted because punch records are associated with it.',
             ], 422);
         }
 
@@ -198,12 +198,12 @@ class DeviceController extends Controller
             'Device Deleted',
             'Device',
             $deviceId,
-            'Deleted biometric device ' . $deviceName,
+            'Deleted biometric device '.$deviceName,
             $request->user()->id
         );
 
         return response()->json([
-            'message' => 'Biometric device deleted successfully.'
+            'message' => 'Biometric device deleted successfully.',
         ]);
     }
 }

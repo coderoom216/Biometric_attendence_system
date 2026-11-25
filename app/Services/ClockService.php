@@ -8,7 +8,9 @@ use Carbon\Carbon;
 class ClockService
 {
     public const TIMEZONE = 'Asia/Kolkata';
+
     public const CUTOFF_TIME = '19:00:00';
+
     public const DEFAULTER_TIME = '22:00:00';
 
     public function current(): Carbon
@@ -17,7 +19,7 @@ class ClockService
 
         if ($clock && $clock->is_enabled) {
             return Carbon::parse(
-                $clock->virtual_date->toDateString() . ' ' . $clock->virtual_time,
+                $clock->virtual_date->toDateString().' '.$clock->virtual_time,
                 self::TIMEZONE
             );
         }

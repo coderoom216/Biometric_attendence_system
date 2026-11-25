@@ -13,10 +13,10 @@ class DeviceFactory extends Factory
     {
         return [
             // hostel_id will be supplied by the seeder
-            'device_name'   => $this->faker->unique()->company . ' Device',
+            'device_name' => $this->faker->unique()->company.' Device',
             'device_serial' => $this->faker->unique()->ean13,
             'device_status' => Device::STATUS_ACTIVE,
-            'last_sync'     => $this->faker->dateTimeBetween('-30 days', 'now'),
+            'last_sync' => $this->faker->dateTimeBetween('-30 days', 'now'),
         ];
     }
 }

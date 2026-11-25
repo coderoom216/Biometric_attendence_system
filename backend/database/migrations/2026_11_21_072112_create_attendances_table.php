@@ -13,11 +13,11 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('student_id')
-                  ->constrained('students');
+                ->constrained('students');
 
             $table->foreignId('marked_by')
-                  ->nullable()
-                  ->constrained('users');
+                ->nullable()
+                ->constrained('users');
 
             $table->date('attendance_date');
             $table->time('punch_time')->nullable();

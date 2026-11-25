@@ -13,7 +13,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('student_id')
-                  ->constrained('students');
+                ->constrained('students');
 
             $table->date('month_start');
             $table->unsignedInteger('total_tokens');

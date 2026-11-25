@@ -13,7 +13,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('job_id')
-                  ->constrained('scheduled_tasks');
+                ->constrained('scheduled_tasks');
 
             $table->dateTime('started_at');
             $table->dateTime('completed_at')->nullable();

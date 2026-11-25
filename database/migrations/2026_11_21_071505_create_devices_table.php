@@ -14,8 +14,8 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('hostel_id')
-                  ->constrained('hostels')
-                  ->cascadeOnDelete();
+                ->constrained('hostels')
+                ->cascadeOnDelete();
 
             $table->string('device_name');
             $table->string('device_serial')->unique();

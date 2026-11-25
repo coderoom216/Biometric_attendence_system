@@ -13,23 +13,34 @@ import {
   Clock,
   ShieldCheck,
   Wifi,
-  WifiOff
+  WifiOff,
+  Key
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { BiometricDevice, Hostel } from '../types';
+import { BiometricDevice, Hostel, Room } from '../types';
+import { SixTierAbsenceAlerts } from '../components/dashboard/SixTierAbsenceAlerts';
 
 const DEVICE_SERIAL = 'RSS20241199684';
 
 interface EnrolledUser {
   userId: string;
   deviceSerial: string;
+  deviceName?: string;
   name: string | null;
+  hostelId?: string;
+  hostelName?: string;
+  hostelCode?: string;
   privilege: string | null;
-  enabled: boolean | null;
+  enabled?: boolean | null;
   hasInfo: boolean;
-  infoFetchedAt: string | null;
+  infoFetchedAt?: string | null;
   fingerprintEnrolled: boolean;
   fingerprintCount: number;
+  isRegistered?: boolean;
+  studentId?: string | null;
+  enrollmentNo?: string | null;
+  roomNumber?: string | null;
+  bedNumber?: string | null;
 }
 
 interface StudentFormData {
@@ -71,6 +82,8 @@ const createInitialForm = (hostelId = ''): StudentFormData => ({
 export const CaretakerBiometricDashboard: React.FC = () => {
   const [devices, setDevices] = useState<BiometricDevice[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>([]);
+  const [hostelRooms, setHostelRooms] = useState<Room[]>([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [enrolledUsers, setEnrolledUsers] = useState<EnrolledUser[]>([]);
   const [selectedMachineUserId, setSelectedMachineUserId] = useState('');
   const [studentForm, setStudentForm] = useState<StudentFormData>(
@@ -81,6 +94,12 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   const [liveError, setLiveError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [onboardFeedback, setOnboardFeedback] = useState<string | null>(null);
+  const [lastCreatedCredentials, setLastCreatedCredentials] = useState<{
+    name: string;
+    email: string;
+    password?: string;
+    enrollmentNo?: string;
+  } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,6 +109,9 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     'device' | 'manual'
   >('device');
 
+  const [selectedEnrolledHostel, setSelectedEnrolledHostel] = useState<string>('all');
+  const [selectedLiveHostel, setSelectedLiveHostel] = useState<string>('all');
+
   const selectedMachineUser = enrolledUsers.find(
     (user) => user.userId === selectedMachineUserId
   );
@@ -97,6 +119,47 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   const livePunches = Array.isArray(liveData?.punches)
     ? liveData.punches
     : [];
+
+  const enrolledCounts = React.useMemo(() => {
+    const counts = { all: enrolledUsers.length, BH1: 0, GH: 0, BH2: 0 };
+    enrolledUsers.forEach((u) => {
+      const code = (u.hostelCode || '').toUpperCase();
+      if (code === 'BH1' || u.hostelId === '1') counts.BH1++;
+      else if (code === 'GH' || u.hostelId === '2') counts.GH++;
+      else if (code === 'BH2' || u.hostelId === '3') counts.BH2++;
+    });
+    return counts;
+  }, [enrolledUsers]);
+
+  const filteredEnrolledUsers = React.useMemo(() => {
+    if (selectedEnrolledHostel === 'all') return enrolledUsers;
+    return enrolledUsers.filter((u) => {
+      const code = (u.hostelCode || '').toUpperCase();
+      if (selectedEnrolledHostel === 'BH1') return code === 'BH1' || u.hostelId === '1';
+      if (selectedEnrolledHostel === 'GH') return code === 'GH' || u.hostelId === '2';
+      if (selectedEnrolledHostel === 'BH2') return code === 'BH2' || u.hostelId === '3';
+      return true;
+    });
+  }, [enrolledUsers, selectedEnrolledHostel]);
+
+  const liveCounts = React.useMemo(() => {
+    const counts = { all: livePunches.length, BH1: 0, GH: 0, BH2: 0 };
+    livePunches.forEach((p: any) => {
+      const code = (p.hostelCode || (p.hostelId === '2' ? 'GH' : p.hostelId === '3' ? 'BH2' : 'BH1')).toUpperCase();
+      if (code === 'BH1') counts.BH1++;
+      else if (code === 'GH') counts.GH++;
+      else if (code === 'BH2') counts.BH2++;
+    });
+    return counts;
+  }, [livePunches]);
+
+  const filteredLivePunches = React.useMemo(() => {
+    if (selectedLiveHostel === 'all') return livePunches;
+    return livePunches.filter((p: any) => {
+      const code = (p.hostelCode || (p.hostelId === '2' ? 'GH' : p.hostelId === '3' ? 'BH2' : 'BH1')).toUpperCase();
+      return code === selectedLiveHostel;
+    });
+  }, [livePunches, selectedLiveHostel]);
 
   const loadHostels = async () => {
     try {
@@ -114,6 +177,28 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Hostel loading failed:', error);
+    }
+  };
+
+  const loadRoomsForHostel = async (hostelId: string) => {
+    if (!hostelId) {
+      setHostelRooms([]);
+      return;
+    }
+
+    setIsLoadingRooms(true);
+    try {
+      const response = await apiService.getHostelRooms(hostelId);
+      if (response.success && Array.isArray(response.rooms)) {
+        setHostelRooms(response.rooms);
+      } else {
+        setHostelRooms([]);
+      }
+    } catch (error) {
+      console.error('Hostel rooms loading failed:', error);
+      setHostelRooms([]);
+    } finally {
+      setIsLoadingRooms(false);
     }
   };
 
@@ -140,7 +225,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       console.error('Enrolled users loading failed:', error);
       setPageError(
         error.response?.data?.message ||
-          'Machine enrolled users load nahi ho pa rahe hain.'
+          'Failed to load machine enrolled users from terminal.'
       );
     }
   };
@@ -153,14 +238,14 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     } catch (error: any) {
       setLiveError(
         error.response?.data?.message ||
-          'MongoDB se live punches read nahi ho pa rahe hain.'
+          'Failed to read live punches from biometric database.'
       );
     }
   };
 
   const handleSyncFromMachine = async () => {
     setIsSyncingDevice(true);
-    setSyncFeedback('Device ko fetch command bheja gaya... 6 seconds me update ho raha hai.');
+    setSyncFeedback('Fetch command dispatched to terminal... refreshing in 6 seconds.');
 
     try {
       await apiService.triggerBiometricUserFetch(DEVICE_SERIAL);
@@ -169,13 +254,13 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       setTimeout(async () => {
         await loadEnrolledUsers();
         setIsSyncingDevice(false);
-        setSyncFeedback('Machine se naye enrollments successfully sync ho gaye!');
+        setSyncFeedback('New terminal enrollments synchronized successfully.');
         setTimeout(() => setSyncFeedback(null), 5000);
       }, 6000);
     } catch (error: any) {
       setIsSyncingDevice(false);
       setSyncFeedback(
-        error.response?.data?.message || 'Sync command send nahi ho saka.'
+        error.response?.data?.message || 'Failed to dispatch sync command to device.'
       );
     }
   };
@@ -209,9 +294,61 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (studentForm.hostelId) {
+      loadRoomsForHostel(studentForm.hostelId);
+    }
+  }, [studentForm.hostelId]);
+
+  // Filter vacant rooms: only rooms with at least 1 available bed
+  const vacantRooms = hostelRooms.filter((r) => {
+    if (typeof r.availableBeds === 'number') {
+      return r.availableBeds > 0;
+    }
+    if (typeof r.capacity === 'number' && typeof r.currentOccupancy === 'number') {
+      return r.currentOccupancy < r.capacity;
+    }
+    return !r.isFull;
+  });
+
+  // Current selected room object
+  const currentRoom = hostelRooms.find(
+    (r) => String(r.roomNumber) === String(studentForm.roomNumber)
+  );
+
+  // Compute vacant beds for the current selected room
+  const availableBedsForCurrentRoom = React.useMemo(() => {
+    if (!currentRoom) return [];
+    if (Array.isArray(currentRoom.vacantBeds) && currentRoom.vacantBeds.length > 0) {
+      return currentRoom.vacantBeds;
+    }
+    const cap = currentRoom.capacity || 3;
+    const allBeds = ['A', 'B', 'C', 'D'].slice(0, cap);
+    const occupied = (currentRoom.occupants || []).map((o: any) =>
+      String(o.bedNumber || o.bed || '').toUpperCase().trim()
+    );
+    return allBeds.filter((b) => !occupied.includes(b));
+  }, [currentRoom]);
+
+  const handleRoomSelect = (roomNum: string) => {
+    const selected = hostelRooms.find((r) => String(r.roomNumber) === String(roomNum));
+    const vacantList = selected?.vacantBeds && selected.vacantBeds.length > 0
+      ? selected.vacantBeds
+      : ['A', 'B', 'C'];
+    const autoBed = vacantList[0] || 'A';
+
+    setStudentForm((prev) => ({
+      ...prev,
+      roomNumber: roomNum,
+      bedNumber: autoBed,
+      block: selected?.block || prev.block || 'Block A'
+    }));
+  };
+
   const handleMachineUserChange = (userId: string) => {
     setSelectedMachineUserId(userId);
     setOnboardFeedback(null);
+    setLastCreatedCredentials(null);
 
     const machineUser = enrolledUsers.find(
       (user) => user.userId === userId
@@ -225,11 +362,31 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       return;
     }
 
-    setStudentForm((previous) => ({
-      ...previous,
-      biometricId: machineUser.userId,
-      name: machineUser.name || previous.name
-    }));
+    const cleanName = (machineUser.name || '').trim();
+    const slugName = cleanName
+      ? cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '.')
+      : `resident${machineUser.userId}`;
+    const autoEmail = `${slugName}@student.edu.in`;
+    const autoEnrollment = machineUser.enrollmentNo || `2024BIO${String(machineUser.userId).padStart(3, '0')}`;
+
+    setStudentForm((previous) => {
+      const targetHostelId = machineUser.hostelId || previous.hostelId;
+      const roomToSet = machineUser.roomNumber || previous.roomNumber || (vacantRooms.length > 0 ? vacantRooms[0].roomNumber : '');
+      const matchedRoom = hostelRooms.find((r) => String(r.roomNumber) === String(roomToSet));
+      const bedToSet = machineUser.bedNumber || previous.bedNumber || matchedRoom?.vacantBeds?.[0] || 'A';
+
+      return {
+        ...previous,
+        hostelId: targetHostelId || previous.hostelId,
+        biometricId: machineUser.userId,
+        name: cleanName || previous.name || `Resident ${machineUser.userId}`,
+        enrollmentNo: autoEnrollment,
+        studentEmail: cleanName ? autoEmail : (previous.studentEmail || autoEmail),
+        roomNumber: roomToSet,
+        bedNumber: bedToSet,
+        block: matchedRoom?.block || previous.block || 'Block A'
+      };
+    });
   };
 
   const handleDeviceRegistration = async (
@@ -237,30 +394,42 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   ) => {
     event.preventDefault();
     setOnboardFeedback(null);
+    setLastCreatedCredentials(null);
 
     if (!selectedMachineUser) {
-      setOnboardFeedback('Pehle biometric machine ka User ID select karein.');
+      setOnboardFeedback('Please select a biometric terminal User ID first.');
       return;
     }
 
     if (!studentForm.hostelId) {
-      setOnboardFeedback('Please hostel select karein.');
+      setOnboardFeedback('Please select an assigned hostel.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      const mappedDev = devices.find((d: any) => String(d.hostelId) === String(studentForm.hostelId));
+      const targetSerial = mappedDev?.deviceSerial || selectedMachineUser.deviceSerial || 'RSS20241199684';
+
       const response =
         await apiService.submitDeviceStudentRegistration({
           ...studentForm,
           biometricId: selectedMachineUser.userId,
-          deviceSerial: selectedMachineUser.deviceSerial
+          deviceSerial: targetSerial
         });
 
       if (response.success) {
+        const creds = (response as any).credentials || {
+          name: studentForm.name,
+          email: studentForm.studentEmail,
+          password: 'student123',
+          enrollmentNo: studentForm.enrollmentNo,
+        };
+        setLastCreatedCredentials(creds);
+
         setOnboardFeedback(
-          'Student registration verified & Active Resident me successfully add ho gaya!'
+          'Student registration verified & added to Active Residents successfully!'
         );
 
         setSelectedMachineUserId('');
@@ -268,9 +437,12 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
         await loadEnrolledUsers();
         await loadLivePunches();
+        if (studentForm.hostelId) {
+          await loadRoomsForHostel(studentForm.hostelId);
+        }
       } else {
         setOnboardFeedback(
-          response.message || 'Student registration submit nahi hua.'
+          response.message || 'Student registration submission failed.'
         );
       }
     } catch (error: any) {
@@ -288,9 +460,10 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   ) => {
     event.preventDefault();
     setOnboardFeedback(null);
+    setLastCreatedCredentials(null);
 
     if (!studentForm.biometricId.trim()) {
-      setOnboardFeedback('Manual onboarding ke liye Biometric ID enter karein.');
+      setOnboardFeedback('Please enter a Biometric ID for manual onboarding.');
       return;
     }
 
@@ -300,12 +473,23 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       const response = await apiService.onboardStudent(studentForm);
 
       if (response.success) {
+        const creds = (response as any).credentials || {
+          name: studentForm.name,
+          email: studentForm.studentEmail,
+          password: 'student123',
+          enrollmentNo: studentForm.enrollmentNo,
+        };
+        setLastCreatedCredentials(creds);
+
         setOnboardFeedback(
           `Student ${studentForm.name} successfully registered and verified.`
         );
 
         setStudentForm(createInitialForm(studentForm.hostelId));
         setSelectedMachineUserId('');
+        if (studentForm.hostelId) {
+          await loadRoomsForHostel(studentForm.hostelId);
+        }
       } else {
         setOnboardFeedback(
           response.message || 'Student onboarding failed.'
@@ -381,7 +565,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           <p className="text-xs text-slate-400 mt-2">
             {deviceOnline
               ? `Live heartbeat active (~${heartbeatSeconds ?? 3}s ago)`
-              : 'Machine power off ya Wi-Fi disconnected'}
+              : 'Hardware powered off or network disconnected'}
           </p>
         </div>
 
@@ -445,66 +629,81 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
       </div>
 
-      {/* Device Information */}
+      {/* Hostel Biometric Terminals (BH1, GH, BH2) */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Cpu className="w-5 h-5 text-indigo-600" />
-          <h2 className="font-bold text-sm text-slate-800">
-            Biometric Device Information
-          </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-indigo-600" />
+            <h2 className="font-bold text-sm text-slate-800">
+              Hostel Biometric Terminals ({devices.length} Assigned Terminals)
+            </h2>
+          </div>
+          <span className="text-xs text-slate-500 font-medium">
+            Boys Hostel 1 • Girls Hostel • Boys Hostel 2
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <p className="text-xs text-slate-500">Device Serial Number</p>
-            <p className="font-mono font-bold text-sm text-slate-800 mt-1">
-              {DEVICE_SERIAL}
-            </p>
-          </div>
+        {/* 3 Terminal Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {devices.map((device: any) => {
+            const isDevOnline = device.isOnline === true || device.status === 'online_synced';
+            const badgeColor = 
+              device.hostelCode === 'GH'
+                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                : device.hostelCode === 'BH2'
+                  ? 'bg-amber-100 text-amber-800 border-amber-200'
+                  : 'bg-indigo-100 text-indigo-800 border-indigo-200';
 
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <p className="text-xs text-slate-500">MongoDB Collection</p>
-            <p className="font-mono font-bold text-sm text-slate-800 mt-1">
-              {liveData?.mongo?.collection || 'glog_data'}
-            </p>
-          </div>
-        </div>
-
-        {devices.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500">
-              Registered Devices
-            </p>
-
-            {devices.map((device: any) => {
-              const isDevOnline = device.isOnline === true || device.status === 'online_synced' || deviceOnline;
-              return (
-                <div
-                  key={device.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border border-slate-100 rounded-lg"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {device.name || device.deviceName || 'Biometric Terminal'}
-                    </p>
-                    <p className="text-xs text-slate-500 font-mono">
-                      Serial: {device.deviceId || device.deviceSerial || DEVICE_SERIAL} • IP: {device.ipAddress || '192.168.1.22'}
-                    </p>
-                  </div>
-
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+            return (
+              <div
+                key={device.id}
+                className={`p-4 rounded-xl border transition-all ${
+                  isDevOnline
+                    ? 'border-emerald-300 bg-emerald-50/30 shadow-xs'
+                    : 'border-slate-200 bg-slate-50/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${badgeColor}`}>
+                    {device.hostelCode || `Hostel ${device.hostelId}`}
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                     isDevOnline
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-slate-200 text-slate-700'
                   }`}>
-                    <span className={`w-2 h-2 rounded-full ${isDevOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                    {isDevOnline ? 'Online (Live Heartbeat)' : 'Disconnected / Offline'}
+                    <span className={`w-1.5 h-1.5 rounded-full ${isDevOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                    {isDevOnline ? 'Online (Live)' : 'Standby / Ready'}
                   </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                <div className="mt-3">
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    {device.name || device.deviceName}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Assigned: <strong className="text-slate-700">{device.hostelName}</strong>
+                  </p>
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-slate-100 text-xs space-y-1.5">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Terminal Serial:</span>
+                    <span className="font-mono font-semibold text-slate-800">{device.deviceSerial || device.deviceId}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>IP / Hardware:</span>
+                    <span className="font-mono text-slate-600">{device.ipAddress} • S362</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Mapped Residents:</span>
+                    <span className="font-bold text-indigo-700">{device.studentCount ?? 0} Students</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Enrolled Machine Users */}
@@ -547,65 +746,122 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           </div>
         )}
 
-        {enrolledUsers.length === 0 ? (
+        {/* Hostel Partition Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-xs font-semibold text-slate-500 mr-1">Partition by Hostel:</span>
+          {(['all', 'BH1', 'GH', 'BH2'] as const).map((tab) => {
+            const isActive = selectedEnrolledHostel === tab;
+            const count = tab === 'all' ? enrolledCounts.all : (enrolledCounts as any)[tab];
+            const label = tab === 'all' ? 'All Hostels' : tab === 'GH' ? "Girls' Hostel (GH)" : tab === 'BH1' ? "Boys' Hostel 1 (BH1)" : "Boys' Hostel 2 (BH2)";
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setSelectedEnrolledHostel(tab)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                <span>{label}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  isActive ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredEnrolledUsers.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-500">
-            Abhi API se koi enrolled user record nahi mila.
+            No enrolled user records found for the selected partition.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
+                  <th className="p-3">Hostel</th>
                   <th className="p-3">Machine User ID</th>
-                  <th className="p-3">Machine Name</th>
+                  <th className="p-3">Student / Machine Name</th>
+                  <th className="p-3">Academic Enrollment</th>
+                  <th className="p-3">Allocated Room</th>
                   <th className="p-3">Privilege</th>
                   <th className="p-3">Fingerprint</th>
-                  <th className="p-3">Info Status</th>
+                  <th className="p-3">Registration Status</th>
                 </tr>
               </thead>
 
               <tbody>
-                {enrolledUsers.map((user) => (
-                  <tr
-                    key={`${user.deviceSerial}-${user.userId}`}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="p-3 font-mono font-bold">
-                      {user.userId}
-                    </td>
-                    <td className="p-3">
-                      {user.name || 'Name not fetched'}
-                    </td>
-                    <td className="p-3">
-                      {user.privilege || 'Not available'}
-                    </td>
-                    <td className="p-3">
-                      {user.fingerprintEnrolled
-                        ? `Yes (${user.fingerprintCount})`
-                        : 'Not confirmed'}
-                    </td>
-                    <td className="p-3">
-                      {user.hasInfo ? (
-                        <span className="text-emerald-600 font-semibold">
-                          Fetched
+                {filteredEnrolledUsers.map((user) => {
+                  const hCode = user.hostelCode || (user.hostelId === '2' ? 'GH' : user.hostelId === '3' ? 'BH2' : 'BH1');
+                  const badgeColor =
+                    hCode === 'GH'
+                      ? 'bg-rose-100 text-rose-800'
+                      : hCode === 'BH2'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-indigo-100 text-indigo-800';
+
+                  return (
+                    <tr
+                      key={`${user.deviceSerial}-${user.userId}`}
+                      className="border-t border-slate-100 hover:bg-slate-50/50"
+                    >
+                      <td className="p-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
+                          {hCode}
                         </span>
-                      ) : (
-                        <span className="text-amber-600 font-semibold">
-                          Pending fetch
+                        <span className="text-[11px] text-slate-500 ml-1.5 font-mono">
+                          {user.deviceName || user.deviceSerial}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-3 font-mono font-bold text-slate-900">
+                        {user.userId}
+                      </td>
+                      <td className="p-3">
+                        <span className={`font-medium ${user.name ? 'text-slate-900' : 'text-slate-400 italic'}`}>
+                          {user.name || 'Name not fetched'}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-slate-600">
+                        {user.enrollmentNo || '-'}
+                      </td>
+                      <td className="p-3">
+                        {user.roomNumber ? `Room ${user.roomNumber} (${user.bedNumber || 'Bed -'})` : '-'}
+                      </td>
+                      <td className="p-3">
+                        {user.privilege || 'User'}
+                      </td>
+                      <td className="p-3">
+                        {user.fingerprintEnrolled
+                          ? <span className="text-emerald-700 font-semibold">Yes ({user.fingerprintCount})</span>
+                          : <span className="text-slate-400">Not confirmed</span>}
+                      </td>
+                      <td className="p-3">
+                        {user.isRegistered ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Registered
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                            New Machine ID
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
         <p className="text-xs text-slate-500">
-          Note: Fingerprint status machine ke enrollment metadata par based hai.
-          Actual fingerprint template is screen par transfer ya display nahi
-          kiya ja raha.
+          {/* Note: Fingerprint status machine ke enrollment metadata par based hai. Actual fingerprint template is screen par transfer ya display nahi kiya ja raha. */}
+          Note: Fingerprint enrollment status reflects machine metadata. Raw biometric templates are securely retained on-device and never exposed in browser views.
         </p>
       </div>
 
@@ -662,8 +918,8 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               Machine-linked registration
             </p>
             <p className="text-xs text-indigo-800 mt-1">
-              Machine se enrolled User ID select karein. Student details
-              bharne ke baad registration pending verification mein jayega.
+              {/* Machine se enrolled User ID select karein. Student details bharne ke baad registration pending verification mein jayega. */}
+              Select an enrolled terminal User ID. Completing student details will register them into the institutional resident roster.
             </p>
           </div>
         ) : (
@@ -672,8 +928,8 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               Manual onboarding
             </p>
             <p className="text-xs text-amber-800 mt-1">
-              Existing manual onboarding process available hai. Is process
-              mein existing backend ke mutabik student verified create hota hai.
+              {/* Existing manual onboarding process available hai. Is process mein existing backend ke mutabik student verified create hota hai. */}
+              Standard manual onboarding workflow is active. Direct administrative entry bypasses terminal biometric pairing.
             </p>
           </div>
         )}
@@ -695,27 +951,46 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               <option value="">Select enrolled machine user</option>
 
               {enrolledUsers
-                .filter((user) => user.deviceSerial === DEVICE_SERIAL)
+                .filter((user) => {
+                  if (!studentForm.hostelId) return true;
+                  return !user.hostelId || String(user.hostelId) === String(studentForm.hostelId);
+                })
                 .map((user) => (
-                  <option key={user.userId} value={user.userId}>
-                    {user.userId} - {user.name || 'Name not fetched'}
+                  <option key={`${user.deviceSerial}-${user.userId}`} value={user.userId}>
+                    [{user.hostelCode || 'S362'}] ID #{user.userId} - {user.name || 'New Machine ID (Unlinked)'} {user.isRegistered ? '(Registered)' : '(New)'}
                   </option>
                 ))}
             </select>
 
             {selectedMachineUser && (
               <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <p>
+                    <strong>Machine User ID:</strong> {selectedMachineUser.userId}
+                  </p>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    selectedMachineUser.isRegistered
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {selectedMachineUser.isRegistered ? 'Registered Resident' : 'Unassigned Machine ID'}
+                  </span>
+                </div>
                 <p>
-                  <strong>Machine User ID:</strong>{' '}
-                  {selectedMachineUser.userId}
+                  <strong>Machine / Resident Name:</strong>{' '}
+                  <span className="font-semibold text-slate-800">
+                    {selectedMachineUser.name || 'Not available'}
+                  </span>
                 </p>
                 <p>
-                  <strong>Machine Name:</strong>{' '}
-                  {selectedMachineUser.name || 'Not available'}
+                  <strong>Hostel Terminal:</strong>{' '}
+                  <span className="font-medium text-indigo-700">
+                    {selectedMachineUser.hostelName || selectedMachineUser.hostelCode || 'Hostel Terminal'} ({selectedMachineUser.deviceSerial})
+                  </span>
                 </p>
                 <p>
                   <strong>Fingerprint Enrolled:</strong>{' '}
-                  {selectedMachineUser.fingerprintEnrolled ? 'Yes' : 'Not confirmed'}
+                  {selectedMachineUser.fingerprintEnrolled ? `Yes (${selectedMachineUser.fingerprintCount} template)` : 'Not confirmed'}
                 </p>
               </div>
             )}
@@ -859,7 +1134,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Hostel
+                Assigned Hostel & Terminal
               </label>
               <select
                 required
@@ -873,12 +1148,20 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
               >
                 <option value="">Select Hostel</option>
-                {hostels.map((hostel) => (
-                  <option key={hostel.id} value={hostel.id}>
-                    {hostel.name}
-                  </option>
-                ))}
+                {hostels.map((hostel) => {
+                  const mapped = devices.find((d: any) => String(d.hostelId) === String(hostel.id));
+                  return (
+                    <option key={hostel.id} value={hostel.id}>
+                      {hostel.name} {mapped ? `(${mapped.hostelCode || 'S362'}: ${mapped.deviceSerial})` : ''}
+                    </option>
+                  );
+                })}
               </select>
+              {studentForm.hostelId && (
+                <p className="text-[11px] text-indigo-600 mt-1 font-mono">
+                  Mapped: {devices.find((d: any) => String(d.hostelId) === String(studentForm.hostelId))?.name || 'Assigned Terminal'}
+                </p>
+              )}
             </div>
 
             <div>
@@ -900,33 +1183,93 @@ export const CaretakerBiometricDashboard: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Room Number
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                <span>Room Number</span>
+                {isLoadingRooms ? (
+                  <span className="text-[10px] text-indigo-600 animate-pulse">Loading...</span>
+                ) : studentForm.hostelId ? (
+                  <span className="text-[10px] font-medium text-emerald-700">
+                    {vacantRooms.length} vacant rooms
+                  </span>
+                ) : null}
               </label>
-              <input
-                type="text"
+              <select
                 required
                 value={studentForm.roomNumber}
-                onChange={(event) =>
-                  setStudentForm({
-                    ...studentForm,
-                    roomNumber: event.target.value
-                  })
-                }
-                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
-              />
+                onChange={(event) => handleRoomSelect(event.target.value)}
+                disabled={isLoadingRooms || !studentForm.hostelId}
+                className="w-full p-2 border border-slate-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
+              >
+                <option value="">
+                  {isLoadingRooms
+                    ? 'Loading rooms...'
+                    : !studentForm.hostelId
+                    ? 'Select hostel first'
+                    : vacantRooms.length === 0
+                    ? 'No vacant rooms available'
+                    : 'Select Vacant Room'}
+                </option>
+                {studentForm.roomNumber && !vacantRooms.some((r) => r.roomNumber === studentForm.roomNumber) && (
+                  <option value={studentForm.roomNumber}>
+                    Room {studentForm.roomNumber} (Current Selection)
+                  </option>
+                )}
+                {vacantRooms.map((r) => {
+                  const bedsLeft = r.availableBeds ?? (r.capacity - r.currentOccupancy);
+                  return (
+                    <option key={r.id || r.roomNumber} value={r.roomNumber}>
+                      Room {r.roomNumber} ({bedsLeft} of {r.capacity} beds vacant)
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
           </div>
 
+          {/* Room & Bed Availability Status Indicator */}
+          {currentRoom ? (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <span>
+                  <strong>Room {currentRoom.roomNumber} Availability:</strong>{' '}
+                  <span className="text-emerald-700 font-semibold">
+                    {currentRoom.availableBeds ?? (currentRoom.capacity - currentRoom.currentOccupancy)} of {currentRoom.capacity} beds vacant
+                  </span>
+                </span>
+                <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[11px] font-medium border border-emerald-300">
+                  Vacant: {availableBedsForCurrentRoom.map((b) => `Bed ${b}`).join(', ') || 'None'}
+                </span>
+              </div>
+              {currentRoom.occupants && currentRoom.occupants.length > 0 && (
+                <div className="text-slate-600 text-[11px]">
+                  Occupied: {currentRoom.occupants.map((o: any) => `${o.name} [Bed ${o.bedNumber || 'Assigned'}]`).join(', ')}
+                </div>
+              )}
+            </div>
+          ) : studentForm.hostelId && vacantRooms.length > 0 ? (
+            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 px-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-indigo-500"></span>
+              <span>
+                Showing <strong>{vacantRooms.length} vacant rooms</strong> for the selected hostel. Select a room to view and allocate vacant beds.
+              </span>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Bed Number
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                <span>Bed Number</span>
+                {currentRoom && (
+                  <span className="text-[10px] font-medium text-emerald-700">
+                    {availableBedsForCurrentRoom.length} beds vacant
+                  </span>
+                )}
               </label>
-              <input
-                type="text"
+              <select
+                required
                 value={studentForm.bedNumber}
                 onChange={(event) =>
                   setStudentForm({
@@ -934,8 +1277,24 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                     bedNumber: event.target.value
                   })
                 }
-                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
-              />
+                disabled={!studentForm.roomNumber || availableBedsForCurrentRoom.length === 0}
+                className="w-full p-2 border border-slate-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
+              >
+                {!studentForm.roomNumber ? (
+                  <option value="">First select a vacant room</option>
+                ) : availableBedsForCurrentRoom.length === 0 ? (
+                  <option value="">No vacant beds in Room {studentForm.roomNumber}</option>
+                ) : (
+                  <>
+                    <option value="">Select Vacant Bed</option>
+                    {availableBedsForCurrentRoom.map((bed) => (
+                      <option key={bed} value={bed}>
+                        Bed {bed} (Available)
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
             </div>
 
             <div>
@@ -1035,11 +1394,35 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           {onboardFeedback && (
             <div className={`p-3 rounded-lg text-xs border ${
               onboardFeedback.toLowerCase().includes('successfully') ||
-              onboardFeedback.toLowerCase().includes('submit ho gaya')
+              onboardFeedback.toLowerCase().includes('verified')
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 : 'bg-rose-50 text-rose-800 border-rose-200'
             }`}>
               {onboardFeedback}
+            </div>
+          )}
+
+          {lastCreatedCredentials && (
+            <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-950 space-y-2.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs uppercase tracking-wide text-indigo-700 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5" /> Generated Student Login Credentials
+                </span>
+                <span className="text-[11px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">Ready to Login</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                <div>
+                  <span className="text-slate-500 block text-[11px] font-medium mb-1">Student Portal Email:</span>
+                  <code className="font-mono font-bold text-indigo-900 bg-white px-2.5 py-1.5 rounded-md border border-indigo-200 block text-xs">{lastCreatedCredentials.email}</code>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px] font-medium mb-1">Default Password:</span>
+                  <code className="font-mono font-bold text-emerald-700 bg-white px-2.5 py-1.5 rounded-md border border-indigo-200 block text-xs">{lastCreatedCredentials.password || 'student123'}</code>
+                </div>
+              </div>
+              <p className="text-[11px] text-indigo-700">
+                The student account has been created and activated. The resident can now log in directly from the login page.
+              </p>
             </div>
           )}
 
@@ -1072,11 +1455,45 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       {/* Live Punches */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
 
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Clock className="w-5 h-5 text-indigo-600" />
-          <h2 className="font-bold text-sm text-slate-800">
-            Live Biometric Punch Records
-          </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-indigo-600" />
+            <h2 className="font-bold text-sm text-slate-800">
+              Live Biometric Punch Records
+            </h2>
+          </div>
+          <span className="text-xs text-slate-500">
+            Real-time feed across terminals
+          </span>
+        </div>
+
+        {/* Hostel Partition Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-xs font-semibold text-slate-500 mr-1">Partition by Hostel:</span>
+          {(['all', 'BH1', 'GH', 'BH2'] as const).map((tab) => {
+            const isActive = selectedLiveHostel === tab;
+            const count = tab === 'all' ? liveCounts.all : (liveCounts as any)[tab];
+            const label = tab === 'all' ? 'All Hostels' : tab === 'GH' ? "Girls' Hostel (GH)" : tab === 'BH1' ? "Boys' Hostel 1 (BH1)" : "Boys' Hostel 2 (BH2)";
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setSelectedLiveHostel(tab)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                <span>{label}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  isActive ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {liveError && (
@@ -1085,66 +1502,84 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           </div>
         )}
 
-        {!liveError && livePunches.length === 0 && (
+        {!liveError && filteredLivePunches.length === 0 && (
           <div className="p-6 text-center text-sm text-slate-500">
-            MongoDB se abhi koi punch record return nahi hua.
+            No live punch records found for the selected partition.
           </div>
         )}
 
-        {livePunches.length > 0 && (
+        {filteredLivePunches.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
                   <th className="p-3">Biometric ID</th>
                   <th className="p-3">Student</th>
+                  <th className="p-3">Hostel / Terminal</th>
                   <th className="p-3">Enrollment No</th>
                   <th className="p-3">Punch Time</th>
-                  <th className="p-3">Direction</th>
                   <th className="p-3">Recognition</th>
                 </tr>
               </thead>
 
               <tbody>
-                {livePunches.map((punch: any, index: number) => (
-                  <tr
-                    key={punch.id || index}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="p-3 font-mono">
-                      {punch.biometricId || '-'}
-                    </td>
-                    <td className="p-3">
-                      {punch.studentName || 'Unrecognized'}
-                    </td>
-                    <td className="p-3">
-                      {punch.enrollmentNo || '-'}
-                    </td>
-                    <td className="p-3">
-                      {punch.punchTime || '-'}
-                    </td>
-                    <td className="p-3">
-                      {punch.direction || '-'}
-                    </td>
-                    <td className="p-3">
-                      {punch.recognized ? (
-                        <span className="text-emerald-600 font-semibold">
-                          Recognized
+                {filteredLivePunches.map((punch: any, index: number) => {
+                  const hCode = punch.hostelCode || (punch.hostelId === '2' ? 'GH' : punch.hostelId === '3' ? 'BH2' : 'BH1');
+                  const badgeColor = 
+                    hCode === 'GH'
+                      ? 'bg-rose-100 text-rose-800'
+                      : hCode === 'BH2'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-indigo-100 text-indigo-800';
+
+                  return (
+                    <tr
+                      key={punch.id || index}
+                      className="border-t border-slate-100"
+                    >
+                      <td className="p-3 font-mono">
+                        {punch.biometricId || '-'}
+                      </td>
+                      <td className="p-3 font-medium text-slate-900">
+                        {punch.studentName || 'Unrecognized'}
+                      </td>
+                      <td className="p-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
+                          {hCode}
                         </span>
-                      ) : (
-                        <span className="text-amber-600 font-semibold">
-                          Not linked
+                        <span className="text-[11px] text-slate-500 ml-1.5 font-mono">
+                          {punch.deviceSerial || 'S362'}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-3">
+                        {punch.enrollmentNo || '-'}
+                      </td>
+                      <td className="p-3 font-mono text-slate-600">
+                        {punch.punchTime || '-'}
+                      </td>
+                      <td className="p-3">
+                        {punch.recognized ? (
+                          <span className="text-emerald-600 font-semibold">
+                            Recognized
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 font-semibold">
+                            Not linked
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
       </div>
+
+      {/* 6-Tier Absence Alert Escalation Hierarchy (FR-08) */}
+      <SixTierAbsenceAlerts />
 
       {pageError && (
         <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">

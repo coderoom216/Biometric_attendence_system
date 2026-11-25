@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Execution;
 use App\Models\ScheduledTask;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Services\AuditService;
 
 class ExecutionController extends Controller
 {
@@ -15,7 +15,7 @@ class ExecutionController extends Controller
     {
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Only Admin can manage executions.'
+                'message' => 'Only Admin can manage executions.',
             ], 403);
         }
 
@@ -35,25 +35,25 @@ class ExecutionController extends Controller
             'completed_at' => ['nullable', 'date', 'after_or_equal:started_at'],
             'status' => [
                 'required',
-                Rule::in(['running', 'completed', 'failed'])
+                Rule::in(['running', 'completed', 'failed']),
             ],
             'error_message' => ['nullable', 'string'],
         ]);
 
         $task = ScheduledTask::findOrFail($data['job_id']);
 
-        if (!$task->is_active) {
+        if (! $task->is_active) {
             return response()->json([
-                'message' => 'This scheduled task is inactive.'
+                'message' => 'This scheduled task is inactive.',
             ], 422);
         }
 
         $execution = Execution::create($data);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Execution Created',
             'Execution',
             $execution->id,
-            'Created execution for scheduled task ID ' . $execution->job_id,
+            'Created execution for scheduled task ID '.$execution->job_id,
             $request->user()->id
         );
 
@@ -109,21 +109,21 @@ class ExecutionController extends Controller
                 'sometimes',
                 'nullable',
                 'date',
-                'after_or_equal:' . $execution->started_at
+                'after_or_equal:'.$execution->started_at,
             ],
             'status' => [
                 'sometimes',
-                Rule::in(['running', 'completed', 'failed'])
+                Rule::in(['running', 'completed', 'failed']),
             ],
             'error_message' => ['sometimes', 'nullable', 'string'],
         ]);
 
         $execution->update($data);
-                app(AuditService::class)->log(
+        app(AuditService::class)->log(
             'Execution Updated',
             'Execution',
             $execution->id,
-            'Updated execution record. Current status: ' . $execution->status,
+            'Updated execution record. Current status: '.$execution->status,
             $request->user()->id
         );
 

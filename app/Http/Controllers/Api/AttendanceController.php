@@ -45,7 +45,7 @@ class AttendanceController extends Controller
             $query->whereHas('student', function (Builder $studentQuery) use ($user) {
                 $studentQuery->where('hostel_id', $user->hostel_id);
             });
-        } elseif (!in_array($role, [
+        } elseif (! in_array($role, [
             'admin',
             'chief_warden',
             'director',
@@ -62,7 +62,7 @@ class AttendanceController extends Controller
             'search' => ['nullable', 'string', 'max:150'],
         ]);
 
-        if (!empty($validated['startDate']) && !empty($validated['endDate'])) {
+        if (! empty($validated['startDate']) && ! empty($validated['endDate'])) {
             abort_if(
                 $validated['endDate'] < $validated['startDate'],
                 422,
@@ -73,17 +73,17 @@ class AttendanceController extends Controller
                 $validated['startDate'],
                 $validated['endDate'],
             ]);
-        } elseif (!empty($validated['startDate'])) {
+        } elseif (! empty($validated['startDate'])) {
             $query->whereDate('attendance_date', '>=', $validated['startDate']);
-        } elseif (!empty($validated['endDate'])) {
+        } elseif (! empty($validated['endDate'])) {
             $query->whereDate('attendance_date', '<=', $validated['endDate']);
         }
 
-        if (!empty($validated['status'])) {
+        if (! empty($validated['status'])) {
             $query->where('status', $validated['status']);
         }
 
-        if (!empty($validated['hostelId'])) {
+        if (! empty($validated['hostelId'])) {
             $hostelId = $validated['hostelId'];
 
             $aliases = [
@@ -107,7 +107,7 @@ class AttendanceController extends Controller
             }
         }
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = $validated['search'];
 
             $query->whereHas('student', function (Builder $studentQuery) use ($search) {
@@ -144,7 +144,7 @@ class AttendanceController extends Controller
             abort_unless($user->hostel_id, 403, 'No hostel assigned.');
 
             $query->where('hostel_id', $user->hostel_id);
-        } elseif (!in_array($role, [
+        } elseif (! in_array($role, [
             'admin',
             'chief_warden',
             'director',
@@ -158,7 +158,7 @@ class AttendanceController extends Controller
 
     private function frontendHostelId($hostel): ?string
     {
-        if (!$hostel) {
+        if (! $hostel) {
             return null;
         }
 
@@ -309,7 +309,7 @@ class AttendanceController extends Controller
                 && $current->format('H:i:s') >= ClockService::DEFAULTER_TIME
             );
 
-        if (!$isVisible) {
+        if (! $isVisible) {
             return response()->json([
                 'success' => true,
                 'targetDate' => $targetDate,
@@ -346,7 +346,7 @@ class AttendanceController extends Controller
             });
         } elseif ($role === 'student') {
             abort(403, 'Students cannot access the defaulter list.');
-        } elseif (!in_array($role, [
+        } elseif (! in_array($role, [
             'admin',
             'chief_warden',
             'director',
@@ -355,7 +355,7 @@ class AttendanceController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        if (!empty($validated['hostelId'])) {
+        if (! empty($validated['hostelId'])) {
             $hostelId = $validated['hostelId'];
 
             $query->whereHas('student', function (Builder $studentQuery) use ($hostelId) {
@@ -434,7 +434,7 @@ class AttendanceController extends Controller
             abort_unless($student, 403, 'Student profile not found.');
 
             $query->where('student_id', $student->id);
-        } elseif (!in_array($role, [
+        } elseif (! in_array($role, [
             'admin',
             'chief_warden',
             'director',
@@ -443,7 +443,7 @@ class AttendanceController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        if (!empty($validated['hostelId'])) {
+        if (! empty($validated['hostelId'])) {
             $hostelId = $validated['hostelId'];
 
             $query->whereHas('student', function (Builder $studentQuery) use ($hostelId) {

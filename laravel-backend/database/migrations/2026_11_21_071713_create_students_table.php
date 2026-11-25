@@ -15,15 +15,15 @@ return new class extends Migration
 
             // User relationship (One-to-One)
             $table->foreignId('user_id')
-                  ->unique()
-                  ->constrained('users');
+                ->unique()
+                ->constrained('users');
 
             // Hostel and Room relationships
             $table->foreignId('hostel_id')
-                  ->constrained('hostels');
+                ->constrained('hostels');
 
             $table->foreignId('room_id')
-                  ->constrained('rooms');
+                ->constrained('rooms');
 
             // Student information
             $table->string('enrollment_no')->unique();

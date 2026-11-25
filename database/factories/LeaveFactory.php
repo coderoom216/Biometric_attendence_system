@@ -18,14 +18,14 @@ class LeaveFactory extends Factory
         $status = $this->faker->randomElement(['pending', 'approved', 'rejected']);
 
         return [
-            'student_id'      => Student::inRandomOrder()->first()?->id ?? Student::factory(),
-            'approved_by'     => $status !== 'pending' ? (User::inRandomOrder()->first()?->id ?? User::factory()) : null,
-            'start_date'      => $startDate->format('Y-m-d'),
-            'end_date'        => $endDate->format('Y-m-d'),
-            'reason'          => $this->faker->sentence(),
-            'gate_pass_no'    => 'GP-' . $this->faker->unique()->numerify('#####'),
+            'student_id' => Student::inRandomOrder()->first()?->id ?? Student::factory(),
+            'approved_by' => $status !== 'pending' ? (User::inRandomOrder()->first()?->id ?? User::factory()) : null,
+            'start_date' => $startDate->format('Y-m-d'),
+            'end_date' => $endDate->format('Y-m-d'),
+            'reason' => $this->faker->sentence(),
+            'gate_pass_no' => 'GP-'.$this->faker->unique()->numerify('#####'),
             'approval_status' => $status,
-            'approved_at'     => $status !== 'pending' ? $startDate : null,
+            'approved_at' => $status !== 'pending' ? $startDate : null,
         ];
     }
 }

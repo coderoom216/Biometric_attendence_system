@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Building2,
   Lock,
   Mail,
   Eye,
@@ -13,10 +12,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import { UserRole } from '../types';
 
 export const LoginPage: React.FC = () => {
-  const { login, quickLoginAsRole, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -48,41 +46,79 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const demoAccounts: { title: string; email: string; pass: string; badge: string; dashboard?: 'caretaker' | 'mehra' }[] = [
-    { title: 'Student', email: 'rahul.sharma@student.edu.in', pass: 'student123', badge: 'Student' },
-    { title: 'Residential Warden', email: 'rw.shivalik@university.edu.in', pass: 'rw123', badge: 'BH-1' },
-    { title: 'Residential Warden', email: 'rw.nilgiri@university.edu.in', pass: 'pathak123', badge: 'BH-2' },
-    { title: 'Residential Warden', email: 'warden.mandakini@university.edu.in', pass: 'warden123', badge: 'GH-1' },
-    { title: 'Chief Warden', email: 'chiefwarden@university.edu.in', pass: 'chief123', badge: 'Chief Warden' },
-    { title: 'Director Sir', email: 'director@university.edu.in', pass: 'director123', badge: 'Director' },
-    { title: 'Caretaker', email: 'vmehra@university.edu.in', pass: 'mehra123', badge: 'Caretaker', dashboard: 'caretaker' },
-    { title: 'Mr Mehra Sir', email: 'vmehra@university.edu.in', pass: 'mehra123', badge: 'Mr Mehra', dashboard: 'mehra' },
-    
-  ];
-
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background architectural glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        {/* Institutional crest badge */}
-        <div className="flex justify-center">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30">
-            <Building2 className="w-8 h-8" />
-          </div>
-        </div>
-
-        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-white">
-          Hostel Attendance Management System
-        </h2>
-        <p className="mt-1 text-center text-xs text-slate-400">
-          Spiders Student Development Team • Educational Institution Oversight
-        </p>
+      {/* Top Left Persistent Collaboration Header */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 flex items-center space-x-2.5">
+        <img
+          src="/images/thdc-ihet-logo.jpg"
+          alt="THDC IHET"
+          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-contain bg-white p-0.5 border border-slate-700 shadow-sm"
+        />
+        <span className="text-slate-500 font-bold text-xs select-none">×</span>
+        <img
+          src="/images/spiders-logo.jpg"
+          alt="SPIDERS"
+          className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg object-contain bg-white p-0.5 border border-slate-700 shadow-sm"
+        />
+        <span className="hidden sm:inline-flex text-[9px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-950/60 border border-indigo-700/40 px-2.5 py-0.5 rounded-full">
+          THDC IHET COLLABORATES WITH SPIDERS
+        </span>
       </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-10 shadow-2xl rounded-2xl border border-slate-200">
+      <div className="sm:mx-auto w-full max-w-4xl relative z-10 px-4 sm:px-6 my-auto pt-14 sm:pt-16 lg:pt-0">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Left Column: Logos, Collaboration Text, and Institutional Overview */}
+          <div className="lg:col-span-6 text-center lg:text-left space-y-4">
+            {/* Dual Partner Logos */}
+            <div className="flex items-center justify-center lg:justify-start space-x-3 sm:space-x-4">
+              <div className="p-1.5 bg-white rounded-full shadow-xl border-2 border-indigo-400/30">
+                <img
+                  src="/images/thdc-ihet-logo.jpg"
+                  alt="THDC IHET Logo"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-contain"
+                />
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-indigo-400 font-extrabold text-xl sm:text-2xl select-none leading-none">×</span>
+              </div>
+              <div className="p-1.5 bg-white rounded-2xl shadow-xl border-2 border-indigo-400/30">
+                <img
+                  src="/images/spiders-logo.jpg"
+                  alt="SPIDERS TECH SERVICES Logo"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain"
+                />
+              </div>
+            </div>
+
+            {/* Collaboration Banner */}
+            <div className="flex justify-center lg:justify-start">
+              <span className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wider uppercase bg-indigo-500/10 text-indigo-300 border border-indigo-400/30 shadow-xs">
+                THDC IHET COLLABORATES WITH SPIDERS
+              </span>
+            </div>
+
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+                Hostel Attendance Management System
+              </h1>
+              <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Institutional biometric attendance oversight, automated curfew enforcement, and multi-tier escalation management.
+              </p>
+            </div>
+
+            <div className="hidden lg:block pt-3 border-t border-slate-800 text-[11px] text-slate-400 space-y-1">
+              <p>• THDC Institute of Hydropower Engineering &amp; Technology, Tehri Garhwal</p>
+              <p>• Engineered &amp; Maintained in Collaboration with Spiders Tech Services</p>
+            </div>
+          </div>
+
+          {/* Right Column: Sign-In Card */}
+          <div className="lg:col-span-6 w-full max-w-md mx-auto lg:max-w-none">
+            <div className="bg-white py-8 px-6 sm:px-10 shadow-2xl rounded-2xl border border-slate-200">
           <form className="space-y-4" onSubmit={handleSubmit}>
             {errorMsg && (
               <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
@@ -154,50 +190,14 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Demo Selector for Reviewers & Stakeholders */}
-          <div className="mt-6 pt-5 border-t border-slate-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                1-Click Role Login (Demo & Audit)
-              </span>
-              <span className="text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded">
-                8 Demo Logins
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {demoAccounts.map((acc) => (
-                <button
-                  key={acc.dashboard || acc.email}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => {
-                    localStorage.setItem('demo_dashboard', acc.dashboard || '');
-                    login(acc.email, acc.pass).catch((err: any) => {
-                      localStorage.removeItem('demo_dashboard');
-                      setErrorMsg(err.response?.data?.message || 'Authentication failed: Invalid credentials');
-                    });
-                  }}
-                  className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 text-left transition group cursor-pointer"
-                >
-                  <div className="font-semibold text-slate-800 text-[11px] group-hover:text-indigo-900 truncate">
-                    {acc.title}
-                  </div>
-                  <div className="text-[10px] text-slate-500 group-hover:text-indigo-600 flex items-center justify-between">
-                    <span>{acc.badge}</span>
-                    <span className="text-[9px] text-slate-400 font-mono">1-click</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center space-x-2 text-[11px] text-slate-500">
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center space-x-2 text-[11px] text-slate-500">
             <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
             <span>On-time cutoff is 7:00 PM IST; punches after 7:00 PM through 10:00 PM are late, and punches after 10:00 PM are defaulters. No-punch evaluation runs at 10:00 PM.</span>
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
       {/* Forgot Password Modal */}
       {isForgotOpen && (

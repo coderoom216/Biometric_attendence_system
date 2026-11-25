@@ -15,11 +15,11 @@ return new class extends Migration
 
             // Student relationship
             $table->foreignId('student_id')
-                  ->constrained('students');
+                ->constrained('students');
 
             // Biometric device relationship
             $table->foreignId('device_id')
-                  ->constrained('devices');
+                ->constrained('devices');
 
             // Biometric punch information
             $table->dateTime('punched_at');

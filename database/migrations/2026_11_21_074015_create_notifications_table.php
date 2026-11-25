@@ -13,7 +13,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('alert_id')
-                  ->constrained('alerts');
+                ->constrained('alerts');
 
             $table->string('channel');
             $table->string('recipient');

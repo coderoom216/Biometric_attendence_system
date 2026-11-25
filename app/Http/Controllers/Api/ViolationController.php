@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
-use App\Models\Violation;
 use App\Models\Ticket;
+use App\Models\Violation;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\AuditService;
 
 class ViolationController extends Controller
 {
@@ -17,7 +17,7 @@ class ViolationController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
@@ -83,7 +83,7 @@ class ViolationController extends Controller
             'Violation Created',
             'Violation',
             $result['violation']->id,
-            'Violation recorded and warning ticket generated for student ID ' .
+            'Violation recorded and warning ticket generated for student ID '.
                 $result['violation']->student_id,
             $user->id
         );

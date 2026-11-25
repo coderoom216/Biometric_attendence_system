@@ -12,7 +12,7 @@ class AuditController extends Controller
     {
         if ($request->user()->role?->name !== 'Admin') {
             return response()->json([
-                'message' => 'Only Admin can access audit logs.'
+                'message' => 'Only Admin can access audit logs.',
             ], 403);
         }
 

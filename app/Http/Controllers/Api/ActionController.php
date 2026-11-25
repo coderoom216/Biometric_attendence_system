@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\Ticket;
-use Illuminate\Http\Request;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 
 class ActionController extends Controller
 {
@@ -15,7 +15,7 @@ class ActionController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
-        if (!in_array($role, [
+        if (! in_array($role, [
             'Admin',
             'Residential Warden',
             'Chief Warden',
@@ -73,7 +73,7 @@ class ActionController extends Controller
             'Action Recorded',
             'Action',
             $action->id,
-            'Action recorded against ticket ID ' . $ticket->id,
+            'Action recorded against ticket ID '.$ticket->id,
             $user->id
         );
 

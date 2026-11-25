@@ -45,7 +45,7 @@ class DevicePayloadParser
                     $json = substr($raw, $start, $i - $start + 1);
                     $data = json_decode($json, true);
 
-                    if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+                    if (json_last_error() !== JSON_ERROR_NONE || ! is_array($data)) {
                         return null;
                     }
 
@@ -66,7 +66,7 @@ class DevicePayloadParser
     public function validatePunch(array $data): bool
     {
         foreach (['user_id', 'verify_mode', 'io_mode', 'io_time'] as $field) {
-            if (!isset($data[$field])) {
+            if (! isset($data[$field])) {
                 return false;
             }
         }

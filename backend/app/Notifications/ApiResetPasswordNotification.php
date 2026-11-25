@@ -29,8 +29,8 @@ class ApiResetPasswordNotification extends Notification
         );
 
         $resetUrl = url(
-            '/reset-password/' . $this->token
-            . '?email=' . $email
+            '/reset-password/'.$this->token
+            .'?email='.$email
         );
 
         return (new MailMessage)
