@@ -18,8 +18,9 @@ class SystemOverviewController extends Controller
 
     public function overview(Request $request)
     {
-        $role = $request->user()?->role?->name;
-        if (! in_array($role, ['Admin', 'Director', 'Chief Warden', 'Residential Warden', 'Warden', 'Caretaker Operator'])) {
+        $user = $request->user();
+        $role = $user?->role?->name;
+        if (! in_array($role, ['Admin', 'Director', 'Chief Warden', 'Residential Warden', 'Warden', 'Caretaker', 'Caretaker Operator'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access.',
@@ -29,12 +30,21 @@ class SystemOverviewController extends Controller
         $current = $this->clockService->current();
         $date = $current->toDateString();
 
-        $totalStudents = Student::verified()->count();
-        $totalHostels = Hostel::count();
-        $totalDevices = Device::count();
-        $activeDevices = Device::where('device_status', 'active')->count();
+        $isScoped = $user->isHostelScoped();
+        $scopedHostelId = $user->hostel_id;
 
-        $todayAttendance = Attendance::whereDate('attendance_date', $date)->get();
+        $totalStudents = Student::verified()
+            ->when($isScoped, fn ($q) => $q->where('hostel_id', $scopedHostelId))
+            ->count();
+        $totalHostels = $isScoped ? ($scopedHostelId ? 1 : 0) : Hostel::count();
+        $totalDevices = Device::when($isScoped, fn ($q) => $q->where('hostel_id', $scopedHostelId))->count();
+        $activeDevices = Device::where('device_status', 'active')
+            ->when($isScoped, fn ($q) => $q->where('hostel_id', $scopedHostelId))
+            ->count();
+
+        $todayAttendance = Attendance::whereDate('attendance_date', $date)
+            ->when($isScoped, fn ($q) => $q->whereHas('student', fn ($sq) => $sq->where('hostel_id', $scopedHostelId)))
+            ->get();
         $present = $todayAttendance->where('status', 'present')->count();
         $late = $todayAttendance->where('status', 'late')->count();
         $defaulters = $todayAttendance->where('is_defaulter', true)->count();

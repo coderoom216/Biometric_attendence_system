@@ -40,7 +40,7 @@ export const HostelManagementPage: React.FC = () => {
   const [clearanceNotes, setClearanceNotes] = useState('All room inventory verified and keys returned');
   const [vacateMsg, setVacateMsg] = useState<string | null>(null);
 
-  const isStaff = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker_operator'].includes(user?.role || '');
+  const isStaff = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker', 'caretaker_operator'].includes(user?.role || '');
 
   const loadData = async () => {
     setIsLoading(true);

@@ -24,7 +24,8 @@ class HostelMasterSeeder extends Seeder
             'Chief Warden' => 'Coordinates all hostel operations.',
             'Residential Warden' => 'Hostel warden with direct residential oversight.',
             'Warden' => 'Hostel warden administrative access.',
-            'Caretaker Operator' => 'Biometric machine operator & caretaker.',
+            'Caretaker' => 'Hostel caretaker managing assigned hostel students, enrollment, attendance, and leave assignment.',
+            'Caretaker Operator' => 'Biometric Device Manager with full multi-hostel biometric oversight.',
             'Student' => 'Resident student account.',
         ];
 
@@ -149,11 +150,32 @@ class HostelMasterSeeder extends Seeder
                 'hostel_id' => $h3->id,
             ],
             [
-                'name' => 'Mr. Vivek Mehra (CSE Dept)',
-                'email' => 'vmehra@university.edu.in',
+                'name' => 'Mehra Ji',
+                'email' => 'mehra@university.edu.in',
                 'password' => 'mehra123',
                 'role' => 'Caretaker Operator',
                 'hostel_id' => $h1->id,
+            ],
+            [
+                'name' => 'Caretaker (Boys Hostel 1)',
+                'email' => 'caretaker.bh1@university.edu.in',
+                'password' => 'caretaker123',
+                'role' => 'Caretaker',
+                'hostel_id' => $h1->id,
+            ],
+            [
+                'name' => 'Caretaker (Girls Hostel)',
+                'email' => 'caretaker.gh@university.edu.in',
+                'password' => 'caretaker123',
+                'role' => 'Caretaker',
+                'hostel_id' => $h2->id,
+            ],
+            [
+                'name' => 'Caretaker (Boys Hostel 2)',
+                'email' => 'caretaker.bh2@university.edu.in',
+                'password' => 'caretaker123',
+                'role' => 'Caretaker',
+                'hostel_id' => $h3->id,
             ],
         ];
 

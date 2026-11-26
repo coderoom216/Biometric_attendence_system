@@ -17,9 +17,11 @@ import Biometrics from './pages/Biometrics';
 import SystemHealth from './pages/SystemHealth';
 import Registration from './pages/Registration';
 
+import { UserRole } from './types';
+
 // Protected route wrapper - redirects to login if not authenticated
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: UserRole[] }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -31,6 +33,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -130,7 +136,7 @@ export default function App() {
           <Route
             path="/security"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'warden']}>
                 <SecurityAudit />
               </ProtectedRoute>
             }
@@ -138,7 +144,7 @@ export default function App() {
           <Route
             path="/hostels"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'residential_warden', 'warden', 'caretaker', 'caretaker_operator']}>
                 <Hostels />
               </ProtectedRoute>
             }
@@ -146,7 +152,7 @@ export default function App() {
           <Route
             path="/biometrics"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'caretaker_operator']}>
                 <Biometrics />
               </ProtectedRoute>
             }
@@ -154,7 +160,7 @@ export default function App() {
           <Route
             path="/system-health"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'caretaker_operator']}>
                 <SystemHealth />
               </ProtectedRoute>
             }

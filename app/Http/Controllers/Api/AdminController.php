@@ -14,9 +14,17 @@ class AdminController extends Controller
     private const STAFF_ROLES = [
         'Admin',
         'Residential Warden',
+        'Warden',
         'Chief Warden',
         'Director',
+        'Caretaker',
         'Caretaker Operator',
+    ];
+
+    private const HOSTEL_SCOPED_ROLES = [
+        'Residential Warden',
+        'Warden',
+        'Caretaker',
     ];
 
     private function checkAdmin(Request $request)
@@ -56,11 +64,11 @@ class AdminController extends Controller
         $role = Role::findOrFail($data['role_id']);
 
         if (
-            $role->name === 'Residential Warden' &&
+            in_array($role->name, self::HOSTEL_SCOPED_ROLES, true) &&
             empty($data['hostel_id'])
         ) {
             return response()->json([
-                'message' => 'Residential Warden must be assigned a hostel.',
+                'message' => "{$role->name} must be assigned a hostel.",
             ], 422);
         }
 
@@ -69,7 +77,7 @@ class AdminController extends Controller
             'email' => $data['email'],
             'password' => $data['password'],
             'role_id' => $role->id,
-            'hostel_id' => $role->name === 'Residential Warden'
+            'hostel_id' => in_array($role->name, self::HOSTEL_SCOPED_ROLES, true)
                 ? $data['hostel_id']
                 : null,
             'is_active' => true,

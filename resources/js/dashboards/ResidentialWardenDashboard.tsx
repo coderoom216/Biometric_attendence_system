@@ -151,6 +151,16 @@ export const ResidentialWardenDashboard: React.FC = () => {
     }
   };
 
+  // Handle Pending Leave Approval / Rejection (Warden Only)
+  const handleLeaveApproval = async (leaveId: string, status: 'approved' | 'rejected') => {
+    try {
+      await apiService.updateLeaveStatus(leaveId, status);
+      loadData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Handle Attendance Correction (FR-11)
   const handleCorrectionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -501,6 +511,65 @@ export const ResidentialWardenDashboard: React.FC = () => {
                       <button
                         onClick={() => handleVerifyStudent(s.id, 'reject')}
                         className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-[11px] font-semibold transition"
+                      >
+                        Reject
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Pending Leave Requests Assigned by Caretaker / Students */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+          <div className="flex items-center space-x-2">
+            <FileText className="w-4 h-4 text-indigo-600" />
+            <h2 className="font-bold text-slate-800 text-sm">
+              Pending Leave Approvals
+            </h2>
+          </div>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+            {leaves.filter((l) => l.status === 'Pending').length} pending approval
+          </span>
+        </div>
+
+        {leaves.filter((l) => l.status === 'Pending').length === 0 ? (
+          <div className="p-4 text-center text-slate-400 text-xs">
+            No pending leave requests awaiting approval.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="py-2.5 px-3">Student</th>
+                  <th className="py-2.5 px-3">Gate Pass</th>
+                  <th className="py-2.5 px-3">Dates</th>
+                  <th className="py-2.5 px-3">Reason</th>
+                  <th className="py-2.5 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {leaves.filter((l) => l.status === 'Pending').map((l) => (
+                  <tr key={l.id}>
+                    <td className="py-2.5 px-3 font-semibold text-slate-900">{l.studentName} ({l.enrollmentNo})</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-700">{l.gatePassNo}</td>
+                    <td className="py-2.5 px-3 text-slate-600">{l.startDate} to {l.endDate}</td>
+                    <td className="py-2.5 px-3 text-slate-600">{l.reason}</td>
+                    <td className="py-2.5 px-3 text-right space-x-2">
+                      <button
+                        onClick={() => handleLeaveApproval(l.id, 'approved')}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold transition cursor-pointer"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleLeaveApproval(l.id, 'rejected')}
+                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-[11px] font-semibold transition cursor-pointer"
                       >
                         Reject
                       </button>

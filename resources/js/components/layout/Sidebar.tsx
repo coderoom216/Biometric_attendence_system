@@ -97,14 +97,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           
         ];
 
+      case 'caretaker':
+        return [
+          { name: 'Caretaker Dashboard', path: '/', icon: LayoutDashboard },
+          { name: 'Student List & Edit', path: '/students', icon: Users },
+          { name: 'Defaulters List (10:00 PM)', path: '/defaulters', icon: AlertOctagon },
+          { name: 'Assign Leave', path: '/leaves', icon: FileText },
+          { name: 'Attendance & Reports', path: '/reports', icon: BarChart3 },
+          { name: 'Assigned Hostel Rooms', path: '/hostels', icon: Building2 },
+        ];
+
       case 'caretaker_operator':
         return [
-          { name: 'Operator Dashboard', path: '/', icon: LayoutDashboard },
-        
+          { name: 'Device Manager Dashboard', path: '/', icon: LayoutDashboard },
           { name: 'Student Biometric Directory', path: '/students', icon: Users },
-          
           { name: 'Hostel Rooms & Vacancies', path: '/hostels', icon: Building2 },
-          
         ];
 
         
@@ -159,15 +166,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         {/* Role Scope Notice */}
         <div className="sticky top-0 z-10 px-4 py-3 mx-3 my-3 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs backdrop-blur-sm">
-          <div className="text-[10px] uppercase font-semibold text-slate-400">{isMehraDashboard ? 'Operator' : 'Current Scope'}</div>
+          <div className="text-[10px] uppercase font-semibold text-slate-400">Current Scope</div>
           <div className="font-semibold text-white mt-0.5 capitalize">
-            {isMehraDashboard ? 'Mr. Mehra Sir · Biometric Sync' : role?.replace('_', ' ')}
+            {role === 'caretaker_operator' ? 'Biometric Device Manager' : role?.replace('_', ' ')}
           </div>
-          {user?.hostelId && (
+          {role === 'caretaker_operator' ? (
             <div className="text-[11px] text-indigo-300 mt-0.5">
-              Assigned: {user.hostelId === 'h-shivalik' ? 'Boys Hostel 1' : user.hostelId === 'h-mandakini' ? 'Girls Hostel' : 'BH-2 (Boys Hostel 2)'}
+              All Hostels (BH1, GH, BH2)
             </div>
-          )}
+          ) : user?.hostelId ? (
+            <div className="text-[11px] text-indigo-300 mt-0.5">
+              Assigned: {user.hostelId === '1' || user.hostelId === 'h-shivalik' ? 'Boys Hostel 1 (BH1)' : user.hostelId === '2' || user.hostelId === 'h-mandakini' ? 'Girls Hostel (GH)' : 'Boys Hostel 2 (BH2)'}
+            </div>
+          ) : null}
         </div>
 
         {/* Navigation list */}

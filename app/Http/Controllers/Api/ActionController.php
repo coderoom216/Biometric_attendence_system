@@ -18,20 +18,22 @@ class ActionController extends Controller
         if (! in_array($role, [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
-        ])) {
+            'Caretaker',
+        ], true)) {
             return response()->json([
                 'message' => 'Unauthorized access.',
             ], 403);
         }
 
         if (
-            $role === 'Residential Warden' &&
+            $user->isHostelScoped() &&
             empty($user->hostel_id)
         ) {
             return response()->json([
-                'message' => 'Residential Warden has no assigned hostel.',
+                'message' => "{$role} has no assigned hostel.",
             ], 403);
         }
 
@@ -54,7 +56,7 @@ class ActionController extends Controller
 
         $query = Ticket::with('violation.student');
 
-        if ($user->role->name === 'Residential Warden') {
+        if ($user->isHostelScoped()) {
             $query->whereHas('violation.student', function ($q) use ($user) {
                 $q->where('hostel_id', $user->hostel_id);
             });

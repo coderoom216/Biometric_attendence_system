@@ -55,19 +55,51 @@ class BiometricController extends Controller
         ];
     }
 
-    public function devices(Request $request)
+    private function checkBiometricAccess(Request $request, array $roles): mixed
     {
-        $role = $request->user()?->role?->name;
-        if (! in_array($role, ['Admin', 'Director', 'Chief Warden', 'Residential Warden', 'Warden', 'Caretaker Operator'])) {
+        $user = $request->user();
+        $role = $user?->role?->name;
+
+        if (! $user || ! in_array($role, $roles, true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access.',
             ], 403);
         }
 
+        if ($user->isHostelScoped() && ! $user->hostel_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No hostel is assigned to this account.',
+            ], 403);
+        }
+
+        return null;
+    }
+
+    public function devices(Request $request)
+    {
+        if ($response = $this->checkBiometricAccess($request, [
+            'Admin',
+            'Director',
+            'Chief Warden',
+            'Residential Warden',
+            'Warden',
+            'Caretaker',
+            'Caretaker Operator',
+        ])) {
+            return $response;
+        }
+
+        $user = $request->user();
         $aliveInfo = $this->checkDeviceHeartbeat('RSS20241199684');
 
-        $devices = Device::with('hostel')->get()->map(function ($device) use ($aliveInfo) {
+        $devicesQuery = Device::with('hostel');
+        if ($user->isHostelScoped()) {
+            $devicesQuery->where('hostel_id', $user->hostel_id);
+        }
+
+        $devices = $devicesQuery->get()->map(function ($device) use ($aliveInfo) {
             $isDeviceOnline = ($device->device_serial === 'RSS20241199684') ? $aliveInfo['online'] : false;
             $status = $isDeviceOnline ? 'online_synced' : ($device->device_status ?: 'standby');
             $studentCount = Student::where('hostel_id', $device->hostel_id)->count();
@@ -215,6 +247,20 @@ class BiometricController extends Controller
 
     public function enrolledUsers(Request $request)
     {
+        if ($response = $this->checkBiometricAccess($request, [
+            'Admin',
+            'Director',
+            'Chief Warden',
+            'Residential Warden',
+            'Warden',
+            'Caretaker',
+            'Caretaker Operator',
+        ])) {
+            return $response;
+        }
+
+        $currentUser = $request->user();
+
         // 1. Fetch devices and hostels from MySQL
         $allDevices = Device::with('hostel')->get();
         $deviceBySerial = $allDevices->keyBy('device_serial');
@@ -237,10 +283,10 @@ class BiometricController extends Controller
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
             $manager = new Manager($mongoUri);
 
-            $idQuery = new Query([], ['sort' => ['user_id' => 1]]);
+            $idQuery = new Query([], ['sort' => ['_id' => -1]]);
             $idDocs = iterator_to_array($manager->executeQuery('biometric_db.get_user_id', $idQuery));
 
-            $infoQuery = new Query([], ['sort' => ['created_at' => -1]]);
+            $infoQuery = new Query([], ['sort' => ['created_at' => -1, '_id' => -1]]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
 
             foreach ($infoDocs as $doc) {
@@ -249,15 +295,39 @@ class BiometricController extends Controller
                     continue;
                 }
                 $infoObj = is_string($doc->info ?? null) ? json_decode($doc->info) : ($doc->info ?? null);
+                $mName = $infoObj->user_name ?? ($doc->name ?? null);
+                $cleanName = (! empty(trim((string) $mName))) ? trim((string) $mName) : null;
+                $privilege = $infoObj->user_privilege ?? ($infoObj->privilege ?? ($doc->privilege ?? null));
+
+                $enrollArray = is_array($infoObj->enroll_data_array ?? null) ? $infoObj->enroll_data_array : [];
+                $fpSlots = 0;
+                foreach ($enrollArray as $item) {
+                    $slot = $item->backup_number ?? null;
+                    if (is_numeric($slot) && (int) $slot >= 0 && (int) $slot <= 9 && ! empty($item->enroll_data)) {
+                        $fpSlots++;
+                    }
+                }
+
+                $hasFp = $fpSlots > 0 || ! empty($doc->backup_number) || ! empty($doc->raw_size) || ! empty($doc->fp_template_size);
+                $fpCount = $fpSlots > 0 ? $fpSlots : (! empty($doc->backup_number) || ! empty($doc->raw_size) ? 1 : 0);
+
                 if (! isset($infoMap[$uid])) {
-                    $mName = $infoObj->user_name ?? ($doc->name ?? null);
                     $infoMap[$uid] = [
-                        'name' => (! empty(trim((string) $mName))) ? trim((string) $mName) : null,
-                        'privilege' => $infoObj->privilege ?? ($doc->privilege ?? 'User'),
-                        'hasFingerprint' => ! empty($doc->backup_number) || ! empty($doc->raw_size) || ! empty($doc->fp_template_size),
-                        'fingerprintCount' => ! empty($doc->backup_number) || ! empty($doc->raw_size) ? 1 : 0,
+                        'name' => $cleanName,
+                        'privilege' => $privilege ?: 'User',
+                        'hasFingerprint' => $hasFp,
+                        'fingerprintCount' => $fpCount,
                         'hasInfo' => true,
                     ];
+                } else {
+                    if ($infoMap[$uid]['name'] === null && $cleanName !== null) {
+                        $infoMap[$uid]['name'] = $cleanName;
+                    }
+                    if ($infoMap[$uid]['privilege'] === 'User' && $privilege) {
+                        $infoMap[$uid]['privilege'] = $privilege;
+                    }
+                    $infoMap[$uid]['hasFingerprint'] = $infoMap[$uid]['hasFingerprint'] || $hasFp;
+                    $infoMap[$uid]['fingerprintCount'] = max($infoMap[$uid]['fingerprintCount'], $fpCount);
                 }
             }
         } catch (\Throwable $e) {
@@ -361,6 +431,14 @@ class BiometricController extends Controller
             return $numA <=> $numB;
         });
 
+        if ($currentUser->isHostelScoped()) {
+            $scopedHostelId = (string) $currentUser->hostel_id;
+            $users = array_values(array_filter(
+                $users,
+                fn (array $user): bool => (string) ($user['hostelId'] ?? '') === $scopedHostelId
+            ));
+        }
+
         return response()->json([
             'success' => true,
             'count' => count($users),
@@ -370,14 +448,58 @@ class BiometricController extends Controller
 
     public function triggerUserFetch(Request $request)
     {
+        if ($response = $this->checkBiometricAccess($request, [
+            'Admin',
+            'Caretaker',
+            'Caretaker Operator',
+        ])) {
+            return $response;
+        }
+
         try {
-            $devId = $request->input('deviceId', 'RSS20241199684');
+            $currentUser = $request->user();
+            $defaultSerial = 'RSS20241199684';
+            if ($currentUser->isHostelScoped()) {
+                $assignedDevice = Device::where('hostel_id', $currentUser->hostel_id)->first();
+                $defaultSerial = $assignedDevice?->device_serial ?? $defaultSerial;
+            }
+
+            $devId = $request->input('deviceId', $defaultSerial);
+
+            if ($currentUser->isHostelScoped()) {
+                $targetDevice = Device::where('device_serial', $devId)->first();
+                if (! $targetDevice || (int) $targetDevice->hostel_id !== (int) $currentUser->hostel_id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'You can only sync the biometric device assigned to your hostel.',
+                    ], 403);
+                }
+            }
+
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
             $manager = new Manager($mongoUri);
 
+            $maxTransId = 100000;
+            $maxId = 0;
+            $cmdQuery = new Query([], ['projection' => ['trans_id' => 1, 'id' => 1]]);
+            foreach ($manager->executeQuery('biometric_db.command_request_pending', $cmdQuery) as $cDoc) {
+                $t = $cDoc->trans_id ?? null;
+                if (is_numeric($t)) {
+                    $tInt = (int) $t;
+                    if ($tInt < 1000000000 && $tInt > $maxTransId) {
+                        $maxTransId = $tInt;
+                    }
+                }
+                $cId = $cDoc->id ?? null;
+                if (is_numeric($cId) && (int) $cId > $maxId) {
+                    $maxId = (int) $cId;
+                }
+            }
+
+            $baseTransId = $maxTransId + 1;
+            $nextId = $maxId + 1;
             $bulk = new BulkWrite;
-            $transId = (string) rand(10000, 99999);
-            $nextId = (int) (round(microtime(true) * 1000) % 100000000);
+            $transId = (string) $baseTransId;
 
             $bulk->insert([
                 'trans_id' => $transId,
@@ -393,13 +515,27 @@ class BiometricController extends Controller
             $idQuery = new Query(['dev_id' => $devId]);
             $idDocs = iterator_to_array($manager->executeQuery('biometric_db.get_user_id', $idQuery));
 
+            $infoQuery = new Query(['dev_id' => $devId]);
+            $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
+            $resolvedUserIds = [];
+            foreach ($infoDocs as $infoDoc) {
+                $iUid = trim((string) ($infoDoc->user_id ?? ''));
+                $infoObj = is_string($infoDoc->info ?? null) ? json_decode($infoDoc->info) : ($infoDoc->info ?? null);
+                $hasName = ! empty(trim((string) ($infoObj->user_name ?? ($infoDoc->name ?? ''))));
+                if ($iUid !== '' && $hasName) {
+                    $resolvedUserIds[$iUid] = true;
+                }
+            }
+
             $queuedCount = 0;
+            $seenUids = [];
             foreach ($idDocs as $doc) {
                 $uid = trim((string) ($doc->user_id ?? ''));
-                if ($uid && $uid !== '0') {
+                if ($uid && $uid !== '0' && ! isset($seenUids[$uid]) && ! isset($resolvedUserIds[$uid])) {
+                    $seenUids[$uid] = true;
                     $queuedCount++;
                     $bulk->insert([
-                        'trans_id' => (string) rand(10000, 99999),
+                        'trans_id' => (string) ($baseTransId + $queuedCount),
                         'dev_id' => $devId,
                         'cmd_code' => 'GET_USER_INFO',
                         'cmd_param' => json_encode(['user_id' => $uid]),
@@ -429,7 +565,20 @@ class BiometricController extends Controller
 
     public function live(Request $request)
     {
+        if ($response = $this->checkBiometricAccess($request, [
+            'Admin',
+            'Director',
+            'Chief Warden',
+            'Residential Warden',
+            'Warden',
+            'Caretaker',
+            'Caretaker Operator',
+        ])) {
+            return $response;
+        }
+
         try {
+            $currentUser = $request->user();
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
             $manager = new Manager($mongoUri);
 
@@ -475,6 +624,10 @@ class BiometricController extends Controller
                 $matchedDev = $deviceBySerial->get($devSerial) ?? $allDevices->first();
 
                 $hostelId = $student ? (string) $student->hostel_id : ($matchedDev ? (string) $matchedDev->hostel_id : '1');
+                if ($currentUser->isHostelScoped() && $hostelId !== (string) $currentUser->hostel_id) {
+                    continue;
+                }
+
                 $hostelName = $student?->hostel?->name ?? ($matchedDev?->hostel?->name ?? 'Boys Hostel 1');
                 $hostelCode = $student?->hostel?->code ?? ($matchedDev?->hostel?->code ?? 'BH1');
 

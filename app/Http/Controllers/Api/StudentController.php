@@ -34,7 +34,8 @@ class StudentController extends Controller
 
     private function checkStudentViewAccess(Request $request)
     {
-        $role = $request->user()->role?->name;
+        $user = $request->user();
+        $role = $user->role?->name;
 
         $allowedRoles = [
             'Admin',
@@ -42,6 +43,7 @@ class StudentController extends Controller
             'Warden',
             'Chief Warden',
             'Director',
+            'Caretaker',
             'Caretaker Operator',
         ];
 
@@ -52,11 +54,41 @@ class StudentController extends Controller
             ], 403);
         }
 
-        if (in_array($role, ['Residential Warden', 'Warden'], true) && ! $request->user()->hostel_id) {
+        if ($user->isHostelScoped() && ! $user->hostel_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'No hostel is assigned to this warden.',
+                'message' => 'No hostel is assigned to this account.',
             ], 403);
+        }
+
+        return null;
+    }
+
+    private function checkStudentManageAccess(Request $request, ?int $targetHostelId = null)
+    {
+        $user = $request->user();
+
+        if (! $user || ! $user->canManageStudents()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access.',
+            ], 403);
+        }
+
+        if ($user->isCaretaker()) {
+            if (! $user->hostel_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hostel is assigned to this caretaker.',
+                ], 403);
+            }
+
+            if ($targetHostelId !== null && (int) $targetHostelId !== (int) $user->hostel_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can only manage students within your assigned hostel.',
+                ], 403);
+            }
         }
 
         return null;
@@ -65,13 +97,8 @@ class StudentController extends Controller
     // Create student account and profile
     public function store(Request $request)
     {
-        $roleName = $request->user()->role?->name;
-
-        if (! in_array($roleName, ['Admin', 'Caretaker Operator'], true)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access.',
-            ], 403);
+        if ($response = $this->checkStudentManageAccess($request)) {
+            return $response;
         }
 
         $data = $request->validate([
@@ -86,6 +113,10 @@ class StudentController extends Controller
             'parentName' => 'nullable|string|max:255',
             'parentEmail' => 'nullable|email',
         ]);
+
+        if ($response = $this->checkStudentManageAccess($request, (int) $data['hostelId'])) {
+            return $response;
+        }
 
         $room = Room::where('hostel_id', $data['hostelId'])
             ->where('room_number', $data['roomNumber'])
@@ -204,12 +235,12 @@ class StudentController extends Controller
             return $response;
         }
 
-        $role = $request->user()->role?->name;
+        $currentUser = $request->user();
 
         $query = Student::with('user', 'hostel', 'room');
 
-        if ($role === 'Residential Warden' || $role === 'Warden') {
-            $query->where('hostel_id', $request->user()->hostel_id);
+        if ($currentUser->isHostelScoped()) {
+            $query->where('hostel_id', $currentUser->hostel_id);
         }
 
         $students = $query->latest()->get()->map(fn ($s) => $this->formatStudentResponse($s));
@@ -227,18 +258,21 @@ class StudentController extends Controller
         $student = Student::with('user', 'hostel', 'room')
             ->findOrFail($id);
 
-        $role = $request->user()->role?->name;
+        $currentUser = $request->user();
+        $role = $currentUser->role?->name;
 
         $staffRoles = [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
+            'Caretaker',
             'Caretaker Operator',
         ];
 
         $isStaff = in_array($role, $staffRoles, true);
-        $isOwner = (int) $student->user_id === (int) $request->user()->id;
+        $isOwner = (int) $student->user_id === (int) $currentUser->id;
 
         if (! $isStaff && ! $isOwner) {
             return response()->json([
@@ -248,8 +282,8 @@ class StudentController extends Controller
         }
 
         if (
-            $role === 'Residential Warden' &&
-            (int) $student->hostel_id !== (int) $request->user()->hostel_id
+            $currentUser->isHostelScoped() &&
+            (int) $student->hostel_id !== (int) $currentUser->hostel_id
         ) {
             return response()->json([
                 'success' => false,
@@ -295,8 +329,9 @@ class StudentController extends Controller
 
     public function verify(Request $request)
     {
-        $role = $request->user()->role?->name;
-        if (! in_array($role, ['Admin', 'Residential Warden', 'Chief Warden', 'Caretaker Operator'], true)) {
+        $currentUser = $request->user();
+        $role = $currentUser->role?->name;
+        if (! in_array($role, ['Admin', 'Residential Warden', 'Warden', 'Chief Warden', 'Caretaker', 'Caretaker Operator'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
@@ -308,7 +343,7 @@ class StudentController extends Controller
 
         $student = Student::findOrFail($data['studentId']);
 
-        if ($role === 'Residential Warden' && (int) $student->hostel_id !== (int) $request->user()->hostel_id) {
+        if ($currentUser->isHostelScoped() && (int) $student->hostel_id !== (int) $currentUser->hostel_id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized hostel access.'], 403);
         }
 
@@ -373,9 +408,17 @@ class StudentController extends Controller
 
     public function warningTickets(Request $request)
     {
-        $tickets = Ticket::with(['violation.student.user', 'violation.student.hostel', 'violation.student.room'])
-            ->latest('issue_date')
-            ->get()
+        $currentUser = $request->user();
+        $ticketsQuery = Ticket::with(['violation.student.user', 'violation.student.hostel', 'violation.student.room'])
+            ->latest('issue_date');
+
+        if ($currentUser->isHostelScoped()) {
+            $ticketsQuery->whereHas('violation.student', function ($q) use ($currentUser) {
+                $q->where('hostel_id', $currentUser->hostel_id);
+            });
+        }
+
+        $tickets = $ticketsQuery->get()
             ->map(fn ($t) => [
                 'id' => (string) $t->id,
                 'ticketNumber' => 'WT-'.str_pad($t->id, 4, '0', STR_PAD_LEFT),
@@ -399,15 +442,15 @@ class StudentController extends Controller
     }
 
     // Allocate or change student's room
-    // Only Admin and Residential Warden
     public function allocateRoom(Request $request, $id)
     {
-        $role = $request->user()->role?->name;
+        $currentUser = $request->user();
+        $role = $currentUser->role?->name;
 
-        if (! in_array($role, ['Admin', 'Residential Warden'], true)) {
+        if (! in_array($role, ['Admin', 'Residential Warden', 'Warden', 'Caretaker', 'Caretaker Operator'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Only Admin and Residential Warden can allocate rooms.',
+                'message' => 'Unauthorized to allocate rooms.',
             ], 403);
         }
 
@@ -418,8 +461,8 @@ class StudentController extends Controller
         ]);
 
         if (
-            $role === 'Residential Warden' &&
-            (int) $data['hostel_id'] !== (int) $request->user()->hostel_id
+            $currentUser->isHostelScoped() &&
+            (int) $data['hostel_id'] !== (int) $currentUser->hostel_id
         ) {
             return response()->json([
                 'success' => false,
@@ -441,8 +484,8 @@ class StudentController extends Controller
         }
 
         if (
-            $role === 'Residential Warden' &&
-            (int) $student->hostel_id !== (int) $request->user()->hostel_id
+            $currentUser->isHostelScoped() &&
+            (int) $student->hostel_id !== (int) $currentUser->hostel_id
         ) {
             return response()->json([
                 'success' => false,
@@ -499,11 +542,40 @@ class StudentController extends Controller
     // Update student details
     public function update(Request $request, $id)
     {
-        if ($response = $this->checkAdmin($request)) {
+        $student = Student::findOrFail($id);
+
+        if ($response = $this->checkStudentManageAccess($request, (int) $student->hostel_id)) {
             return $response;
         }
 
-        $student = Student::findOrFail($id);
+        $normalized = [];
+        if ($request->has('studentEmail') && ! $request->has('email')) {
+            $normalized['email'] = $request->input('studentEmail');
+        }
+        if ($request->has('hostelId') && ! $request->has('hostel_id')) {
+            $normalized['hostel_id'] = $request->input('hostelId');
+        }
+        if ($request->has('enrollmentNo') && ! $request->has('enrollment_no')) {
+            $normalized['enrollment_no'] = $request->input('enrollmentNo');
+        }
+        if ($request->has('biometricId') && ! $request->has('biometric_id')) {
+            $normalized['biometric_id'] = $request->input('biometricId');
+        }
+        if ($request->has('bedNumber') && ! $request->has('bed_number')) {
+            $normalized['bed_number'] = $request->input('bedNumber');
+        }
+        if ($request->has('parentName') && ! $request->has('parent_guardian_name')) {
+            $normalized['parent_guardian_name'] = $request->input('parentName');
+        }
+        if ($request->has('parentEmail') && ! $request->has('parent_email')) {
+            $normalized['parent_email'] = $request->input('parentEmail');
+        }
+        if ($request->has('verificationStatus') && ! $request->has('verification_status')) {
+            $normalized['verification_status'] = $request->input('verificationStatus');
+        }
+        if (! empty($normalized)) {
+            $request->merge($normalized);
+        }
 
         $data = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -515,6 +587,7 @@ class StudentController extends Controller
             ],
             'hostel_id' => 'sometimes|required|exists:hostels,id',
             'room_id' => 'sometimes|required|exists:rooms,id',
+            'roomNumber' => 'sometimes|required|string',
             'enrollment_no' => [
                 'sometimes',
                 'required',
@@ -532,8 +605,25 @@ class StudentController extends Controller
             'verification_status' => 'sometimes|required|in:pending_verification,verified,rejected',
         ]);
 
-        $hostelId = $data['hostel_id'] ?? $student->hostel_id;
+        $hostelId = (int) ($data['hostel_id'] ?? $student->hostel_id);
+        if ($response = $this->checkStudentManageAccess($request, $hostelId)) {
+            return $response;
+        }
+
         $roomId = $data['room_id'] ?? $student->room_id;
+        if (isset($data['roomNumber']) && ! isset($data['room_id'])) {
+            $resolvedRoom = Room::where('hostel_id', $hostelId)
+                ->where('room_number', $data['roomNumber'])
+                ->first();
+            if (! $resolvedRoom) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Selected room does not exist in this hostel.',
+                ], 422);
+            }
+            $roomId = $resolvedRoom->id;
+        }
+        unset($data['roomNumber']);
 
         $room = Room::where('id', $roomId)
             ->where('hostel_id', $hostelId)
@@ -597,15 +687,21 @@ class StudentController extends Controller
             $request->user()->id
         );
 
+        $freshStudent = $student->fresh()->load('user', 'hostel', 'room');
+
         return response()->json([
             'success' => true,
             'message' => 'Student details updated successfully.',
-            'student' => $student->fresh()->load('user', 'hostel', 'room'),
+            'student' => $this->formatStudentResponse($freshStudent),
         ]);
     }
 
     public function deviceRegistration(Request $request)
     {
+        if ($response = $this->checkStudentManageAccess($request)) {
+            return $response;
+        }
+
         $data = $request->validate([
             'enrollmentNo' => ['required', 'string'],
             'name' => ['required', 'string'],
@@ -618,6 +714,10 @@ class StudentController extends Controller
         ]);
 
         $hostelId = is_numeric($data['hostelId']) ? (int) $data['hostelId'] : 1;
+
+        if ($response = $this->checkStudentManageAccess($request, $hostelId)) {
+            return $response;
+        }
         $room = Room::firstOrCreate(
             ['hostel_id' => $hostelId, 'room_number' => $data['roomNumber']],
             ['capacity' => 3]
@@ -628,6 +728,10 @@ class StudentController extends Controller
         $plainPassword = $request->input('password') ?: 'student123';
 
         $existingStudent = Student::with('user')->where('biometric_id', $data['biometricId'])->first();
+
+        if ($existingStudent && ($response = $this->checkStudentManageAccess($request, (int) $existingStudent->hostel_id))) {
+            return $response;
+        }
 
         if ($existingStudent && $existingStudent->user) {
             $user = $existingStudent->user;

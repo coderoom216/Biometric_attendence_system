@@ -16,7 +16,10 @@ All accounts listed below are active, verified against the database and backend 
 | **Warden (BH-1)** | Residential Warden (Boys Hostel 1) | `warden.bh1@university.edu.in` | `warden123` | Boys Hostel 1 (BH1 - Shivalik) | `/` (Residential Warden) |
 | **Warden (GH)** | Residential Warden (Girls Hostel) | `warden.gh@university.edu.in` | `warden123` | Girls Hostel (GH - Mandakini) | `/` (Residential Warden) |
 | **Warden (BH-2)** | Residential Warden (Boys Hostel 2) | `warden.bh2@university.edu.in` | `warden123` | Boys Hostel 2 (BH2 - Nilgiri) | `/` (Residential Warden) |
-| **Caretaker / Biometric Operator** | Mr. V. Mehra (Biometric In-Charge) | `vmehra@university.edu.in` | `mehra123` | Biometric Terminal (S362) & Attendance | `/` (Biometric Terminal) |
+| **Biometric Device Manager** | Mehra Ji (Biometric Device Manager) | `mehra@university.edu.in` | `mehra123` | All Hostels (BH1, BH2, GH) | `/` (Device Manager Dashboard) |
+| **Caretaker (BH-1)** | Caretaker (Boys Hostel 1) | `caretaker.bh1@university.edu.in` | `caretaker123` | Boys Hostel 1 (BH1) Only | `/` (Caretaker Dashboard) |
+| **Caretaker (GH)** | Caretaker (Girls Hostel) | `caretaker.gh@university.edu.in` | `caretaker123` | Girls Hostel (GH) Only | `/` (Caretaker Dashboard) |
+| **Caretaker (BH-2)** | Caretaker (Boys Hostel 2) | `caretaker.bh2@university.edu.in` | `caretaker123` | Boys Hostel 2 (BH2) Only | `/` (Caretaker Dashboard) |
 | **Student (Default Demo)** | Rahul Sharma | `rahul.sharma@student.edu.in` | `student123` | Boys Hostel 1 (Room 101, Bed A) | `/` (Student Portal) |
 | **Student (Resident 1)** | Resident Student | `resident1@student.edu.in` | `student123` | Boys Hostel 1 (Room 101) | `/` (Student Portal) |
 

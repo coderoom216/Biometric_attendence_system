@@ -60,10 +60,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
         return <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-200">Residential Warden</span>;
       case 'warden':
         return <span className="bg-teal-100 text-teal-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-teal-200">Warden</span>;
-      case 'caretaker_operator':
+      case 'caretaker':
         return (
           <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-amber-200">
-            {localStorage.getItem('demo_dashboard') === 'mehra' ? 'Mr. Mehra Sir' : 'Caretaker'}
+            Hostel Caretaker
+          </span>
+        );
+      case 'caretaker_operator':
+        return (
+          <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-indigo-200">
+            Biometric Device Manager
           </span>
         );
       case 'student':
@@ -151,11 +157,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
               {/* User details & Logout */}
               <div className="flex items-center space-x-2 pl-1 border-l border-slate-200">
                 <div className="hidden lg:block text-right">
-                  {user?.role !== 'caretaker_operator' && (
-                    <div className="text-xs font-semibold text-slate-800 leading-tight">
-                      {user?.name}
-                    </div>
-                  )}
+                  <div className="text-xs font-semibold text-slate-800 leading-tight">
+                    {user?.name}
+                  </div>
                   <div className="mt-0.5">{getRoleBadge(user?.role)}</div>
                 </div>
 

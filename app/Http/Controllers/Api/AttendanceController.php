@@ -39,7 +39,7 @@ class AttendanceController extends Controller
             abort_unless($student, 403, 'Student profile not found.');
 
             $query->where('student_id', $student->id);
-        } elseif ($role === 'residential_warden') {
+        } elseif ($user->isHostelScoped()) {
             abort_unless($user->hostel_id, 403, 'No hostel assigned.');
 
             $query->whereHas('student', function (Builder $studentQuery) use ($user) {
@@ -140,7 +140,7 @@ class AttendanceController extends Controller
             abort_unless($user->student, 403, 'Student profile not found.');
 
             $query->whereKey($user->student->id);
-        } elseif ($role === 'residential_warden') {
+        } elseif ($user->isHostelScoped()) {
             abort_unless($user->hostel_id, 403, 'No hostel assigned.');
 
             $query->where('hostel_id', $user->hostel_id);
@@ -338,7 +338,7 @@ class AttendanceController extends Controller
             $request->user()->role?->name ?? ''
         ));
 
-        if ($role === 'residential_warden') {
+        if ($request->user()->isHostelScoped()) {
             abort_unless($request->user()->hostel_id, 403, 'No hostel assigned.');
 
             $query->whereHas('student', function (Builder $studentQuery) use ($request) {
@@ -422,7 +422,7 @@ class AttendanceController extends Controller
             $request->user()->role?->name ?? ''
         ));
 
-        if ($role === 'residential_warden') {
+        if ($request->user()->isHostelScoped()) {
             abort_unless($request->user()->hostel_id, 403, 'No hostel assigned.');
 
             $query->whereHas('student', function (Builder $studentQuery) use ($request) {
@@ -493,8 +493,10 @@ class AttendanceController extends Controller
         abort_unless(in_array($role, [
             'admin',
             'residential_warden',
+            'warden',
             'chief_warden',
             'director',
+            'caretaker',
             'caretaker_operator',
         ], true), 403, 'You are not authorized to record attendance.');
 
@@ -510,7 +512,7 @@ class AttendanceController extends Controller
 
         $student = Student::findOrFail($validated['student_id']);
 
-        if ($role === 'residential_warden') {
+        if ($user->isHostelScoped()) {
             abort_unless($user->hostel_id, 403, 'No hostel assigned.');
 
             abort_unless(
@@ -612,9 +614,9 @@ class AttendanceController extends Controller
         $role = strtolower(str_replace(' ', '_', $user->role?->name ?? ''));
 
         abort_unless(
-            in_array($role, ['admin', 'residential_warden'], true),
+            in_array($role, ['admin', 'residential_warden', 'warden', 'caretaker'], true),
             403,
-            'Only Admin or Residential Warden can correct attendance.'
+            'Only Admin, Warden, or Caretaker can correct attendance.'
         );
 
         $validated = $request->validate([
@@ -625,7 +627,7 @@ class AttendanceController extends Controller
 
         $attendance = Attendance::with('student')->findOrFail($validated['recordId']);
 
-        if ($role === 'residential_warden') {
+        if ($user->isHostelScoped()) {
             abort_unless($user->hostel_id, 403, 'No hostel assigned.');
 
             abort_unless(

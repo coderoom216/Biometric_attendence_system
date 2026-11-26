@@ -20,7 +20,7 @@ router.get(
   (req: AuthenticatedRequest, res: Response) => {
     return res.json({
       success: true,
-      authorizedAdministrator: 'Mr. Vivek Mehra (Computer Science Dept)',
+      authorizedAdministrator: 'Mehra Ji (Computer Science Dept)',
       devices: store.biometricDevices
     });
   }

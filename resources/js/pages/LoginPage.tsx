@@ -51,25 +51,7 @@ export const LoginPage: React.FC = () => {
       {/* Background architectural glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Left Persistent Collaboration Header */}
-      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 flex items-center space-x-2.5">
-        <img
-          src="/images/thdc-ihet-logo.jpg"
-          alt="THDC IHET"
-          className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-contain bg-white p-0.5 border border-slate-700 shadow-sm"
-        />
-        <span className="text-slate-500 font-bold text-xs select-none">×</span>
-        <img
-          src="/images/spiders-logo.jpg"
-          alt="SPIDERS"
-          className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg object-contain bg-white p-0.5 border border-slate-700 shadow-sm"
-        />
-        <span className="hidden sm:inline-flex text-[9px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-950/60 border border-indigo-700/40 px-2.5 py-0.5 rounded-full">
-          THDC IHET COLLABORATES WITH SPIDERS
-        </span>
-      </div>
-
-      <div className="sm:mx-auto w-full max-w-4xl relative z-10 px-4 sm:px-6 my-auto pt-14 sm:pt-16 lg:pt-0">
+      <div className="sm:mx-auto w-full max-w-4xl relative z-10 px-4 sm:px-6 my-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           {/* Left Column: Logos, Collaboration Text, and Institutional Overview */}
           <div className="lg:col-span-6 text-center lg:text-left space-y-4">

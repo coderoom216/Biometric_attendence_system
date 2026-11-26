@@ -17,7 +17,8 @@ class RolesAndAdminSeeder extends Seeder
             'Residential Warden' => 'Manages the assigned hostel.',
             'Chief Warden' => 'Supervises hostel operations.',
             'Director' => 'Institution-level management access.',
-            'Caretaker Operator' => 'Manages student-related operations.',
+            'Caretaker' => 'Hostel caretaker assigned to a specific hostel.',
+            'Caretaker Operator' => 'Biometric Device Manager across all hostels.',
             'Student' => 'Student account access.',
         ];
 
@@ -73,10 +74,31 @@ class RolesAndAdminSeeder extends Seeder
                 'hostel_id' => 3,
             ],
             [
-                'email' => 'vmehra@university.edu.in',
+                'email' => 'mehra@university.edu.in',
                 'password' => 'mehra123',
                 'role' => 'Caretaker Operator',
-                'name' => 'Demo Caretaker',
+                'name' => 'Mehra Ji',
+            ],
+            [
+                'email' => 'caretaker.bh1@university.edu.in',
+                'password' => 'caretaker123',
+                'role' => 'Caretaker',
+                'name' => 'Caretaker (Boys Hostel 1)',
+                'hostel_id' => 1,
+            ],
+            [
+                'email' => 'caretaker.gh@university.edu.in',
+                'password' => 'caretaker123',
+                'role' => 'Caretaker',
+                'name' => 'Caretaker (Girls Hostel)',
+                'hostel_id' => 2,
+            ],
+            [
+                'email' => 'caretaker.bh2@university.edu.in',
+                'password' => 'caretaker123',
+                'role' => 'Caretaker',
+                'name' => 'Caretaker (Boys Hostel 2)',
+                'hostel_id' => 3,
             ],
             [
                 'email' => 'rahul.sharma@student.edu.in',

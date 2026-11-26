@@ -171,6 +171,12 @@ export const apiService = {
     const res = await api.post<{ success: boolean; message: string; leave: LeaveRecord }>('/leaves/enter', payload);
     return res.data;
   },
+  async updateLeaveStatus(leaveId: string, approvalStatus: 'approved' | 'rejected') {
+    const res = await api.patch<{ message: string; leave: LeaveRecord }>(`/admin/leaves/${leaveId}/status`, {
+      approval_status: approvalStatus
+    });
+    return res.data;
+  },
 
   // Students
   async getStudents() {
@@ -183,6 +189,10 @@ export const apiService = {
   },
   async onboardStudent(data: Partial<Student>) {
     const res = await api.post<{ success: boolean; message: string; student: Student }>('/students/onboard', data);
+    return res.data;
+  },
+  async updateStudent(id: string, data: Record<string, unknown>) {
+    const res = await api.put<{ success: boolean; message: string; student: Student }>(`/students/${id}`, data);
     return res.data;
   },
   async verifyStudentRegistration(studentId: string, action: 'approve' | 'reject', rejectionReason?: string) {

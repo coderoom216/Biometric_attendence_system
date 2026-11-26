@@ -19,10 +19,9 @@ function DashboardContent() {
         case 'chief_warden': return <ChiefWardenDashboard />;
         case 'admin': return <DirectorDashboard officeRole="admin" />;
         case 'director': return <DirectorDashboard />;
+        case 'caretaker': return <CaretakerDashboard />;
         case 'caretaker_operator':
-            return localStorage.getItem('demo_dashboard') === 'caretaker'
-                ? <CaretakerDashboard />
-                : <CaretakerBiometricDashboard />;
+            return <CaretakerBiometricDashboard />;
         default: return <StudentDashboard />;
     }
 }

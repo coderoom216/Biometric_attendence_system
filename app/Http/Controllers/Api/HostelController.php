@@ -25,13 +25,16 @@ class HostelController extends Controller
 
     private function checkViewAccess(Request $request)
     {
-        $role = $request->user()->role?->name;
+        $user = $request->user();
+        $role = $user->role?->name;
 
         $allowedRoles = [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
+            'Caretaker',
             'Caretaker Operator',
         ];
 
@@ -39,9 +42,9 @@ class HostelController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        if ($role === 'Residential Warden' && ! $request->user()->hostel_id) {
+        if ($user->isHostelScoped() && ! $user->hostel_id) {
             return response()->json([
-                'message' => 'No hostel is assigned to this warden.',
+                'message' => 'No hostel is assigned to this account.',
             ], 403);
         }
 
@@ -82,7 +85,7 @@ class HostelController extends Controller
 
         $query = Hostel::withCount(['rooms', 'students']);
 
-        if ($request->user()->role?->name === 'Residential Warden') {
+        if ($request->user()->isHostelScoped()) {
             $query->where('id', $request->user()->hostel_id);
         }
 
@@ -126,7 +129,7 @@ class HostelController extends Controller
         $user = $request->user();
 
         if (
-            $user->role?->name === 'Residential Warden' &&
+            $user->isHostelScoped() &&
             (int) $user->hostel_id !== (int) $id
         ) {
             return response()->json([
@@ -176,6 +179,13 @@ class HostelController extends Controller
     {
         if ($response = $this->checkViewAccess($request)) {
             return $response;
+        }
+
+        $user = $request->user();
+        if ($user->isHostelScoped() && (int) $user->hostel_id !== (int) $id) {
+            return response()->json([
+                'message' => 'You can only access rooms in your assigned hostel.',
+            ], 403);
         }
 
         $hostel = Hostel::findOrFail($id);
@@ -237,6 +247,12 @@ class HostelController extends Controller
 
     public function allocateRoom(Request $request)
     {
+        $user = $request->user();
+        $role = $user->role?->name;
+        if (! in_array($role, ['Admin', 'Residential Warden', 'Warden', 'Caretaker', 'Caretaker Operator'], true)) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         $data = $request->validate([
             'studentId' => ['required'],
             'hostelId' => ['required'],
@@ -245,6 +261,13 @@ class HostelController extends Controller
         ]);
 
         $student = Student::findOrFail($data['studentId']);
+        if ($user->isHostelScoped()) {
+            if (! $user->hostel_id || (int) $data['hostelId'] !== (int) $user->hostel_id || (int) $student->hostel_id !== (int) $user->hostel_id) {
+                return response()->json([
+                    'message' => 'You can only allocate rooms within your assigned hostel.',
+                ], 403);
+            }
+        }
         $room = Room::where('hostel_id', $data['hostelId'])
             ->where('room_number', $data['roomNumber'])
             ->firstOrFail();
@@ -274,12 +297,23 @@ class HostelController extends Controller
 
     public function checkout(Request $request)
     {
+        $user = $request->user();
+        $role = $user->role?->name;
+        if (! in_array($role, ['Admin', 'Residential Warden', 'Warden', 'Caretaker', 'Caretaker Operator'], true)) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         $data = $request->validate([
             'studentId' => ['required'],
             'clearanceNotes' => ['nullable', 'string'],
         ]);
 
         $student = Student::findOrFail($data['studentId']);
+        if ($user->isHostelScoped() && (! $user->hostel_id || (int) $student->hostel_id !== (int) $user->hostel_id)) {
+            return response()->json([
+                'message' => 'You can only check out students in your assigned hostel.',
+            ], 403);
+        }
 
         app(AuditService::class)->log(
             'Student Hostel Checkout',

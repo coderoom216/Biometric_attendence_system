@@ -515,10 +515,10 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900">
-            Biometric Terminal & Student Onboarding
+            Biometric Device Manager Dashboard
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Actual machine users, real-time hardware status, and student registration
+            All-hostel biometric terminals, enrolled machine users, live attendance punches, and student registration
           </p>
         </div>
 

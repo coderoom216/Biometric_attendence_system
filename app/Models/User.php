@@ -76,4 +76,29 @@ class User extends Authenticatable
     {
         return $this->hasMany(Audit::class, 'user_id');
     }
+
+    public function roleSlug(): string
+    {
+        return strtolower(str_replace([' ', '-'], '_', $this->role?->name ?? ''));
+    }
+
+    public function isBiometricManager(): bool
+    {
+        return in_array($this->roleSlug(), ['caretaker_operator', 'biometric_device_manager'], true);
+    }
+
+    public function isCaretaker(): bool
+    {
+        return $this->roleSlug() === 'caretaker';
+    }
+
+    public function isHostelScoped(): bool
+    {
+        return in_array($this->roleSlug(), ['residential_warden', 'warden', 'caretaker'], true);
+    }
+
+    public function canManageStudents(): bool
+    {
+        return $this->roleSlug() === 'admin' || $this->isBiometricManager() || $this->isCaretaker();
+    }
 }

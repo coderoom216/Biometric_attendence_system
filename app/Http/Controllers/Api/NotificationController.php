@@ -19,17 +19,19 @@ class NotificationController extends Controller
         if (! in_array($role, [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
-        ])) {
+            'Caretaker',
+        ], true)) {
             return response()->json([
                 'message' => 'Unauthorized access.',
             ], 403);
         }
 
-        if ($role === 'Residential Warden' && empty($user->hostel_id)) {
+        if ($user->isHostelScoped() && empty($user->hostel_id)) {
             return response()->json([
-                'message' => 'Residential Warden has no assigned hostel.',
+                'message' => "{$role} has no assigned hostel.",
             ], 403);
         }
 
@@ -52,7 +54,7 @@ class NotificationController extends Controller
 
         $alertQuery = Alert::with('student');
 
-        if ($user->role->name === 'Residential Warden') {
+        if ($user->isHostelScoped()) {
             $alertQuery->whereHas('student', function ($q) use ($user) {
                 $q->where('hostel_id', $user->hostel_id);
             });
@@ -94,7 +96,7 @@ class NotificationController extends Controller
             'alert.alertTier',
         ]);
 
-        if ($user->role->name === 'Residential Warden') {
+        if ($user->isHostelScoped()) {
             $query->whereHas('alert.student', function ($q) use ($user) {
                 $q->where('hostel_id', $user->hostel_id);
             });
@@ -123,7 +125,7 @@ class NotificationController extends Controller
 
         $query = Notification::with('alert.student');
 
-        if ($user->role->name === 'Residential Warden') {
+        if ($user->isHostelScoped()) {
             $query->whereHas('alert.student', function ($q) use ($user) {
                 $q->where('hostel_id', $user->hostel_id);
             });

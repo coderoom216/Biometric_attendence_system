@@ -32,7 +32,9 @@ export const LeaveManagementPage: React.FC = () => {
   });
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const canEnterLeave = ['residential_warden', 'warden', 'chief_warden', 'director'].includes(user?.role || '');
+  const isCaretaker = user?.role === 'caretaker';
+  const canEnterLeave = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker'].includes(user?.role || '');
+  const canApproveLeave = ['residential_warden', 'warden', 'chief_warden', 'director'].includes(user?.role || '');
 
   const loadData = async () => {
     try {
@@ -81,6 +83,16 @@ export const LeaveManagementPage: React.FC = () => {
     }
   };
 
+  const handleLeaveStatusUpdate = async (leaveId: string, status: 'approved' | 'rejected') => {
+    setFeedback(null);
+    try {
+      await apiService.updateLeaveStatus(leaveId, status);
+      await loadData();
+    } catch (err: any) {
+      setFeedback(err.response?.data?.message || 'Unable to update leave status.');
+    }
+  };
+
   const matchingStudents = students.filter((student) => {
     const query = studentSearch.trim().toLowerCase();
     return !query || [
@@ -126,7 +138,7 @@ export const LeaveManagementPage: React.FC = () => {
             className="flex items-center space-x-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>Enter Approved Leave</span>
+            <span>{isCaretaker ? 'Assign Leave (Pending Warden Approval)' : 'Enter Approved Leave'}</span>
           </button>
         )}
       </div>
@@ -173,13 +185,14 @@ export const LeaveManagementPage: React.FC = () => {
                 <th className="py-2.5 px-3">Reason / Details</th>
                 <th className="py-2.5 px-3">Parent Consent</th>
                 <th className="py-2.5 px-3">Authorized By</th>
-                <th className="py-2.5 px-3">Alert Suppression</th>
+                <th className="py-2.5 px-3">Approval Status</th>
+                {canApproveLeave && <th className="py-2.5 px-3 text-right">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredLeaves.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={canApproveLeave ? 9 : 8} className="py-8 text-center text-slate-400">
                     No approved leaves found matching criteria.
                   </td>
                 </tr>
@@ -203,10 +216,40 @@ export const LeaveManagementPage: React.FC = () => {
                     </td>
                     <td className="py-2.5 px-3 text-slate-700 font-medium">{l.residentialWardenName}</td>
                     <td className="py-2.5 px-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                        Suppressed
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        l.status === 'Approved'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : l.status === 'Rejected'
+                            ? 'bg-rose-100 text-rose-800 border-rose-200'
+                            : 'bg-amber-100 text-amber-800 border-amber-200'
+                      }`}>
+                        {l.status === 'Pending' ? 'Pending Warden Approval' : (l.status || 'Approved')}
                       </span>
                     </td>
+                    {canApproveLeave && (
+                      <td className="py-2.5 px-3 text-right">
+                        {l.status === 'Pending' ? (
+                          <div className="inline-flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleLeaveStatusUpdate(l.id, 'approved')}
+                              className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold cursor-pointer"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleLeaveStatusUpdate(l.id, 'rejected')}
+                              className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold cursor-pointer"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">Processed</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

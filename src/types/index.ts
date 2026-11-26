@@ -4,6 +4,7 @@ export type UserRole =
   | 'warden' 
   | 'chief_warden' 
   | 'director' 
+  | 'caretaker'
   | 'caretaker_operator';
 
 export interface User {

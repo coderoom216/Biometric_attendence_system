@@ -68,7 +68,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       chief_warden: { email: 'chiefwarden@university.edu.in', pass: 'chief123' },
       residential_warden: { email: 'warden.bh1@university.edu.in', pass: 'warden123' },
       warden: { email: 'warden.gh@university.edu.in', pass: 'warden123' },
-      caretaker_operator: { email: 'vmehra@university.edu.in', pass: 'mehra123' },
+      caretaker: { email: 'caretaker.bh1@university.edu.in', pass: 'caretaker123' },
+      caretaker_operator: { email: 'mehra@university.edu.in', pass: 'mehra123' },
       student: { email: 'rahul.sharma@student.edu.in', pass: 'student123' }
     };
 
@@ -89,7 +90,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'rw.shivalik@university.edu.in': 'warden123',
       'warden.mandakini@university.edu.in': 'warden123',
       'rw.nilgiri@university.edu.in': 'warden123',
-      'vmehra@university.edu.in': 'mehra123',
+      'mehra@university.edu.in': 'mehra123',
+      'caretaker.bh1@university.edu.in': 'caretaker123',
+      'caretaker.gh@university.edu.in': 'caretaker123',
+      'caretaker.bh2@university.edu.in': 'caretaker123',
       'rahul.sharma@student.edu.in': 'student123'
     };
     const password = accountCredentials[email];

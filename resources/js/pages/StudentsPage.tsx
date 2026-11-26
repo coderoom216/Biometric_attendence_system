@@ -14,16 +14,19 @@ import {
   Mail,
   GraduationCap,
   Layers,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Pencil,
+  X
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Student, WarningTicket } from '../types';
+import { Hostel, Student, WarningTicket } from '../types';
 
 export const StudentsPage: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'directory' | 'verification'>('directory');
   const [students, setStudents] = useState<Student[]>([]);
+  const [hostels, setHostels] = useState<Hostel[]>([]);
   const [warningTickets, setWarningTickets] = useState<WarningTicket[]>([]);
   const [search, setSearch] = useState('');
   const [hostelFilter, setHostelFilter] = useState('all');
@@ -31,16 +34,37 @@ export const StudentsPage: React.FC = () => {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    studentEmail: '',
+    enrollmentNo: '',
+    course: '',
+    hostelId: '',
+    roomNumber: '',
+    bedNumber: 'A',
+    biometricId: '',
+    parentName: '',
+    parentEmail: ''
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const isWardenOrAdmin = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker_operator'].includes(user?.role || '');
+  const isCaretaker = user?.role === 'caretaker';
+  const isHostelScoped = isCaretaker || user?.role === 'residential_warden' || user?.role === 'warden';
+  const canEditStudents = ['caretaker', 'caretaker_operator'].includes(user?.role || '');
+  const isWardenOrAdmin = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker', 'caretaker_operator'].includes(user?.role || '');
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const res = await apiService.getStudents();
+      const [res, hRes] = await Promise.all([
+        apiService.getStudents(),
+        apiService.getHostels()
+      ]);
       if (res.success) setStudents(res.students);
+      if (hRes.success) setHostels(hRes.hostels);
 
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('hostel_auth_token');
       const ticketRes = await fetch('/api/students/warning-tickets', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -59,6 +83,41 @@ export const StudentsPage: React.FC = () => {
     loadData();
   }, [user]);
 
+  const handleOpenEdit = (s: Student) => {
+    setEditingStudent(s);
+    setEditForm({
+      name: s.name || '',
+      studentEmail: s.studentEmail || '',
+      enrollmentNo: s.enrollmentNo || '',
+      course: s.course || '',
+      hostelId: String(s.hostelId || ''),
+      roomNumber: s.roomNumber || '',
+      bedNumber: s.bedNumber || 'A',
+      biometricId: s.biometricId || '',
+      parentName: s.parentName || '',
+      parentEmail: s.parentEmail || ''
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setIsSavingEdit(true);
+    setActionFeedback(null);
+    try {
+      const res = await apiService.updateStudent(editingStudent.id, editForm);
+      if (res.success) {
+        setActionFeedback(res.message || 'Student updated successfully.');
+        setEditingStudent(null);
+        await loadData();
+      }
+    } catch (err: any) {
+      setActionFeedback(err.response?.data?.message || 'Failed to update student record.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const handleVerify = async (studentId: string, action: 'approve' | 'reject') => {
     setActionFeedback(null);
     try {
@@ -75,7 +134,7 @@ export const StudentsPage: React.FC = () => {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('hostel_auth_token');
       const url = hostelFilter !== 'all'
         ? `/api/students/export-directory-excel?hostelId=${hostelFilter}`
         : '/api/students/export-directory-excel';
@@ -216,16 +275,18 @@ export const StudentsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {(!user?.hostelId || ['director', 'chief_warden', 'caretaker_operator'].includes(user?.role || '')) && (
+          {!isHostelScoped && (
             <select
               value={hostelFilter}
               onChange={(e) => setHostelFilter(e.target.value)}
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs text-slate-700"
             >
               <option value="all">All Hostels (BH1, GH, BH2)</option>
-              <option value="h-shivalik">Boys Hostel 1</option>
-              <option value="h-mandakini">Girls Hostel</option>
-              <option value="h-nilgiri">Boys Hostel 2</option>
+              {hostels.map((h) => (
+                <option key={h.id} value={String(h.id)}>
+                  {h.name} ({h.code})
+                </option>
+              ))}
             </select>
           )}
 
@@ -269,23 +330,26 @@ export const StudentsPage: React.FC = () => {
                   <th className="py-2.5 px-3">Parent Contact</th>
                   <th className="py-2.5 px-3">Biometric ID</th>
                   <th className="py-2.5 px-3">Disciplinary Standing</th>
+                  {canEditStudents && <th className="py-2.5 px-3 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                    <td colSpan={canEditStudents ? 9 : 8} className="py-8 text-center text-slate-400">
                       No students found matching your criteria.
                     </td>
                   </tr>
                 ) : (
                   filtered.map((s) => {
                     const ticket = ticketByStudentId.get(s.id);
-                    const hostelName = s.hostelId === 'h-shivalik'
-                      ? 'Boys Hostel 1'
-                      : s.hostelId === 'h-mandakini'
-                      ? 'Girls Hostel'
-                      : 'Boys Hostel 2';
+                    const hostelName =
+                      hostels.find((h) => String(h.id) === String(s.hostelId))?.name ||
+                      (s.hostelId === '1' || s.hostelId === 'h-shivalik'
+                        ? 'Boys Hostel 1'
+                        : s.hostelId === '2' || s.hostelId === 'h-mandakini'
+                        ? 'Girls Hostel'
+                        : 'Boys Hostel 2');
 
                     return (
                       <tr key={s.id} className="hover:bg-slate-50/80 transition">
@@ -354,6 +418,17 @@ export const StudentsPage: React.FC = () => {
                             </span>
                           )}
                         </td>
+                        {canEditStudents && (
+                          <td className="py-3 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(s)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold cursor-pointer"
+                            >
+                              <Pencil className="w-3 h-3" /> Edit
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })
@@ -461,6 +536,42 @@ export const StudentsPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-lg w-full p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="font-bold text-sm text-slate-900">
+                Edit Student Record ({editingStudent.enrollmentNo})
+              </h2>
+              <button type="button" onClick={() => setEditingStudent(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div><label className="block font-semibold text-slate-700 mb-1">Full Name</label><input type="text" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
+                <div><label className="block font-semibold text-slate-700 mb-1">Email</label><input type="email" required value={editForm.studentEmail} onChange={(e) => setEditForm({ ...editForm, studentEmail: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
+                <div><label className="block font-semibold text-slate-700 mb-1">Enrollment No</label><input type="text" required value={editForm.enrollmentNo} onChange={(e) => setEditForm({ ...editForm, enrollmentNo: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg font-mono" /></div>
+                <div><label className="block font-semibold text-slate-700 mb-1">Biometric ID</label><input type="text" required value={editForm.biometricId} onChange={(e) => setEditForm({ ...editForm, biometricId: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg font-mono" /></div>
+                <div><label className="block font-semibold text-slate-700 mb-1">Course</label><input type="text" required value={editForm.course} onChange={(e) => setEditForm({ ...editForm, course: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Hostel</label>
+                  <select required disabled={isCaretaker} value={editForm.hostelId} onChange={(e) => setEditForm({ ...editForm, hostelId: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100">
+                    {hostels.map((h) => <option key={h.id} value={String(h.id)}>{h.name} ({h.code})</option>)}
+                  </select>
+                </div>
+                <div><label className="block font-semibold text-slate-700 mb-1">Room Number</label><input type="text" required value={editForm.roomNumber} onChange={(e) => setEditForm({ ...editForm, roomNumber: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg font-mono" /></div>
+                <div><label className="block font-semibold text-slate-700 mb-1">Bed Number</label><input type="text" required value={editForm.bedNumber} onChange={(e) => setEditForm({ ...editForm, bedNumber: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setEditingStudent(null)} className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer">Cancel</button>
+                <button type="submit" disabled={isSavingEdit} className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold disabled:opacity-50 cursor-pointer">{isSavingEdit ? 'Saving...' : 'Save Changes'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

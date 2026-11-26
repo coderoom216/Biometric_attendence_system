@@ -61,11 +61,11 @@ export const initialUsers: (User & { passwordHash: string })[] = [
     hostelId: 'h-nilgiri',
     passwordHash: 'pathak123'
   },
-  // Caretaker / Biometric Operator - Mr. Vivek Mehra (Computer Science Dept)
+  // Biometric Device Manager - Mehra Ji
   {
     id: 'usr-mr-mehra',
-    name: 'Mr. Vivek Mehra (CSE Dept)',
-    email: 'vmehra@university.edu.in',
+    name: 'Mehra Ji',
+    email: 'mehra@university.edu.in',
     role: 'caretaker_operator',
     phone: '+91 98765 00033',
     passwordHash: 'mehra123'
@@ -160,7 +160,7 @@ export const initialBiometricDevices: BiometricDevice[] = [
     totalLogsStoredLocally: 0,
     lastSyncAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
     status: 'online_synced',
-    authorizedTechnician: 'Mr. Vivek Mehra (CSE Dept)'
+    authorizedTechnician: 'Mehra Ji'
   },
   {
     id: 'bdev-mand-01',
@@ -171,7 +171,7 @@ export const initialBiometricDevices: BiometricDevice[] = [
     totalLogsStoredLocally: 0,
     lastSyncAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
     status: 'online_synced',
-    authorizedTechnician: 'Mr. Vivek Mehra (CSE Dept)'
+    authorizedTechnician: 'Mehra Ji'
   },
   {
     id: 'bdev-nilg-01',
@@ -182,7 +182,7 @@ export const initialBiometricDevices: BiometricDevice[] = [
     totalLogsStoredLocally: 0,
     lastSyncAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
     status: 'online_synced',
-    authorizedTechnician: 'Mr. Vivek Mehra (CSE Dept)'
+    authorizedTechnician: 'Mehra Ji'
   }
 ];
 

@@ -23,18 +23,19 @@ class LeaveController extends Controller
             'Warden',
             'Chief Warden',
             'Director',
-        ])) {
+            'Caretaker',
+        ], true)) {
             return response()->json([
                 'message' => 'Unauthorized access.',
             ], 403);
         }
 
         if (
-            in_array($role, ['Residential Warden', 'Warden'], true) &&
+            $user->isHostelScoped() &&
             empty($user->hostel_id)
         ) {
             return response()->json([
-                'message' => 'Residential Warden has no assigned hostel.',
+                'message' => "{$role} has no assigned hostel.",
             ], 403);
         }
 
@@ -101,7 +102,7 @@ class LeaveController extends Controller
 
         $query = Leave::with(['student.user', 'student.hostel', 'student.room', 'approvedBy']);
 
-        if ($user->role?->name === 'Residential Warden') {
+        if ($user->isHostelScoped()) {
             $query->whereHas('student', function ($q) use ($user) {
                 $q->where('hostel_id', $user->hostel_id);
             });
@@ -152,34 +153,38 @@ class LeaveController extends Controller
         $student = Student::findOrFail($data['studentId']);
         $user = $request->user();
 
-        if ($user->role?->name === 'Residential Warden' && (int) $student->hostel_id !== (int) $user->hostel_id) {
+        if ($user->isHostelScoped() && (int) $student->hostel_id !== (int) $user->hostel_id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized hostel access.'], 403);
         }
 
         $gatePassNo = $data['gatePassNo'] ?? ('GP-'.strtoupper(Str::random(8)));
+        $isCaretaker = $user->isCaretaker();
 
         $leave = Leave::create([
             'student_id' => $student->id,
-            'approved_by' => $user->id,
+            'approved_by' => $isCaretaker ? null : $user->id,
             'start_date' => $data['startDate'],
             'end_date' => $data['endDate'],
             'reason' => $data['reason'].(! empty($data['notes']) ? ' ('.$data['notes'].')' : ''),
             'gate_pass_no' => $gatePassNo,
-            'approval_status' => 'approved',
-            'approved_at' => now(),
+            'approval_status' => $isCaretaker ? 'pending' : 'approved',
+            'approved_at' => $isCaretaker ? null : now(),
         ]);
 
         app(AuditService::class)->log(
-            'Leave Entered by Warden',
+            $isCaretaker ? 'Leave Assigned by Caretaker' : 'Leave Entered by Warden',
             'Leave',
             $leave->id,
-            'Approved leave entered for '.$student->enrollment_no.' from '.$leave->start_date.' to '.$leave->end_date,
+            ($isCaretaker ? 'Pending leave assigned for ' : 'Approved leave entered for ')
+                .$student->enrollment_no.' from '.$leave->start_date.' to '.$leave->end_date,
             $user->id
         );
 
         return response()->json([
             'success' => true,
-            'message' => 'Approved leave logged successfully.',
+            'message' => $isCaretaker
+                ? 'Leave assigned successfully and queued for Warden approval.'
+                : 'Approved leave logged successfully.',
             'leave' => [
                 'id' => (string) $leave->id,
                 'studentId' => (string) $student->id,
@@ -189,9 +194,9 @@ class LeaveController extends Controller
                 'endDate' => $leave->end_date?->toDateString() ?? $leave->end_date,
                 'reason' => $leave->reason,
                 'gatePassNo' => $leave->gate_pass_no,
-                'status' => 'Approved',
-                'approvalStatus' => 'approved',
-                'approvedBy' => $user->name,
+                'status' => $isCaretaker ? 'Pending' : 'Approved',
+                'approvalStatus' => $isCaretaker ? 'pending' : 'approved',
+                'approvedBy' => $isCaretaker ? 'Pending Warden' : $user->name,
                 'approvedAt' => $leave->approved_at?->toIso8601String(),
             ],
         ], 201);
@@ -206,6 +211,13 @@ class LeaveController extends Controller
 
         $user = $request->user();
 
+        if ($user->isCaretaker()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Caretakers cannot approve or reject leaves. Only Wardens can approve leave requests.',
+            ], 403);
+        }
+
         $data = $request->validate([
             'approval_status' => [
                 'required',
@@ -216,8 +228,8 @@ class LeaveController extends Controller
         $leave = Leave::with('student')->findOrFail($id);
 
         if (
-            $user->role->name === 'Residential Warden' &&
-            $leave->student->hostel_id != $user->hostel_id
+            $user->isHostelScoped() &&
+            (int) $leave->student->hostel_id !== (int) $user->hostel_id
         ) {
             return response()->json([
                 'message' => 'You cannot manage leaves of another hostel.',

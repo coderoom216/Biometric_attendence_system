@@ -40,7 +40,10 @@ Use these accounts on the login page:
 | Warden (BH2) | `rw.nilgiri@university.edu.in` | `pathak123` |
 | Chief Warden | `chiefwarden@university.edu.in` | `chief123` |
 | Director | `director@university.edu.in` | `director123` |
-| Caretaker / Biometric Operator | `vmehra@university.edu.in` | `mehra123` |
+| Biometric Device Manager (Mehra Ji) | `mehra@university.edu.in` | `mehra123` |
+| Caretaker (BH1) | `caretaker.bh1@university.edu.in` | `caretaker123` |
+| Caretaker (GH) | `caretaker.gh@university.edu.in` | `caretaker123` |
+| Caretaker (BH2) | `caretaker.bh2@university.edu.in` | `caretaker123` |
 
 ## Available commands
 

@@ -17,17 +17,19 @@ class AlertController extends Controller
         if (! in_array($role, [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
-        ])) {
+            'Caretaker',
+        ], true)) {
             return response()->json([
                 'message' => 'Unauthorized access.',
             ], 403);
         }
 
-        if ($role === 'Residential Warden' && empty($user->hostel_id)) {
+        if ($user->isHostelScoped() && empty($user->hostel_id)) {
             return response()->json([
-                'message' => 'Residential Warden has no assigned hostel.',
+                'message' => "{$role} has no assigned hostel.",
             ], 403);
         }
 
@@ -44,7 +46,7 @@ class AlertController extends Controller
 
         $user = $request->user();
 
-        if ($user->role->name === 'Residential Warden') {
+        if ($user->isHostelScoped()) {
             $query->whereHas('student', function ($q) use ($user) {
                 $q->where('hostel_id', $user->hostel_id);
             });
@@ -95,7 +97,7 @@ class AlertController extends Controller
 
         $query = Alert::with('student');
 
-        if ($user->role->name === 'Residential Warden') {
+        if ($user->isHostelScoped()) {
             $query->whereHas('student', function ($q) use ($user) {
                 $q->where('hostel_id', $user->hostel_id);
             });

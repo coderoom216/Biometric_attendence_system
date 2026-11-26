@@ -22,13 +22,16 @@ class RoomController extends Controller
 
     private function checkViewAccess(Request $request)
     {
-        $role = $request->user()->role?->name;
+        $user = $request->user();
+        $role = $user->role?->name;
 
         $allowedRoles = [
             'Admin',
             'Residential Warden',
+            'Warden',
             'Chief Warden',
             'Director',
+            'Caretaker',
             'Caretaker Operator',
         ];
 
@@ -38,9 +41,9 @@ class RoomController extends Controller
             ], 403);
         }
 
-        if ($role === 'Residential Warden' && ! $request->user()->hostel_id) {
+        if ($user->isHostelScoped() && ! $user->hostel_id) {
             return response()->json([
-                'message' => 'No hostel is assigned to this warden.',
+                'message' => 'No hostel is assigned to this account.',
             ], 403);
         }
 
@@ -99,7 +102,7 @@ class RoomController extends Controller
             'students.user',
         ])->withCount('students');
 
-        if ($request->user()->role?->name === 'Residential Warden') {
+        if ($request->user()->isHostelScoped()) {
             $query->where('hostel_id', $request->user()->hostel_id);
         } elseif ($request->filled('hostel_id')) {
             $query->where('hostel_id', $request->hostel_id);
@@ -127,7 +130,7 @@ class RoomController extends Controller
         ])->withCount('students')->findOrFail($id);
 
         if (
-            $request->user()->role?->name === 'Residential Warden' &&
+            $request->user()->isHostelScoped() &&
             (int) $room->hostel_id !== (int) $request->user()->hostel_id
         ) {
             return response()->json([
