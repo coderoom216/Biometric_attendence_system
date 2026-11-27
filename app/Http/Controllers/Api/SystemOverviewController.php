@@ -8,12 +8,14 @@ use App\Models\Device;
 use App\Models\Hostel;
 use App\Models\Student;
 use App\Services\ClockService;
+use App\Services\DefaulterEvaluationService;
 use Illuminate\Http\Request;
 
 class SystemOverviewController extends Controller
 {
     public function __construct(
-        private ClockService $clockService
+        private ClockService $clockService,
+        private DefaulterEvaluationService $evaluationService
     ) {}
 
     public function overview(Request $request)
@@ -29,6 +31,7 @@ class SystemOverviewController extends Controller
 
         $current = $this->clockService->current();
         $date = $current->toDateString();
+        $this->evaluationService->ensureEvaluatedForDate($date);
 
         $isScoped = $user->isHostelScoped();
         $scopedHostelId = $user->hostel_id;

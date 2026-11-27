@@ -82,38 +82,38 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
   return (
     <>
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-2 h-14 sm:h-16">
             {/* Left: Mobile hamburger & institutional brand */}
-            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <button
                 onClick={onToggleSidebar}
-                className="lg:hidden p-2 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 focus:outline-hidden shrink-0"
+                className="lg:hidden p-1.5 sm:p-2 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 focus:outline-hidden shrink-0"
               >
                 {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
               {/* Dual Partner Logos */}
-              <div className="flex items-center space-x-1.5 shrink-0">
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                 <img
                   src="/images/thdc-ihet-logo.jpg"
                   alt="THDC IHET Logo"
-                  className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-contain bg-white border border-slate-200 shadow-xs p-0.5"
+                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-contain bg-white border border-slate-200 shadow-xs p-0.5"
                 />
-                <span className="text-[11px] font-bold text-slate-400 select-none">×</span>
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 select-none">×</span>
                 <img
                   src="/images/spiders-logo.jpg"
                   alt="SPIDERS TECH SERVICES Logo"
-                  className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg object-contain bg-white border border-slate-200 shadow-xs p-0.5"
+                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain bg-white border border-slate-200 shadow-xs p-0.5"
                 />
               </div>
 
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <span className="font-bold text-slate-900 tracking-tight text-sm sm:text-base truncate">
+                  <span className="font-bold text-slate-900 tracking-tight text-xs sm:text-base truncate">
                     Hostel Attendance Portal
                   </span>
-                  <span className="inline-flex text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
+                  <span className="hidden md:inline-flex text-[10px] font-extrabold tracking-wider uppercase px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
                     THDC IHET COLLABORATES WITH SPIDERS
                   </span>
                 </div>
@@ -124,30 +124,30 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
             </div>
 
             {/* Right: Clock Simulator Pill, Switcher, and User Profile */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               {/* Virtual Clock Pill */}
               <button
                 onClick={() => setIsClockModalOpen(true)}
-                className="flex items-center space-x-2 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-mono transition shadow-xs hover:border-slate-300 bg-slate-50 border-slate-200 text-slate-700"
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg border text-[11px] sm:text-xs font-mono transition shadow-xs hover:border-slate-300 bg-slate-50 border-slate-200 text-slate-700"
                 title="Adjust the simulated clock or run 10:00 PM defaulter evaluation"
               >
                 <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span className="font-bold hidden sm:inline">{virtualTime} IST</span>
                 <span className="sm:hidden font-bold">{virtualTime.slice(0, 5)}</span>
                 {isPastDefaulter ? (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-100 text-rose-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-100 text-rose-800">
                     10:00 PM Defaulter Check
                   </span>
                 ) : isWithinGraceWindow ? (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
                     Late Grace Window
                   </span>
                 ) : isPastCutoff ? (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
                     Awaiting 10:00 PM Check
                   </span>
                 ) : (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                  <span className="hidden md:inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                     Entry Open
                   </span>
                 )}

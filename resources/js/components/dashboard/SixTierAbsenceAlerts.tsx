@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Mail, Calendar, Building2, Bell, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { NotificationLog } from '../../types';
+import { DateQuickPresets } from './DateQuickPresets';
 
 interface SixTierAbsenceAlertsProps {
   initialDate?: string;
@@ -331,7 +332,7 @@ export const SixTierAbsenceAlerts: React.FC<SixTierAbsenceAlertsProps> = ({
         </div>
 
         <div className="flex flex-col items-start gap-2 sm:items-end">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs">
             <Calendar className="h-3.5 w-3.5 text-indigo-600" />
             <label htmlFor="six-tier-alert-date-picker" className="font-medium text-slate-600 whitespace-nowrap">
               Audit Date:
@@ -344,6 +345,7 @@ export const SixTierAbsenceAlerts: React.FC<SixTierAbsenceAlertsProps> = ({
               aria-label="Select six-tier alert audit date"
               className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-indigo-500 focus:outline-hidden"
             />
+            <DateQuickPresets value={selectedDate} onChange={setSelectedDate} tone="indigo" />
           </div>
         </div>
       </div>

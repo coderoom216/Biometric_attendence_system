@@ -10,6 +10,9 @@ use App\Models\Ticket;
 use App\Models\Token;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\ClockService;
+use App\Services\DefaulterEvaluationService;
+use App\Services\SemesterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -92,6 +95,15 @@ class StudentController extends Controller
         }
 
         return null;
+    }
+
+    private function syncTodayPunchesAfterStudentLink(): void
+    {
+        try {
+            $today = app(ClockService::class)->current()->toDateString();
+            app(DefaulterEvaluationService::class)->invalidateAndSyncForDate($today);
+        } catch (\Throwable) {
+        }
     }
 
     // Create student account and profile
@@ -178,6 +190,8 @@ class StudentController extends Controller
             'Created student profile for enrollment number '.$student->enrollment_no,
             $request->user()->id
         );
+
+        $this->syncTodayPunchesAfterStudentLink();
 
         return response()->json([
             'success' => true,
@@ -291,33 +305,58 @@ class StudentController extends Controller
             ], 403);
         }
 
-        $tokens = Token::where('student_id', $student->id)->get();
-        $currentMonthTokens = $tokens->where('month_start', now()->startOfMonth()->toDateString())->sum('token_count');
-        $lifetimeTokens = $tokens->sum('token_count');
+        $semester = app(SemesterService::class)->active();
+        $semStart = $semester['startDate'];
+        $semEnd = $semester['endDate'];
+
+        $tokens = Token::where('student_id', $student->id)
+            ->orderByDesc('issued_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $semesterTokens = $tokens->filter(function (Token $token) use ($semStart, $semEnd): bool {
+            $d = $token->issued_date?->toDateString() ?? $token->created_at?->toDateString();
+
+            return $d !== null && $d >= $semStart && $d <= $semEnd;
+        });
+
+        $currentSemesterTokens = (int) $semesterTokens->sum('token_count');
+        $lifetimeTokens = (int) $tokens->sum('token_count');
 
         $status = 'none';
-        if ($currentMonthTokens > 10) {
+        if ($currentSemesterTokens > 10) {
             $status = 'red_card_blacklist';
-        } elseif ($currentMonthTokens >= 6) {
+        } elseif ($currentSemesterTokens >= 6) {
             $status = 'yellow_card';
-        } elseif ($currentMonthTokens >= 1) {
+        } elseif ($currentSemesterTokens >= 1) {
             $status = 'normal_warning';
         }
 
         $disciplinary = [
-            'currentMonth' => now()->format('F Y'),
-            'currentMonthTokens' => $currentMonthTokens,
+            'currentSemester' => $semStart.' to '.$semEnd,
+            'currentSemesterStart' => $semStart,
+            'currentSemesterEnd' => $semEnd,
+            'currentSemesterDurationDays' => $semester['durationDays'],
+            'currentSemesterTokens' => $currentSemesterTokens,
+            'currentMonth' => $semStart.' to '.$semEnd,
+            'currentMonthTokens' => $currentSemesterTokens,
             'lifetimeTokens' => $lifetimeTokens,
             'disciplinaryStatus' => $status,
-            'isBlacklisted' => $currentMonthTokens > 10,
-            'history' => $tokens->map(fn ($t) => [
-                'id' => (string) $t->id,
-                'studentId' => (string) $t->student_id,
-                'date' => $t->issued_date?->toDateString() ?? $t->created_at?->toDateString() ?? now()->toDateString(),
-                'reason' => $t->reason,
-                'tokensReceived' => $t->token_count,
-                'warningCardStatus' => $status,
-            ])->values(),
+            'isBlacklisted' => $currentSemesterTokens > 10,
+            'history' => $tokens->map(function (Token $t) use ($semStart, $semEnd, $status) {
+                $tokenDate = $t->issued_date?->toDateString() ?? $t->created_at?->toDateString() ?? now()->toDateString();
+                $inActiveSemester = $tokenDate >= $semStart && $tokenDate <= $semEnd;
+
+                return [
+                    'id' => (string) $t->id,
+                    'studentId' => (string) $t->student_id,
+                    'date' => $tokenDate,
+                    'reason' => $t->reason,
+                    'tokensReceived' => $t->token_count,
+                    'warningCardStatus' => $inActiveSemester ? $status : 'none',
+                    'inActiveSemester' => $inActiveSemester,
+                ];
+            })->values(),
         ];
 
         return response()->json([
@@ -364,6 +403,10 @@ class StudentController extends Controller
             $request->user()->id
         );
 
+        if ($isApproved) {
+            $this->syncTodayPunchesAfterStudentLink();
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Student registration '.($isApproved ? 'approved' : 'rejected').' successfully.',
@@ -409,7 +452,13 @@ class StudentController extends Controller
     public function warningTickets(Request $request)
     {
         $currentUser = $request->user();
+        $semester = app(SemesterService::class)->active();
+        $semStart = $semester['startDate'];
+        $semEnd = $semester['endDate'];
+
         $ticketsQuery = Ticket::with(['violation.student.user', 'violation.student.hostel', 'violation.student.room'])
+            ->whereDate('issue_date', '>=', $semStart)
+            ->whereDate('issue_date', '<=', $semEnd)
             ->latest('issue_date');
 
         if ($currentUser->isHostelScoped()) {
@@ -418,25 +467,44 @@ class StudentController extends Controller
             });
         }
 
-        $tickets = $ticketsQuery->get()
-            ->map(fn ($t) => [
-                'id' => (string) $t->id,
-                'ticketNumber' => 'WT-'.str_pad($t->id, 4, '0', STR_PAD_LEFT),
-                'studentId' => (string) $t->violation?->student_id,
-                'studentName' => $t->violation?->student?->user?->name ?? 'Unknown Student',
-                'enrollmentNo' => $t->violation?->student?->enrollment_no ?? '',
-                'hostel' => $t->violation?->student?->hostel?->name ?? '',
-                'roomNumber' => $t->violation?->student?->room?->room_number ?? '',
-                'tier' => 1,
-                'tokenCount' => 1,
-                'warningCard' => 'normal_warning',
-                'issueDate' => $t->issue_date?->toDateString() ?? now()->toDateString(),
-                'status' => $t->warning_status ?? 'Issued',
-                'remarks' => $t->violation?->description ?? 'Absence without approved leave',
-            ]);
+        $ticketRows = $ticketsQuery->get();
+        $studentIds = $ticketRows->pluck('violation.student_id')->filter()->unique()->values();
+        $tokensByStudent = Token::query()
+            ->whereIn('student_id', $studentIds)
+            ->whereDate('issued_date', '>=', $semStart)
+            ->whereDate('issued_date', '<=', $semEnd)
+            ->selectRaw('student_id, SUM(token_count) as total_tokens')
+            ->groupBy('student_id')
+            ->pluck('total_tokens', 'student_id');
+
+        $tickets = $ticketRows
+            ->map(function ($t) use ($tokensByStudent) {
+                $sid = $t->violation?->student_id;
+                $tokenTotal = (int) ($tokensByStudent[$sid] ?? 1);
+                $card = $tokenTotal > 10
+                    ? 'red_card_blacklist'
+                    : ($tokenTotal >= 6 ? 'yellow_card' : 'normal_warning');
+
+                return [
+                    'id' => (string) $t->id,
+                    'ticketNumber' => 'WT-'.str_pad($t->id, 4, '0', STR_PAD_LEFT),
+                    'studentId' => (string) $sid,
+                    'studentName' => $t->violation?->student?->user?->name ?? 'Unknown Student',
+                    'enrollmentNo' => $t->violation?->student?->enrollment_no ?? '',
+                    'hostel' => $t->violation?->student?->hostel?->name ?? '',
+                    'roomNumber' => $t->violation?->student?->room?->room_number ?? '',
+                    'tier' => $tokenTotal > 10 ? 3 : ($tokenTotal >= 6 ? 2 : 1),
+                    'tokenCount' => $tokenTotal,
+                    'warningCard' => $card,
+                    'issueDate' => $t->issue_date?->toDateString() ?? now()->toDateString(),
+                    'status' => $t->warning_status ?? 'Issued',
+                    'remarks' => $t->violation?->description ?? 'Absence without approved leave',
+                ];
+            });
 
         return response()->json([
             'success' => true,
+            'semester' => $semester,
             'tickets' => $tickets,
         ]);
     }
@@ -687,6 +755,8 @@ class StudentController extends Controller
             $request->user()->id
         );
 
+        $this->syncTodayPunchesAfterStudentLink();
+
         $freshStudent = $student->fresh()->load('user', 'hostel', 'room');
 
         return response()->json([
@@ -814,6 +884,8 @@ class StudentController extends Controller
         } catch (\Throwable $e) {
             \Log::warning('MongoDB biometric sync skipped: '.$e->getMessage());
         }
+
+        $this->syncTodayPunchesAfterStudentLink();
 
         return response()->json([
             'success' => true,

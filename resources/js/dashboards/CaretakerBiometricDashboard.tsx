@@ -14,11 +14,18 @@ import {
   ShieldCheck,
   Wifi,
   WifiOff,
-  Key
+  Key,
+  Pencil,
+  X,
+  Save,
+  Calendar,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { BiometricDevice, Hostel, Room } from '../types';
 import { SixTierAbsenceAlerts } from '../components/dashboard/SixTierAbsenceAlerts';
+import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
 
 const DEVICE_SERIAL = 'RSS20241199684';
 
@@ -33,6 +40,7 @@ interface EnrolledUser {
   privilege: string | null;
   enabled?: boolean | null;
   hasInfo: boolean;
+  enrolledDate?: string | null;
   infoFetchedAt?: string | null;
   fingerprintEnrolled: boolean;
   fingerprintCount: number;
@@ -111,6 +119,74 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
   const [selectedEnrolledHostel, setSelectedEnrolledHostel] = useState<string>('all');
   const [selectedLiveHostel, setSelectedLiveHostel] = useState<string>('all');
+  const [enrolledDateFilter, setEnrolledDateFilter] = useState<string>('');
+  const [showAllEnrolledUsers, setShowAllEnrolledUsers] = useState<boolean>(false);
+  const [liveDateFilter, setLiveDateFilter] = useState<string>('');
+  const [showAllLivePunches, setShowAllLivePunches] = useState<boolean>(false);
+
+  // Edit Terminal Modal State (for Mehra Ji)
+  const [editingDevice, setEditingDevice] = useState<any | null>(null);
+  const [editDeviceForm, setEditDeviceForm] = useState({
+    deviceName: '',
+    modelNo: '',
+    deviceSerial: '',
+    ipAddress: '',
+    firmwareVersion: '',
+    location: '',
+    hostelId: '',
+    deviceStatus: 'online_synced'
+  });
+  const [isSavingDevice, setIsSavingDevice] = useState(false);
+  const [deviceEditError, setDeviceEditError] = useState<string | null>(null);
+  const [deviceEditFeedback, setDeviceEditFeedback] = useState<string | null>(null);
+
+  const openEditDeviceModal = (device: any) => {
+    setEditingDevice(device);
+    setDeviceEditError(null);
+    setEditDeviceForm({
+      deviceName: device.deviceName || device.name || '',
+      modelNo: device.modelNo || 'S362',
+      deviceSerial: device.deviceSerial || device.deviceId || '',
+      ipAddress: device.ipAddress || '',
+      firmwareVersion: device.firmware || '',
+      location: device.location || '',
+      hostelId: String(device.hostelId || ''),
+      deviceStatus: device.deviceStatus || device.status || 'online_synced'
+    });
+  };
+
+  const handleSaveDeviceEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDevice) return;
+    setIsSavingDevice(true);
+    setDeviceEditError(null);
+
+    try {
+      const res = await apiService.updateBiometricDevice(editingDevice.id, {
+        deviceName: editDeviceForm.deviceName,
+        modelNo: editDeviceForm.modelNo || null,
+        deviceSerial: editDeviceForm.deviceSerial,
+        ipAddress: editDeviceForm.ipAddress || null,
+        firmwareVersion: editDeviceForm.firmwareVersion || null,
+        location: editDeviceForm.location || null,
+        hostelId: editDeviceForm.hostelId || undefined,
+        deviceStatus: editDeviceForm.deviceStatus
+      });
+
+      if (res.success) {
+        await loadDevices();
+        setEditingDevice(null);
+        setDeviceEditFeedback(`Updated ${res.device?.deviceName || editDeviceForm.deviceName} (Model: ${editDeviceForm.modelNo || 'S362'}).`);
+        window.setTimeout(() => setDeviceEditFeedback(null), 5000);
+      }
+    } catch (error: any) {
+      setDeviceEditError(
+        error.response?.data?.message || 'Failed to update biometric terminal details.'
+      );
+    } finally {
+      setIsSavingDevice(false);
+    }
+  };
 
   const selectedMachineUser = enrolledUsers.find(
     (user) => user.userId === selectedMachineUserId
@@ -120,46 +196,64 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     ? liveData.punches
     : [];
 
+  const dateScopedEnrolledUsers = React.useMemo(() => {
+    if (!enrolledDateFilter) return enrolledUsers;
+    return enrolledUsers.filter((u) => u.enrolledDate === enrolledDateFilter);
+  }, [enrolledUsers, enrolledDateFilter]);
+
   const enrolledCounts = React.useMemo(() => {
-    const counts = { all: enrolledUsers.length, BH1: 0, GH: 0, BH2: 0 };
-    enrolledUsers.forEach((u) => {
+    const counts = { all: dateScopedEnrolledUsers.length, BH1: 0, GH: 0, BH2: 0 };
+    dateScopedEnrolledUsers.forEach((u) => {
       const code = (u.hostelCode || '').toUpperCase();
       if (code === 'BH1' || u.hostelId === '1') counts.BH1++;
       else if (code === 'GH' || u.hostelId === '2') counts.GH++;
       else if (code === 'BH2' || u.hostelId === '3') counts.BH2++;
     });
     return counts;
-  }, [enrolledUsers]);
+  }, [dateScopedEnrolledUsers]);
 
   const filteredEnrolledUsers = React.useMemo(() => {
-    if (selectedEnrolledHostel === 'all') return enrolledUsers;
-    return enrolledUsers.filter((u) => {
+    if (selectedEnrolledHostel === 'all') return dateScopedEnrolledUsers;
+    return dateScopedEnrolledUsers.filter((u) => {
       const code = (u.hostelCode || '').toUpperCase();
       if (selectedEnrolledHostel === 'BH1') return code === 'BH1' || u.hostelId === '1';
       if (selectedEnrolledHostel === 'GH') return code === 'GH' || u.hostelId === '2';
       if (selectedEnrolledHostel === 'BH2') return code === 'BH2' || u.hostelId === '3';
       return true;
     });
-  }, [enrolledUsers, selectedEnrolledHostel]);
+  }, [dateScopedEnrolledUsers, selectedEnrolledHostel]);
+
+  const visibleEnrolledUsers = React.useMemo(() => {
+    return showAllEnrolledUsers ? filteredEnrolledUsers : filteredEnrolledUsers.slice(0, 10);
+  }, [filteredEnrolledUsers, showAllEnrolledUsers]);
+
+  const dateScopedLivePunches = React.useMemo(() => {
+    if (!liveDateFilter) return livePunches;
+    return livePunches.filter((p: any) => String(p.punchTime || '').slice(0, 10) === liveDateFilter);
+  }, [livePunches, liveDateFilter]);
 
   const liveCounts = React.useMemo(() => {
-    const counts = { all: livePunches.length, BH1: 0, GH: 0, BH2: 0 };
-    livePunches.forEach((p: any) => {
+    const counts = { all: dateScopedLivePunches.length, BH1: 0, GH: 0, BH2: 0 };
+    dateScopedLivePunches.forEach((p: any) => {
       const code = (p.hostelCode || (p.hostelId === '2' ? 'GH' : p.hostelId === '3' ? 'BH2' : 'BH1')).toUpperCase();
       if (code === 'BH1') counts.BH1++;
       else if (code === 'GH') counts.GH++;
       else if (code === 'BH2') counts.BH2++;
     });
     return counts;
-  }, [livePunches]);
+  }, [dateScopedLivePunches]);
 
   const filteredLivePunches = React.useMemo(() => {
-    if (selectedLiveHostel === 'all') return livePunches;
-    return livePunches.filter((p: any) => {
+    if (selectedLiveHostel === 'all') return dateScopedLivePunches;
+    return dateScopedLivePunches.filter((p: any) => {
       const code = (p.hostelCode || (p.hostelId === '2' ? 'GH' : p.hostelId === '3' ? 'BH2' : 'BH1')).toUpperCase();
       return code === selectedLiveHostel;
     });
-  }, [livePunches, selectedLiveHostel]);
+  }, [dateScopedLivePunches, selectedLiveHostel]);
+
+  const visibleLivePunches = React.useMemo(() => {
+    return showAllLivePunches ? filteredLivePunches : filteredLivePunches.slice(0, 10);
+  }, [filteredLivePunches, showAllLivePunches]);
 
   const loadHostels = async () => {
     try {
@@ -250,13 +344,17 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     try {
       await apiService.triggerBiometricUserFetch(DEVICE_SERIAL);
 
-      // 6 seconds delay allows device full heartbeat + template processing cycle
+      // Kick off GET_USER_INFO auto-fetch once GET_USER_ID_LIST lands (~3.5s), then refresh full user details (~7s)
+      setTimeout(() => {
+        loadEnrolledUsers();
+      }, 3500);
+
       setTimeout(async () => {
-        await loadEnrolledUsers();
+        await Promise.all([loadEnrolledUsers(), loadLivePunches()]);
         setIsSyncingDevice(false);
         setSyncFeedback('New terminal enrollments synchronized successfully.');
         setTimeout(() => setSyncFeedback(null), 5000);
-      }, 6000);
+      }, 7000);
     } catch (error: any) {
       setIsSyncingDevice(false);
       setSyncFeedback(
@@ -644,10 +742,17 @@ export const CaretakerBiometricDashboard: React.FC = () => {
         </div>
 
         {/* 3 Terminal Cards Grid */}
+        {deviceEditFeedback && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{deviceEditFeedback}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {devices.map((device: any) => {
             const isDevOnline = device.isOnline === true || device.status === 'online_synced';
-            const badgeColor = 
+            const badgeColor =
               device.hostelCode === 'GH'
                 ? 'bg-rose-100 text-rose-800 border-rose-200'
                 : device.hostelCode === 'BH2'
@@ -663,18 +768,29 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                     : 'border-slate-200 bg-slate-50/40'
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${badgeColor}`}>
                     {device.hostelCode || `Hostel ${device.hostelId}`}
                   </span>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                    isDevOnline
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isDevOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                    {isDevOnline ? 'Online (Live)' : 'Standby / Ready'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                      isDevOnline
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isDevOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                      {isDevOnline ? 'Online (Live)' : 'Standby / Ready'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openEditDeviceModal(device)}
+                      title="Edit device model, serial, IP or hostel"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition cursor-pointer"
+                    >
+                      <Pencil className="w-3 h-3" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-3">
@@ -688,13 +804,29 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
                 <div className="mt-3 pt-3 border-t border-slate-100 text-xs space-y-1.5">
                   <div className="flex justify-between text-slate-500">
+                    <span>Model No.:</span>
+                    <span className="font-mono font-semibold text-slate-800">{device.modelNo || 'S362'}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
                     <span>Terminal Serial:</span>
                     <span className="font-mono font-semibold text-slate-800">{device.deviceSerial || device.deviceId}</span>
                   </div>
                   <div className="flex justify-between text-slate-500">
                     <span>IP / Hardware:</span>
-                    <span className="font-mono text-slate-600">{device.ipAddress} • S362</span>
+                    <span className="font-mono text-slate-600">{device.ipAddress} • {device.modelNo || 'S362'}</span>
                   </div>
+                  {device.firmware && (
+                    <div className="flex justify-between text-slate-500">
+                      <span>Firmware:</span>
+                      <span className="font-mono text-slate-600">{device.firmware}</span>
+                    </div>
+                  )}
+                  {device.location && (
+                    <div className="flex justify-between text-slate-500">
+                      <span>Location:</span>
+                      <span className="text-slate-700 font-medium">{device.location}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-slate-500">
                     <span>Mapped Residents:</span>
                     <span className="font-bold text-indigo-700">{device.studentCount ?? 0} Students</span>
@@ -707,16 +839,42 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       </div>
 
       {/* Enrolled Machine Users */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Fingerprint className="w-5 h-5 text-indigo-600" />
+            <Fingerprint className="w-5 h-5 text-indigo-600 shrink-0" />
             <h2 className="font-bold text-sm text-slate-800">
               Actual Machine Enrolled Users
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
+              <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <label htmlFor="enrolled-users-date-filter" className="text-slate-600 font-medium whitespace-nowrap">
+                Enroll Date:
+              </label>
+              <input
+                id="enrolled-users-date-filter"
+                type="date"
+                value={enrolledDateFilter}
+                onChange={(e) => {
+                  setEnrolledDateFilter(e.target.value);
+                  setShowAllEnrolledUsers(false);
+                }}
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 font-mono text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500"
+              />
+              <DateQuickPresets
+                value={enrolledDateFilter}
+                onChange={(date) => {
+                  setEnrolledDateFilter(date);
+                  setShowAllEnrolledUsers(false);
+                }}
+                allowAll
+                tone="indigo"
+              />
+            </div>
+
             <button
               type="button"
               onClick={handleSyncFromMachine}
@@ -727,7 +885,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
               <span>{isSyncingDevice ? 'Syncing Machine...' : 'Pull Latest from Machine'}</span>
             </button>
 
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-500 hidden sm:inline">
               Auto refresh: 10 seconds
             </span>
           </div>
@@ -777,85 +935,124 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
         {filteredEnrolledUsers.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-500">
-            No enrolled user records found for the selected partition.
+            {enrolledDateFilter
+              ? `No enrolled user records found on ${enrolledDateFilter} for this partition.`
+              : 'No enrolled user records found for the selected partition.'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="p-3">Hostel</th>
-                  <th className="p-3">Machine User ID</th>
-                  <th className="p-3">Student / Machine Name</th>
-                  <th className="p-3">Academic Enrollment</th>
-                  <th className="p-3">Allocated Room</th>
-                  <th className="p-3">Privilege</th>
-                  <th className="p-3">Fingerprint</th>
-                  <th className="p-3">Registration Status</th>
-                </tr>
-              </thead>
+          <div className="space-y-3">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="p-3">Hostel</th>
+                    <th className="p-3">Machine User ID</th>
+                    <th className="p-3">Student / Machine Name</th>
+                    <th className="p-3">Academic Enrollment</th>
+                    <th className="p-3">Allocated Room</th>
+                    <th className="p-3">Privilege</th>
+                    <th className="p-3">Fingerprint</th>
+                    <th className="p-3">Registration Status</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {filteredEnrolledUsers.map((user) => {
-                  const hCode = user.hostelCode || (user.hostelId === '2' ? 'GH' : user.hostelId === '3' ? 'BH2' : 'BH1');
-                  const badgeColor =
-                    hCode === 'GH'
-                      ? 'bg-rose-100 text-rose-800'
-                      : hCode === 'BH2'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-indigo-100 text-indigo-800';
+                <tbody>
+                  {visibleEnrolledUsers.map((user) => {
+                    const hCode = user.hostelCode || (user.hostelId === '2' ? 'GH' : user.hostelId === '3' ? 'BH2' : 'BH1');
+                    const badgeColor =
+                      hCode === 'GH'
+                        ? 'bg-rose-100 text-rose-800'
+                        : hCode === 'BH2'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-indigo-100 text-indigo-800';
 
-                  return (
-                    <tr
-                      key={`${user.deviceSerial}-${user.userId}`}
-                      className="border-t border-slate-100 hover:bg-slate-50/50"
-                    >
-                      <td className="p-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
-                          {hCode}
-                        </span>
-                        <span className="text-[11px] text-slate-500 ml-1.5 font-mono">
-                          {user.deviceName || user.deviceSerial}
-                        </span>
-                      </td>
-                      <td className="p-3 font-mono font-bold text-slate-900">
-                        {user.userId}
-                      </td>
-                      <td className="p-3">
-                        <span className={`font-medium ${user.name ? 'text-slate-900' : 'text-slate-400 italic'}`}>
-                          {user.name || 'Name not fetched'}
-                        </span>
-                      </td>
-                      <td className="p-3 font-mono text-slate-600">
-                        {user.enrollmentNo || '-'}
-                      </td>
-                      <td className="p-3">
-                        {user.roomNumber ? `Room ${user.roomNumber} (${user.bedNumber || 'Bed -'})` : '-'}
-                      </td>
-                      <td className="p-3">
-                        {user.privilege || 'User'}
-                      </td>
-                      <td className="p-3">
-                        {user.fingerprintEnrolled
-                          ? <span className="text-emerald-700 font-semibold">Yes ({user.fingerprintCount})</span>
-                          : <span className="text-slate-400">Not confirmed</span>}
-                      </td>
-                      <td className="p-3">
-                        {user.isRegistered ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            Registered
+                    return (
+                      <tr
+                        key={`${user.deviceSerial}-${user.userId}`}
+                        className="border-t border-slate-100 hover:bg-slate-50/50"
+                      >
+                        <td className="p-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
+                            {hCode}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                            New Machine ID
+                          <span className="text-[11px] text-slate-500 ml-1.5 font-mono">
+                            {user.deviceName || user.deviceSerial}
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="p-3 font-mono font-bold text-slate-900">
+                          {user.userId}
+                        </td>
+                        <td className="p-3">
+                          <span className={`font-medium ${user.name ? 'text-slate-900' : 'text-slate-400 italic'}`}>
+                            {user.name || 'Name not fetched'}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-slate-600">
+                          {user.enrollmentNo || '-'}
+                        </td>
+                        <td className="p-3">
+                          {user.roomNumber ? `Room ${user.roomNumber} (${user.bedNumber || 'Bed -'})` : '-'}
+                        </td>
+                        <td className="p-3">
+                          {user.privilege || 'User'}
+                        </td>
+                        <td className="p-3">
+                          {user.fingerprintEnrolled
+                            ? <span className="text-emerald-700 font-semibold">Yes ({user.fingerprintCount})</span>
+                            : <span className="text-slate-400">Not confirmed</span>}
+                        </td>
+                        <td className="p-3">
+                          {user.isRegistered ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              Registered
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRegistrationMode('device');
+                                handleMachineUserChange(user.userId);
+                                document.getElementById('device-manager-enroll-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-semibold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 cursor-pointer"
+                            >
+                              <span>New Machine ID</span>
+                              <span className="underline">Enroll →</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredEnrolledUsers.length > 10 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                <span className="text-slate-500">
+                  Showing <strong className="text-slate-800">{visibleEnrolledUsers.length}</strong> of{' '}
+                  <strong className="text-slate-800">{filteredEnrolledUsers.length}</strong> enrolled users
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAllEnrolledUsers((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold transition cursor-pointer"
+                >
+                  {showAllEnrolledUsers ? (
+                    <>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                      <span>Show Less</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      <span>View More ({filteredEnrolledUsers.length - 10} more)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -866,7 +1063,7 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       </div>
 
       {/* Student Registration */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5">
+      <div id="device-manager-enroll-form" className="bg-white rounded-xl border border-slate-200 p-5 space-y-5">
 
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
           <UserPlus className="w-5 h-5 text-indigo-600" />
@@ -1453,18 +1650,47 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       </div>
 
       {/* Live Punches */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-600" />
+            <Clock className="w-5 h-5 text-indigo-600 shrink-0" />
             <h2 className="font-bold text-sm text-slate-800">
               Live Biometric Punch Records
             </h2>
           </div>
-          <span className="text-xs text-slate-500">
-            Real-time feed across terminals
-          </span>
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
+              <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <label htmlFor="live-punches-date-filter" className="text-slate-600 font-medium whitespace-nowrap">
+                Punch Date:
+              </label>
+              <input
+                id="live-punches-date-filter"
+                type="date"
+                value={liveDateFilter}
+                onChange={(e) => {
+                  setLiveDateFilter(e.target.value);
+                  setShowAllLivePunches(false);
+                }}
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 font-mono text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500"
+              />
+              <DateQuickPresets
+                value={liveDateFilter}
+                onChange={(date) => {
+                  setLiveDateFilter(date);
+                  setShowAllLivePunches(false);
+                }}
+                allowAll
+                tone="indigo"
+              />
+            </div>
+
+            <span className="text-xs text-slate-500 hidden sm:inline">
+              Real-time feed across terminals
+            </span>
+          </div>
         </div>
 
         {/* Hostel Partition Filter Tabs */}
@@ -1504,75 +1730,105 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
         {!liveError && filteredLivePunches.length === 0 && (
           <div className="p-6 text-center text-sm text-slate-500">
-            No live punch records found for the selected partition.
+            {liveDateFilter
+              ? `No live punch records found on ${liveDateFilter} for the selected partition.`
+              : 'No live punch records found for the selected partition.'}
           </div>
         )}
 
         {filteredLivePunches.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="p-3">Biometric ID</th>
-                  <th className="p-3">Student</th>
-                  <th className="p-3">Hostel / Terminal</th>
-                  <th className="p-3">Enrollment No</th>
-                  <th className="p-3">Punch Time</th>
-                  <th className="p-3">Recognition</th>
-                </tr>
-              </thead>
+          <div className="space-y-3">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="p-3">Biometric ID</th>
+                    <th className="p-3">Student</th>
+                    <th className="p-3">Hostel / Terminal</th>
+                    <th className="p-3">Enrollment No</th>
+                    <th className="p-3">Punch Time</th>
+                    <th className="p-3">Recognition</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {filteredLivePunches.map((punch: any, index: number) => {
-                  const hCode = punch.hostelCode || (punch.hostelId === '2' ? 'GH' : punch.hostelId === '3' ? 'BH2' : 'BH1');
-                  const badgeColor = 
-                    hCode === 'GH'
-                      ? 'bg-rose-100 text-rose-800'
-                      : hCode === 'BH2'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-indigo-100 text-indigo-800';
+                <tbody>
+                  {visibleLivePunches.map((punch: any, index: number) => {
+                    const hCode = punch.hostelCode || (punch.hostelId === '2' ? 'GH' : punch.hostelId === '3' ? 'BH2' : 'BH1');
+                    const badgeColor =
+                      hCode === 'GH'
+                        ? 'bg-rose-100 text-rose-800'
+                        : hCode === 'BH2'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-indigo-100 text-indigo-800';
 
-                  return (
-                    <tr
-                      key={punch.id || index}
-                      className="border-t border-slate-100"
-                    >
-                      <td className="p-3 font-mono">
-                        {punch.biometricId || '-'}
-                      </td>
-                      <td className="p-3 font-medium text-slate-900">
-                        {punch.studentName || 'Unrecognized'}
-                      </td>
-                      <td className="p-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
-                          {hCode}
-                        </span>
-                        <span className="text-[11px] text-slate-500 ml-1.5 font-mono">
-                          {punch.deviceSerial || 'S362'}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        {punch.enrollmentNo || '-'}
-                      </td>
-                      <td className="p-3 font-mono text-slate-600">
-                        {punch.punchTime || '-'}
-                      </td>
-                      <td className="p-3">
-                        {punch.recognized ? (
-                          <span className="text-emerald-600 font-semibold">
-                            Recognized
+                    return (
+                      <tr
+                        key={punch.id || index}
+                        className="border-t border-slate-100"
+                      >
+                        <td className="p-3 font-mono">
+                          {punch.biometricId || '-'}
+                        </td>
+                        <td className="p-3 font-medium text-slate-900">
+                          {punch.studentName || 'Unrecognized'}
+                        </td>
+                        <td className="p-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
+                            {hCode}
                           </span>
-                        ) : (
-                          <span className="text-amber-600 font-semibold">
-                            Not linked
+                          <span className="text-[11px] text-slate-500 ml-1.5 font-mono">
+                            {punch.deviceSerial || 'S362'}
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="p-3">
+                          {punch.enrollmentNo || '-'}
+                        </td>
+                        <td className="p-3 font-mono text-slate-600">
+                          {punch.punchTime || '-'}
+                        </td>
+                        <td className="p-3">
+                          {punch.recognized ? (
+                            <span className="text-emerald-600 font-semibold">
+                              Recognized
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 font-semibold">
+                              Not linked
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredLivePunches.length > 10 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                <span className="text-slate-500">
+                  Showing <strong className="text-slate-800">{visibleLivePunches.length}</strong> of{' '}
+                  <strong className="text-slate-800">{filteredLivePunches.length}</strong> punch records
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAllLivePunches((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold transition cursor-pointer"
+                >
+                  {showAllLivePunches ? (
+                    <>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                      <span>Show Less</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      <span>View More ({filteredLivePunches.length - 10} more)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1585,6 +1841,174 @@ export const CaretakerBiometricDashboard: React.FC = () => {
         <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
           <AlertTriangle className="w-4 h-4 inline mr-2" />
           {pageError}
+        </div>
+      )}
+
+      {/* Edit Biometric Terminal Modal */}
+      {editingDevice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div className="bg-slate-900 px-5 py-4 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-indigo-400" />
+                <div>
+                  <h3 className="text-sm font-bold">Edit Biometric Terminal</h3>
+                  <p className="text-[11px] text-slate-300">
+                    Update hardware model number, serial, IP address, firmware, or hostel mapping
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDevice(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-md transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDeviceEdit} className="p-5 space-y-4">
+              {deviceEditError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                  {deviceEditError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Terminal Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editDeviceForm.deviceName}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, deviceName: e.target.value }))}
+                    placeholder="Boys Hostel 1 Terminal (BH1 - S362)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Model No.
+                  </label>
+                  <input
+                    type="text"
+                    value={editDeviceForm.modelNo}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, modelNo: e.target.value }))}
+                    placeholder="e.g. S362"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Terminal Serial No.
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editDeviceForm.deviceSerial}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, deviceSerial: e.target.value }))}
+                    placeholder="e.g. RSS20241199684"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    IP Address
+                  </label>
+                  <input
+                    type="text"
+                    value={editDeviceForm.ipAddress}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, ipAddress: e.target.value }))}
+                    placeholder="e.g. 192.168.1.22"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Firmware Version
+                  </label>
+                  <input
+                    type="text"
+                    value={editDeviceForm.firmwareVersion}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, firmwareVersion: e.target.value }))}
+                    placeholder="e.g. S362 v3.15.630"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Assigned Hostel
+                  </label>
+                  <select
+                    value={editDeviceForm.hostelId}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, hostelId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {hostels.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name} ({h.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Device Status
+                  </label>
+                  <select
+                    value={editDeviceForm.deviceStatus}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, deviceStatus: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="online_synced">Online / Synced</option>
+                    <option value="standby">Standby / Ready</option>
+                    <option value="active">Active</option>
+                    <option value="offline">Offline</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Physical Location / Gate
+                  </label>
+                  <input
+                    type="text"
+                    value={editDeviceForm.location}
+                    onChange={(e) => setEditDeviceForm((prev) => ({ ...prev, location: e.target.value }))}
+                    placeholder="e.g. Main Entrance Gate, BH1 Lobby"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingDevice(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingDevice}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSavingDevice ? 'Saving...' : 'Save Device Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

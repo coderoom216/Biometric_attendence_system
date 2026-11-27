@@ -19,13 +19,16 @@ import {
   FileText,
   AlertOctagon,
   UserCheck,
-  X
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { AttendanceRecord, BiometricDevice, Hostel, LeaveRecord, Room, Student } from '../types';
 import { HostelAttendanceBarChart } from '../components/dashboard/HostelAttendanceBarChart';
 import { WarningTicketsTable } from '../components/dashboard/WarningTicketsTable';
+import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
 
 type SummaryCategory = 'residents' | 'present' | 'late' | 'leave' | 'follow-up';
 
@@ -39,6 +42,8 @@ interface EnrolledUser {
   hostelCode?: string;
   privilege: string | null;
   hasInfo: boolean;
+  enrolledDate?: string | null;
+  infoFetchedAt?: string | null;
   fingerprintEnrolled: boolean;
   fingerprintCount: number;
   isRegistered?: boolean;
@@ -107,6 +112,30 @@ export const CaretakerDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncingDevice, setIsSyncingDevice] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [enrolledDateFilter, setEnrolledDateFilter] = useState<string>('');
+  const [showAllEnrolledUsers, setShowAllEnrolledUsers] = useState<boolean>(false);
+  const [liveDateFilter, setLiveDateFilter] = useState<string>('');
+  const [showAllLivePunches, setShowAllLivePunches] = useState<boolean>(false);
+
+  const filteredEnrolledUsers = React.useMemo(() => {
+    if (!enrolledDateFilter) return enrolledUsers;
+    return enrolledUsers.filter((u) => u.enrolledDate === enrolledDateFilter);
+  }, [enrolledUsers, enrolledDateFilter]);
+
+  const visibleEnrolledUsers = React.useMemo(() => {
+    return showAllEnrolledUsers ? filteredEnrolledUsers : filteredEnrolledUsers.slice(0, 10);
+  }, [filteredEnrolledUsers, showAllEnrolledUsers]);
+
+  const livePunches: any[] = Array.isArray(liveData?.punches) ? liveData.punches : [];
+
+  const filteredLivePunches = React.useMemo(() => {
+    if (!liveDateFilter) return livePunches;
+    return livePunches.filter((p: any) => String(p.punchTime || '').slice(0, 10) === liveDateFilter);
+  }, [livePunches, liveDateFilter]);
+
+  const visibleLivePunches = React.useMemo(() => {
+    return showAllLivePunches ? filteredLivePunches : filteredLivePunches.slice(0, 10);
+  }, [filteredLivePunches, showAllLivePunches]);
 
   // Enrollment state (same full form as Biometric Device Manager, locked to assigned hostel)
   const [registrationMode, setRegistrationMode] = useState<'device' | 'manual'>('device');
@@ -139,10 +168,11 @@ export const CaretakerDashboard: React.FC = () => {
 
   // Assign Leave Modal (Caretaker assigns -> Warden approves)
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const [leaveForm, setLeaveForm] = useState({
     studentId: '',
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: new Date().toISOString().slice(0, 10),
+    startDate: todayIst,
+    endDate: todayIst,
     reason: '',
     gatePassNo: `GP-${Date.now().toString().slice(-4)}`,
     parentConsentVerified: true,
@@ -184,6 +214,8 @@ export const CaretakerDashboard: React.FC = () => {
   const loadAll = async () => {
     setIsLoading(true);
     try {
+      apiService.triggerBiometricUserFetch(activeDeviceSerial).catch(() => {});
+
       const [hRes, dRes, eRes, sRes, attRes, defRes, lvRes] = await Promise.all([
         apiService.getHostels(),
         apiService.getBiometricDevices(),
@@ -229,33 +261,45 @@ export const CaretakerDashboard: React.FC = () => {
       apiService.getBiometricDevices().then((r) => r.success && setDevices(r.devices)).catch(() => {});
       apiService.getBiometricEnrolledUsers().then((r) => r.success && setEnrolledUsers(r.users || [])).catch(() => {});
       apiService.getLiveBiometricPunches().then((r) => { setLiveData(r); setLiveError(null); }).catch(() => {});
-    }, 8000);
+      apiService.getLeaves().then((r) => r.success && setLeaves(r.leaves)).catch(() => {});
+    }, 5000);
     return () => window.clearInterval(timer);
   }, [user]);
 
   useEffect(() => {
     if (!attendanceDate) return;
     let isCurrent = true;
-    setIsSummaryLoading(true);
-    setSummaryError(null);
-    apiService
-      .getAttendanceHistory({ startDate: attendanceDate, endDate: attendanceDate })
-      .then((res) => {
-        if (isCurrent && res.success) setDateAttendance(res.records);
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setDateAttendance([]);
-          setSummaryError('Unable to load attendance records for this date.');
-        }
-      })
-      .finally(() => {
-        if (isCurrent) setIsSummaryLoading(false);
-      });
+    const fetchDateAttendance = (showSpinner: boolean) => {
+      if (showSpinner) setIsSummaryLoading(true);
+      setSummaryError(null);
+      Promise.all([
+        apiService.getAttendanceHistory({ startDate: attendanceDate, endDate: attendanceDate }),
+        apiService.getDefaulters(attendanceDate, assignedHostelId || undefined)
+      ])
+        .then(([histRes, defRes]) => {
+          if (!isCurrent) return;
+          if (histRes.success) setDateAttendance(histRes.records);
+          if (defRes.success) setDefaulters(defRes.defaulters);
+        })
+        .catch(() => {
+          if (isCurrent && showSpinner) {
+            setDateAttendance([]);
+            setSummaryError('Unable to load attendance records for this date.');
+          }
+        })
+        .finally(() => {
+          if (isCurrent && showSpinner) setIsSummaryLoading(false);
+        });
+    };
+
+    fetchDateAttendance(true);
+    const summaryTimer = window.setInterval(() => fetchDateAttendance(false), 5000);
+
     return () => {
       isCurrent = false;
+      window.clearInterval(summaryTimer);
     };
-  }, [attendanceDate, user]);
+  }, [attendanceDate, assignedHostelId, user]);
 
   const handleSyncFromMachine = async () => {
     setIsSyncingDevice(true);
@@ -265,10 +309,19 @@ export const CaretakerDashboard: React.FC = () => {
       window.setTimeout(async () => {
         const eRes = await apiService.getBiometricEnrolledUsers();
         if (eRes.success) setEnrolledUsers(eRes.users || []);
+      }, 3500);
+
+      window.setTimeout(async () => {
+        const [eRes, lRes] = await Promise.all([
+          apiService.getBiometricEnrolledUsers(),
+          apiService.getLiveBiometricPunches().catch(() => null),
+        ]);
+        if (eRes.success) setEnrolledUsers(eRes.users || []);
+        if (lRes) setLiveData(lRes);
         setIsSyncingDevice(false);
         setSyncFeedback('Assigned hostel terminal enrollments synchronized.');
         window.setTimeout(() => setSyncFeedback(null), 4000);
-      }, 6000);
+      }, 7000);
     } catch (err: any) {
       setIsSyncingDevice(false);
       setSyncFeedback(err.response?.data?.message || 'Failed to sync assigned terminal.');
@@ -474,7 +527,6 @@ export const CaretakerDashboard: React.FC = () => {
   const lateRecords = dateAttendance.filter((r) => r.status === 'late');
   const leaveRecords = dateAttendance.filter((r) => r.status === 'approved_leave');
   const followUpRecords = dateAttendance.filter((r) => r.isDefaulter || r.status === 'absent');
-  const livePunches: any[] = Array.isArray(liveData?.punches) ? liveData.punches : [];
 
   const filteredStudents = students.filter((s) => {
     const q = studentSearch.toLowerCase();
@@ -610,7 +662,7 @@ export const CaretakerDashboard: React.FC = () => {
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">{assignedDevice.name || assignedDevice.deviceName}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Assigned: <strong className="text-slate-700">{assignedDevice.hostelName}</strong> • Serial: <span className="font-mono font-semibold text-slate-800">{activeDeviceSerial}</span> • IP: <span className="font-mono">{assignedDevice.ipAddress}</span>
+                  Assigned: <strong className="text-slate-700">{assignedDevice.hostelName}</strong> • Model: <span className="font-mono font-semibold text-slate-800">{assignedDevice.modelNo || 'S362'}</span> • Serial: <span className="font-mono font-semibold text-slate-800">{activeDeviceSerial}</span> • IP: <span className="font-mono">{assignedDevice.ipAddress}</span>
                 </p>
               </div>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${deviceOnline ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
@@ -625,24 +677,52 @@ export const CaretakerDashboard: React.FC = () => {
       </div>
 
       {/* Actual Machine Enrolled Users (Hostel Scoped) */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Fingerprint className="w-5 h-5 text-indigo-600" />
+            <Fingerprint className="w-5 h-5 text-indigo-600 shrink-0" />
             <h2 className="font-bold text-sm text-slate-800">
               Actual Machine Enrolled Users ({assignedHostel?.code || 'Assigned Hostel'})
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={handleSyncFromMachine}
-            disabled={isSyncingDevice}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDevice ? 'animate-spin' : ''}`} />
-            <span>{isSyncingDevice ? 'Syncing Machine...' : 'Pull Latest from Machine'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
+              <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <label htmlFor="caretaker-enrolled-date-filter" className="text-slate-600 font-medium whitespace-nowrap">
+                Enroll Date:
+              </label>
+              <input
+                id="caretaker-enrolled-date-filter"
+                type="date"
+                value={enrolledDateFilter}
+                onChange={(e) => {
+                  setEnrolledDateFilter(e.target.value);
+                  setShowAllEnrolledUsers(false);
+                }}
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 font-mono text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500"
+              />
+              <DateQuickPresets
+                value={enrolledDateFilter}
+                onChange={(date) => {
+                  setEnrolledDateFilter(date);
+                  setShowAllEnrolledUsers(false);
+                }}
+                allowAll
+                tone="indigo"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSyncFromMachine}
+              disabled={isSyncingDevice}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 transition cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDevice ? 'animate-spin' : ''}`} />
+              <span>{isSyncingDevice ? 'Syncing Machine...' : 'Pull Latest from Machine'}</span>
+            </button>
+          </div>
         </div>
 
         {syncFeedback && (
@@ -652,61 +732,93 @@ export const CaretakerDashboard: React.FC = () => {
           </div>
         )}
 
-        {enrolledUsers.length === 0 ? (
-          <div className="p-6 text-center text-sm text-slate-500">No machine user records found for your hostel.</div>
+        {filteredEnrolledUsers.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500">
+            {enrolledDateFilter
+              ? `No machine user records found on ${enrolledDateFilter} for your hostel.`
+              : 'No machine user records found for your hostel.'}
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="p-3">Machine User ID</th>
-                  <th className="p-3">Student / Machine Name</th>
-                  <th className="p-3">Academic Enrollment</th>
-                  <th className="p-3">Allocated Room</th>
-                  <th className="p-3">Privilege</th>
-                  <th className="p-3">Fingerprint</th>
-                  <th className="p-3">Registration Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enrolledUsers.map((u) => (
-                  <tr key={`${u.deviceSerial}-${u.userId}`} className="border-t border-slate-100 hover:bg-slate-50/50">
-                    <td className="p-3 font-mono font-bold text-slate-900">{u.userId}</td>
-                    <td className="p-3">
-                      <span className={`font-medium ${u.name ? 'text-slate-900' : 'text-slate-400 italic'}`}>
-                        {u.name || 'Name not fetched'}
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono text-slate-600">{u.enrollmentNo || '-'}</td>
-                    <td className="p-3">{u.roomNumber ? `Room ${u.roomNumber} (${u.bedNumber || 'A'})` : '-'}</td>
-                    <td className="p-3">{u.privilege || 'User'}</td>
-                    <td className="p-3">
-                      {u.fingerprintEnrolled ? <span className="text-emerald-700 font-semibold">Yes ({u.fingerprintCount})</span> : <span className="text-slate-400">Not confirmed</span>}
-                    </td>
-                    <td className="p-3">
-                      {u.isRegistered ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          Registered
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRegistrationMode('device');
-                            handleSelectMachineUser(u.userId);
-                            document.getElementById('caretaker-enroll-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-semibold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 cursor-pointer"
-                        >
-                          <span>New Machine ID</span>
-                          <span className="underline">Enroll →</span>
-                        </button>
-                      )}
-                    </td>
+          <div className="space-y-3">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="p-3">Machine User ID</th>
+                    <th className="p-3">Student / Machine Name</th>
+                    <th className="p-3">Academic Enrollment</th>
+                    <th className="p-3">Allocated Room</th>
+                    <th className="p-3">Privilege</th>
+                    <th className="p-3">Fingerprint</th>
+                    <th className="p-3">Registration Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visibleEnrolledUsers.map((u) => (
+                    <tr key={`${u.deviceSerial}-${u.userId}`} className="border-t border-slate-100 hover:bg-slate-50/50">
+                      <td className="p-3 font-mono font-bold text-slate-900">{u.userId}</td>
+                      <td className="p-3">
+                        <span className={`font-medium ${u.name ? 'text-slate-900' : 'text-slate-400 italic'}`}>
+                          {u.name || 'Name not fetched'}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-slate-600">{u.enrollmentNo || '-'}</td>
+                      <td className="p-3">{u.roomNumber ? `Room ${u.roomNumber} (${u.bedNumber || 'A'})` : '-'}</td>
+                      <td className="p-3">{u.privilege || 'User'}</td>
+                      <td className="p-3">
+                        {u.fingerprintEnrolled ? <span className="text-emerald-700 font-semibold">Yes ({u.fingerprintCount})</span> : <span className="text-slate-400">Not confirmed</span>}
+                      </td>
+                      <td className="p-3">
+                        {u.isRegistered ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Registered
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRegistrationMode('device');
+                              handleSelectMachineUser(u.userId);
+                              document.getElementById('caretaker-enroll-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-semibold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 cursor-pointer"
+                          >
+                            <span>New Machine ID</span>
+                            <span className="underline">Enroll →</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredEnrolledUsers.length > 10 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                <span className="text-slate-500">
+                  Showing <strong className="text-slate-800">{visibleEnrolledUsers.length}</strong> of{' '}
+                  <strong className="text-slate-800">{filteredEnrolledUsers.length}</strong> enrolled users
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAllEnrolledUsers((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold transition cursor-pointer"
+                >
+                  {showAllEnrolledUsers ? (
+                    <>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                      <span>Show Less</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      <span>View More ({filteredEnrolledUsers.length - 10} more)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -898,47 +1010,108 @@ export const CaretakerDashboard: React.FC = () => {
       </div>
 
       {/* Live Biometric Punches (Assigned Hostel Only) */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-600" />
+            <Clock className="w-5 h-5 text-indigo-600 shrink-0" />
             <h2 className="font-bold text-sm text-slate-800">Live Biometric Punch Records ({assignedHostel?.code || 'Assigned Hostel'})</h2>
           </div>
-          <span className="text-xs text-slate-500">Real-time feed for your hostel terminal</span>
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
+              <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <label htmlFor="caretaker-live-date-filter" className="text-slate-600 font-medium whitespace-nowrap">
+                Punch Date:
+              </label>
+              <input
+                id="caretaker-live-date-filter"
+                type="date"
+                value={liveDateFilter}
+                onChange={(e) => {
+                  setLiveDateFilter(e.target.value);
+                  setShowAllLivePunches(false);
+                }}
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 font-mono text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500"
+              />
+              <DateQuickPresets
+                value={liveDateFilter}
+                onChange={(date) => {
+                  setLiveDateFilter(date);
+                  setShowAllLivePunches(false);
+                }}
+                allowAll
+                tone="indigo"
+              />
+            </div>
+
+            <span className="text-xs text-slate-500 hidden sm:inline">Real-time feed for your hostel terminal</span>
+          </div>
         </div>
 
         {liveError && <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">{liveError}</div>}
 
-        {livePunches.length === 0 ? (
-          <div className="p-6 text-center text-sm text-slate-500">No live punches recorded for this hostel yet.</div>
+        {filteredLivePunches.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500">
+            {liveDateFilter
+              ? `No live punches recorded on ${liveDateFilter} for this hostel.`
+              : 'No live punches recorded for this hostel yet.'}
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="p-3">Biometric ID</th>
-                  <th className="p-3">Student</th>
-                  <th className="p-3">Enrollment No</th>
-                  <th className="p-3">Punch Time</th>
-                  <th className="p-3">Recognition</th>
-                </tr>
-              </thead>
-              <tbody>
-                {livePunches.slice(0, 15).map((p: any) => (
-                  <tr key={p.id} className="border-t border-slate-100">
-                    <td className="p-3 font-mono font-bold">{p.biometricId}</td>
-                    <td className="p-3 font-medium">{p.studentName || 'Unrecognized'}</td>
-                    <td className="p-3 font-mono">{p.enrollmentNo || '-'}</td>
-                    <td className="p-3 font-mono">{p.punchTime || '-'}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${p.recognized ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {p.recognized ? 'Recognized' : 'Not linked'}
-                      </span>
-                    </td>
+          <div className="space-y-3">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="p-3">Biometric ID</th>
+                    <th className="p-3">Student</th>
+                    <th className="p-3">Enrollment No</th>
+                    <th className="p-3">Punch Time</th>
+                    <th className="p-3">Recognition</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visibleLivePunches.map((p: any) => (
+                    <tr key={p.id} className="border-t border-slate-100">
+                      <td className="p-3 font-mono font-bold">{p.biometricId}</td>
+                      <td className="p-3 font-medium">{p.studentName || 'Unrecognized'}</td>
+                      <td className="p-3 font-mono">{p.enrollmentNo || '-'}</td>
+                      <td className="p-3 font-mono">{p.punchTime || '-'}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${p.recognized ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {p.recognized ? 'Recognized' : 'Not linked'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredLivePunches.length > 10 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                <span className="text-slate-500">
+                  Showing <strong className="text-slate-800">{visibleLivePunches.length}</strong> of{' '}
+                  <strong className="text-slate-800">{filteredLivePunches.length}</strong> punch records
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAllLivePunches((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold transition cursor-pointer"
+                >
+                  {showAllLivePunches ? (
+                    <>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                      <span>Show Less</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      <span>View More ({filteredLivePunches.length - 10} more)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -947,11 +1120,12 @@ export const CaretakerDashboard: React.FC = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-slate-800">Hostel Attendance Summary (Warden Controls)</h2>
-          <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
             <Calendar className="h-4 w-4 text-indigo-600" />
             <span>Attendance date</span>
             <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="rounded border border-slate-300 px-2 py-0.5 font-mono text-xs" />
-          </label>
+            <DateQuickPresets value={attendanceDate} onChange={setAttendanceDate} tone="indigo" />
+          </div>
         </div>
 
         {summaryError && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{summaryError}</div>}
@@ -1224,8 +1398,8 @@ export const CaretakerDashboard: React.FC = () => {
 
       {/* Attendance Correction Modal */}
       {correctionTarget && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <form onSubmit={handleCorrectionSubmit} className="bg-white rounded-xl max-w-md w-full p-5 space-y-3 text-xs">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4">
+          <form onSubmit={handleCorrectionSubmit} className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
             <h3 className="font-bold text-sm text-slate-900">Correct Attendance ({correctionTarget.studentName})</h3>
             {correctionMsg && <div className="p-2 bg-emerald-50 text-emerald-800 rounded">{correctionMsg}</div>}
             <select value={correctionStatus} onChange={(e) => setCorrectionStatus(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
@@ -1245,8 +1419,8 @@ export const CaretakerDashboard: React.FC = () => {
 
       {/* Assign Leave Modal */}
       {isLeaveModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <form onSubmit={handleAssignLeave} className="bg-white rounded-xl max-w-md w-full p-5 space-y-3 text-xs">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4">
+          <form onSubmit={handleAssignLeave} className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="font-bold text-sm text-slate-900">Assign Leave (Pending Warden Approval)</h3>
               <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="text-slate-400 cursor-pointer"><X className="w-4 h-4" /></button>
@@ -1261,7 +1435,7 @@ export const CaretakerDashboard: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Start Date</label>
                 <input type="date" required value={leaveForm.startDate} onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" />
@@ -1286,8 +1460,8 @@ export const CaretakerDashboard: React.FC = () => {
 
       {/* Edit Student Modal */}
       {editingStudent && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <form onSubmit={handleSaveEdit} className="bg-white rounded-xl max-w-lg w-full p-5 space-y-3 text-xs">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4">
+          <form onSubmit={handleSaveEdit} className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="font-bold text-sm text-slate-900">Edit Student ({editingStudent.enrollmentNo})</h3>
               <button type="button" onClick={() => setEditingStudent(null)} className="text-slate-400 cursor-pointer"><X className="w-4 h-4" /></button>

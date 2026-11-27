@@ -11,7 +11,9 @@ import {
   BiometricDevice,
   AuditLog,
   SecurityTestCaseResult,
-  StudentTokenSummary
+  StudentTokenSummary,
+  SemesterSettings,
+  InstitutionalHoliday
 } from '../types';
 
 const api = axios.create({
@@ -159,6 +161,14 @@ export const apiService = {
     const res = await api.get<{ success: boolean; total: number; leaves: LeaveRecord[] }>('/leaves');
     return res.data;
   },
+  async getMyLeaves() {
+    const res = await api.get<{ success?: boolean; leaves: LeaveRecord[] }>('/leaves/my');
+    return res.data;
+  },
+  async applyStudentLeave(payload: { startDate: string; endDate: string; reason: string }) {
+    const res = await api.post<{ success?: boolean; message: string; leave: LeaveRecord }>('/leaves', payload);
+    return res.data;
+  },
   async enterLeave(payload: {
     studentId: string;
     startDate: string;
@@ -172,9 +182,22 @@ export const apiService = {
     return res.data;
   },
   async updateLeaveStatus(leaveId: string, approvalStatus: 'approved' | 'rejected') {
-    const res = await api.patch<{ message: string; leave: LeaveRecord }>(`/admin/leaves/${leaveId}/status`, {
+    const res = await api.patch<{ success?: boolean; message: string; leave: LeaveRecord }>(`/admin/leaves/${leaveId}/status`, {
       approval_status: approvalStatus
     });
+    return res.data;
+  },
+  async updateLeave(
+    leaveId: string,
+    payload: {
+      startDate: string;
+      endDate: string;
+      reason: string;
+      gatePassNo?: string;
+      approvalStatus?: 'pending' | 'approved' | 'rejected';
+    }
+  ) {
+    const res = await api.put<{ success: boolean; message: string; leave: LeaveRecord }>(`/leaves/${leaveId}`, payload);
     return res.data;
   },
 
@@ -229,6 +252,26 @@ export const apiService = {
   // Biometrics
   async getBiometricDevices() {
     const res = await api.get<{ success: boolean; authorizedAdministrator: string; devices: BiometricDevice[] }>('/biometric/devices');
+    return res.data;
+  },
+
+  async updateBiometricDevice(
+    deviceId: string,
+    payload: {
+      deviceName?: string;
+      deviceSerial?: string;
+      modelNo?: string | null;
+      ipAddress?: string | null;
+      firmwareVersion?: string | null;
+      location?: string | null;
+      hostelId?: string | number;
+      deviceStatus?: string;
+    }
+  ) {
+    const res = await api.put<{ success: boolean; message: string; device: BiometricDevice }>(
+      `/biometric/devices/${deviceId}`,
+      payload
+    );
     return res.data;
   },
 
@@ -406,11 +449,43 @@ export const apiService = {
     }>('/reports/summary', { params: { date } });
     return res.data;
   },
-  async getReportTrends() {
+  async getReportTrends(date?: string) {
     const res = await api.get<{
       success: boolean;
+      date?: string;
       trends: any[];
-    }>('/reports/trends');
+    }>('/reports/trends', { params: date ? { date } : undefined });
+    return res.data;
+  },
+
+  // Semester Settings & Institutional Holidays (Chief Warden)
+  async getSemester() {
+    const res = await api.get<{ success: boolean; semester: SemesterSettings }>('/semester');
+    return res.data;
+  },
+  async updateSemester(startDate: string, endDate: string) {
+    const res = await api.put<{ success: boolean; message: string; semester: SemesterSettings }>('/semester', {
+      startDate,
+      endDate,
+    });
+    return res.data;
+  },
+  async getHolidays() {
+    const res = await api.get<{
+      success: boolean;
+      today: string;
+      holidays: InstitutionalHoliday[];
+      upcomingHolidays: InstitutionalHoliday[];
+      pastHolidays: InstitutionalHoliday[];
+    }>('/holidays');
+    return res.data;
+  },
+  async createHoliday(payload: { startDate: string; endDate?: string; reason: string }) {
+    const res = await api.post<{ success: boolean; message: string; holiday: InstitutionalHoliday }>('/holidays', payload);
+    return res.data;
+  },
+  async deleteHoliday(id: string) {
+    const res = await api.delete<{ success: boolean; message: string }>(`/holidays/${id}`);
     return res.data;
   },
 

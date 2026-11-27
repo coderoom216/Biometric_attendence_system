@@ -7,18 +7,21 @@ use App\Models\Attendance;
 use App\Models\Hostel;
 use App\Models\Student;
 use App\Services\ClockService;
+use App\Services\DefaulterEvaluationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
     public function __construct(
-        private ClockService $clockService
+        private ClockService $clockService,
+        private DefaulterEvaluationService $evaluationService
     ) {}
 
     public function summary(Request $request)
     {
         $date = $request->query('date', $this->clockService->current()->toDateString());
+        $this->evaluationService->ensureEvaluatedForDate($date);
 
         $hostels = Hostel::withCount('students')->get();
         $totalStudents = Student::verified()->count();
@@ -83,26 +86,60 @@ class ReportController extends Controller
 
     public function trends(Request $request)
     {
-        $current = $this->clockService->current();
+        $endDateParam = $request->query('date');
+        $current = $endDateParam
+            ? Carbon::parse($endDateParam, ClockService::TIMEZONE)
+            : $this->clockService->current();
+        $hostels = Hostel::all();
+        $studentsByHostel = $hostels->mapWithKeys(function (Hostel $hostel) {
+            return [$hostel->id => Student::where('hostel_id', $hostel->id)->pluck('id')];
+        });
+        $totalEnrolled = Student::verified()->count();
         $trends = [];
 
         for ($i = 6; $i >= 0; $i--) {
-            $d = $current->copy()->subDays($i)->toDateString();
+            $dCarbon = $current->copy()->subDays($i);
+            $d = $dCarbon->toDateString();
+            $this->evaluationService->ensureEvaluatedForDate($d);
+
             $records = Attendance::whereDate('attendance_date', $d)->get();
             $pres = $records->where('status', 'present')->count();
             $late = $records->where('status', 'late')->count();
+            $leave = $records->where('status', 'approved_leave')->count();
             $def = $records->where('is_defaulter', true)->count();
 
+            $hostelBreakdown = $hostels->map(function (Hostel $hostel) use ($records, $studentsByHostel) {
+                $ids = $studentsByHostel->get($hostel->id, collect());
+                $hRecords = $records->whereIn('student_id', $ids);
+
+                return [
+                    'hostelId' => (string) $hostel->id,
+                    'hostelName' => $hostel->name,
+                    'code' => $hostel->code ?? ('H'.$hostel->id),
+                    'enrolled' => $ids->count(),
+                    'present' => $hRecords->where('status', 'present')->count(),
+                    'late' => $hRecords->where('status', 'late')->count(),
+                    'leave' => $hRecords->where('status', 'approved_leave')->count(),
+                    'defaulters' => $hRecords->where('is_defaulter', true)->count(),
+                ];
+            })->values();
+
             $trends[] = [
-                'date' => Carbon::parse($d)->format('M d'),
+                'isoDate' => $d,
+                'date' => $dCarbon->format('M d'),
+                'label' => $dCarbon->format('D, M j'),
+                'enrolled' => $totalEnrolled,
                 'present' => $pres,
                 'late' => $late,
+                'leave' => $leave,
                 'defaulters' => $def,
+                'hostels' => $hostelBreakdown,
             ];
         }
 
         return response()->json([
             'success' => true,
+            'date' => $current->toDateString(),
             'trends' => $trends,
         ]);
     }

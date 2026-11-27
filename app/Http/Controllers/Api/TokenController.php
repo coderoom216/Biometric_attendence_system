@@ -9,6 +9,7 @@ use App\Models\Token;
 use App\Services\AlertService;
 use App\Services\AuditService;
 use App\Services\ClockService;
+use App\Services\SemesterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -80,6 +81,8 @@ class TokenController extends Controller
                 ->startOfMonth()
                 ->toDateString();
 
+            $semester = app(SemesterService::class)->active();
+
             $token = Token::create([
                 'student_id' => $student->id,
                 'issued_by' => $user->id,
@@ -90,18 +93,19 @@ class TokenController extends Controller
             ]);
 
             $totalTokens = Token::where('student_id', $student->id)
-                ->where('month_start', $monthStart)
+                ->whereDate('issued_date', '>=', $semester['startDate'])
+                ->whereDate('issued_date', '<=', $semester['endDate'])
                 ->sum('token_count');
 
             app(AlertService::class)->checkStudentAlerts($student);
 
             $blacklist = null;
 
-            // Blacklist only when monthly tokens exceed 10
+            // Blacklist only when semester tokens exceed 10
             if ($totalTokens > 10) {
                 $blacklist = Blacklist::firstOrNew([
                     'student_id' => $student->id,
-                    'month_start' => $monthStart,
+                    'month_start' => $semester['startDate'],
                 ]);
 
                 $blacklist->total_tokens = $totalTokens;
@@ -146,6 +150,7 @@ class TokenController extends Controller
         return response()->json([
             'message' => 'Token issued successfully.',
             'token' => $result['token'],
+            'semester_total' => $result['total_tokens'],
             'monthly_total' => $result['total_tokens'],
             'blacklisted' => $result['total_tokens'] > 10,
             'blacklist' => $result['blacklist'],

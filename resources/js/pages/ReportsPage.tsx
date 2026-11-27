@@ -14,14 +14,16 @@ import {
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { AttendanceRecord } from '../types';
+import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
 
 export const ReportsPage: React.FC = () => {
   const { user } = useAuth();
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [startDate, setStartDate] = useState('2026-10-25');
-  const [endDate, setEndDate] = useState('2026-10-27');
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const [startDate, setStartDate] = useState(todayIst);
+  const [endDate, setEndDate] = useState(todayIst);
   const [hostelFilter, setHostelFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -97,6 +99,20 @@ export const ReportsPage: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+            Quick Date Filter:
+          </span>
+          <DateQuickPresets
+            value={startDate === endDate ? startDate : ''}
+            onChange={(date) => {
+              setStartDate(date);
+              setEndDate(date);
+            }}
+            tone="indigo"
+          />
+        </div>
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
           <div>
             <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">From Date</label>

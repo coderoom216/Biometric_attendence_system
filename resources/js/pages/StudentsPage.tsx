@@ -22,9 +22,11 @@ import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Hostel, Student, WarningTicket } from '../types';
 
-export const StudentsPage: React.FC = () => {
+export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' }> = ({
+  initialTab = 'directory'
+}) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'directory' | 'verification'>('directory');
+  const [activeTab, setActiveTab] = useState<'directory' | 'verification'>(initialTab);
   const [students, setStudents] = useState<Student[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const [warningTickets, setWarningTickets] = useState<WarningTicket[]>([]);
@@ -78,6 +80,10 @@ export const StudentsPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     loadData();
@@ -168,14 +174,16 @@ export const StudentsPage: React.FC = () => {
 
   // Filtered directory
   const filtered = students.filter((s) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.enrollmentNo.toLowerCase().includes(search.toLowerCase()) ||
-      s.roomNumber.toLowerCase().includes(search.toLowerCase()) ||
+      !q ||
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.enrollmentNo || '').toLowerCase().includes(q) ||
+      (s.roomNumber || '').toLowerCase().includes(q) ||
       (s.parentPhone && s.parentPhone.includes(search)) ||
-      s.course.toLowerCase().includes(search.toLowerCase());
+      (s.course || '').toLowerCase().includes(q);
 
-    const matchesHostel = hostelFilter === 'all' || s.hostelId === hostelFilter;
+    const matchesHostel = hostelFilter === 'all' || String(s.hostelId) === String(hostelFilter);
     const matchesStatus = statusFilter === 'all' || s.verificationStatus === statusFilter;
 
     return matchesSearch && matchesHostel && matchesStatus;
@@ -442,12 +450,12 @@ export const StudentsPage: React.FC = () => {
       {/* Tab 2: Verification Queue */}
       {activeTab === 'verification' && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-4 bg-slate-50/75 border-b border-slate-200 flex items-center justify-between">
+          <div className="p-4 bg-slate-50/75 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <span className="font-bold text-slate-800 text-xs">
               Student Registration Requests Requiring Formal Warden Verification (FR-02)
             </span>
             <span className="text-[11px] text-slate-500">
-              Audited in Institute Master Register
+              {pendingCount} Pending · {students.filter((s) => s.verificationStatus === 'verified').length} Verified · Audited in Institute Master Register
             </span>
           </div>
 
@@ -477,7 +485,12 @@ export const StudentsPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-medium text-slate-800">
-                        {s.hostelId === 'h-shivalik' ? 'Boys Hostel 1' : s.hostelId === 'h-mandakini' ? 'Girls Hostel' : 'Boys Hostel 2'}
+                        {hostels.find((h) => String(h.id) === String(s.hostelId))?.name ||
+                          (s.hostelId === '1' || s.hostelId === 'h-shivalik'
+                            ? 'Boys Hostel 1'
+                            : s.hostelId === '2' || s.hostelId === 'h-mandakini'
+                              ? 'Girls Hostel'
+                              : 'Boys Hostel 2')}
                       </div>
                       <div className="text-[11px] text-slate-500">{s.block}, Room {s.roomNumber}</div>
                     </td>
@@ -541,8 +554,8 @@ export const StudentsPage: React.FC = () => {
       )}
 
       {editingStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-lg w-full p-5 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="font-bold text-sm text-slate-900">
                 Edit Student Record ({editingStudent.enrollmentNo})

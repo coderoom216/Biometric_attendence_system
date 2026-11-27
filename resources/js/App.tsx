@@ -126,6 +126,22 @@ export default function App() {
             }
           />
           <Route
+            path="/students/verification"
+            element={
+              <ProtectedRoute allowedRoles={['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker', 'caretaker_operator']}>
+                <Students initialTab="verification" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/registration"
+            element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <Registration />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/reports"
             element={
               <ProtectedRoute>

@@ -13,6 +13,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { AttendanceRecord } from '../../types';
+import { DateQuickPresets } from './DateQuickPresets';
 
 interface DefaultersRosterProps {
   records: AttendanceRecord[];
@@ -116,7 +117,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
             </button>
           </div>
           {onDateChange && (
-            <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5">
               <Calendar className="h-3.5 w-3.5 text-rose-600" />
               <label htmlFor={`defaulters-roster-date-${role}`} className="text-xs font-medium text-slate-600 whitespace-nowrap">
                 Select Date:
@@ -131,6 +132,7 @@ export const DefaultersRoster: React.FC<DefaultersRosterProps> = ({
                 aria-label="Select defaulters roster date"
                 className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-rose-500 focus:outline-hidden"
               />
+              <DateQuickPresets value={targetDate} onChange={onDateChange} tone="rose" />
             </div>
           )}
         </div>

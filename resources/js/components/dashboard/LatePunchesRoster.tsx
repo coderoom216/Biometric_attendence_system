@@ -13,6 +13,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { AttendanceRecord } from '../../types';
+import { DateQuickPresets } from './DateQuickPresets';
 
 interface LatePunchesRosterProps {
   records: AttendanceRecord[];
@@ -26,7 +27,7 @@ interface LatePunchesRosterProps {
 export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
   records,
   targetDate = '2026-10-27',
-  title = 'Institution-Wide Late Punches Roster (7:00 PM - 10:00 PM)',
+  title = 'Institution-Wide Late Punches Roster (7:30 PM - 10:00 PM)',
   role = 'director',
   hostelId = 'all',
   onDateChange
@@ -59,14 +60,12 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
   const getMinutesLate = (punchTime?: string) => {
     if (!punchTime) return 'Late';
     const [h, m] = punchTime.split(':').map(Number);
-    if (h === 19) {
-      return `+${m}m past 7:00 PM`;
-    } else if (h > 19) {
-      const totalM = (h - 19) * 60 + m;
-      return `+${totalM}m past 7:00 PM`;
-    } else {
-      return `On-Time`;
+    const totalMinutes = h * 60 + m;
+    const cutoffMinutes = 19 * 60 + 30;
+    if (totalMinutes >= cutoffMinutes) {
+      return `+${totalMinutes - cutoffMinutes}m past 7:30 PM`;
     }
+    return 'On-Time';
   };
 
   const handleExportCSV = () => {
@@ -112,7 +111,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-amber-900/80 mt-0.5">
-              Entries after 7:00 PM through 10:00 PM IST are marked Late. Punches after 10:00 PM become Defaulters; students without a punch are evaluated at 10:00 PM.
+              Entries from 7:30 PM through 10:00 PM IST are marked Late. Punches after 10:00 PM become Defaulters; students without a punch are evaluated at 10:00 PM.
             </p>
           </div>
         </div>
@@ -131,7 +130,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
             </button>
           </div>
           {onDateChange && (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5">
               <Calendar className="h-3.5 w-3.5 text-amber-600" />
               <label htmlFor={`late-punches-roster-date-${role}`} className="text-xs font-medium text-slate-600 whitespace-nowrap">
                 Select Date:
@@ -146,6 +145,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
                 aria-label="Select late punches roster date"
                 className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-amber-500 focus:outline-hidden"
               />
+              <DateQuickPresets value={targetDate} onChange={onDateChange} tone="amber" />
             </div>
           )}
         </div>
@@ -282,7 +282,7 @@ export const LatePunchesRoster: React.FC<LatePunchesRosterProps> = ({
             </button>
           )}
         </div>
-        <span className="font-mono text-[11px]">Late: after 7:00 through 10:00 PM IST | Defaulter cutoff and no-punch evaluation: 10:00 PM IST</span>
+        <span className="font-mono text-[11px]">Late: 7:30 PM through 10:00 PM IST | Defaulter cutoff and no-punch evaluation: 10:00 PM IST</span>
       </div>
     </div>
   );

@@ -135,11 +135,108 @@ class CaretakerAndDeviceManagerTest extends TestCase
         // Warden CAN approve the Caretaker-assigned leave
         $this->actingAs($wardenBh1, 'sanctum')
             ->patchJson("/api/admin/leaves/{$leaveId}/status", ['approval_status' => 'approved'])
-            ->assertStatus(200);
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('leave.status', 'Approved')
+            ->assertJsonPath('leave.approvalStatus', 'approved');
 
         $this->assertDatabaseHas('leaves', [
             'id' => $leaveId,
             'approval_status' => 'approved',
+        ]);
+
+        $syncedAttendance = Attendance::query()
+            ->where('student_id', $s1->id)
+            ->whereDate('attendance_date', now('Asia/Kolkata')->toDateString())
+            ->first();
+
+        $this->assertNotNull($syncedAttendance);
+        $this->assertSame('approved_leave', $syncedAttendance->status);
+        $this->assertFalse((bool) $syncedAttendance->is_defaulter);
+
+        // Warden CAN edit the approved leave (e.g. update dates, gate pass, reason)
+        $today = now('Asia/Kolkata')->toDateString();
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->putJson("/api/leaves/{$leaveId}", [
+                'startDate' => $today,
+                'endDate' => now('Asia/Kolkata')->addDays(2)->toDateString(),
+                'reason' => 'Extended family function',
+                'gatePassNo' => 'GP-EDIT-01',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('leave.reason', 'Extended family function')
+            ->assertJsonPath('leave.gatePassNo', 'GP-EDIT-01')
+            ->assertJsonPath('leave.status', 'Approved');
+
+        // Caretaker CANNOT edit leaves (403)
+        $this->actingAs($caretakerBh1, 'sanctum')
+            ->putJson("/api/leaves/{$leaveId}", [
+                'startDate' => $today,
+                'endDate' => $today,
+                'reason' => 'Unauthorized edit',
+            ])
+            ->assertStatus(403);
+    }
+
+    public function test_biometric_device_manager_can_update_device_model_and_details(): void
+    {
+        $managerRole = Role::firstOrCreate(['name' => 'Caretaker Operator'], ['description' => 'Biometric Device Manager']);
+        $caretakerRole = Role::firstOrCreate(['name' => 'Caretaker'], ['description' => 'Hostel Caretaker']);
+
+        $bh1 = Hostel::create(['name' => 'Boys Hostel 1', 'code' => 'BH1', 'type' => 'boys', 'total_capacity' => 100]);
+        $device = Device::create([
+            'hostel_id' => $bh1->id,
+            'device_serial' => 'RSS20241199684',
+            'device_name' => 'BH1 Terminal',
+            'device_status' => 'online_synced',
+        ]);
+
+        $mehra = User::create([
+            'name' => 'Mehra Ji',
+            'email' => 'mehra@university.edu.in',
+            'password' => Hash::make('mehra123'),
+            'role_id' => $managerRole->id,
+            'hostel_id' => $bh1->id,
+            'is_active' => true,
+        ]);
+
+        $caretakerBh1 = User::create([
+            'name' => 'Caretaker BH1',
+            'email' => 'caretaker.bh1@university.edu.in',
+            'password' => Hash::make('caretaker123'),
+            'role_id' => $caretakerRole->id,
+            'hostel_id' => $bh1->id,
+            'is_active' => true,
+        ]);
+
+        // Hostel-scoped Caretaker cannot edit terminal specs
+        $this->actingAs($caretakerBh1, 'sanctum')
+            ->putJson("/api/biometric/devices/{$device->id}", ['modelNo' => 'X999'])
+            ->assertStatus(403);
+
+        // Biometric Device Manager (Mehra Ji) can update model number, IP, firmware, location, and name
+        $this->actingAs($mehra, 'sanctum')
+            ->putJson("/api/biometric/devices/{$device->id}", [
+                'deviceName' => 'BH1 Main Entrance Terminal',
+                'modelNo' => 'ZKTeco-S362Pro',
+                'ipAddress' => '192.168.1.30',
+                'firmwareVersion' => 'S362Pro v4.02',
+                'location' => 'BH1 Ground Floor Lobby',
+                'deviceStatus' => 'online_synced',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('device.deviceName', 'BH1 Main Entrance Terminal')
+            ->assertJsonPath('device.modelNo', 'ZKTeco-S362Pro')
+            ->assertJsonPath('device.ipAddress', '192.168.1.30')
+            ->assertJsonPath('device.firmware', 'S362Pro v4.02')
+            ->assertJsonPath('device.location', 'BH1 Ground Floor Lobby');
+
+        $this->assertDatabaseHas('devices', [
+            'id' => $device->id,
+            'device_name' => 'BH1 Main Entrance Terminal',
+            'model_no' => 'ZKTeco-S362Pro',
+            'ip_address' => '192.168.1.30',
         ]);
     }
 }

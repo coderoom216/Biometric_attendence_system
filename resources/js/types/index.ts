@@ -84,15 +84,40 @@ export interface TokenHistoryEntry {
   reason: string;
   tokensReceived: number;
   warningCardStatus: DisciplinaryCardStatus;
+  inActiveSemester?: boolean;
 }
 
 export interface StudentTokenSummary {
   currentMonth: string;
   currentMonthTokens: number;
+  currentSemester?: string;
+  currentSemesterStart?: string;
+  currentSemesterEnd?: string;
+  currentSemesterDurationDays?: number;
+  currentSemesterTokens?: number;
   lifetimeTokens: number;
   disciplinaryStatus: DisciplinaryCardStatus;
   isBlacklisted: boolean;
   history: TokenHistoryEntry[];
+}
+
+export interface SemesterSettings {
+  id?: number | null;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  isCustom?: boolean;
+}
+
+export interface InstitutionalHoliday {
+  id: string;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  reason: string;
+  isPast: boolean;
+  isCurrentOrUpcoming: boolean;
+  createdBy: string;
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'approved_leave' | 'absent';
@@ -123,12 +148,19 @@ export interface LeaveRecord {
   enrollmentNo: string;
   studentName: string;
   hostelId: string;
+  hostel?: string;
+  hostelCode?: string;
   block: string;
   roomNumber: string;
   startDate: string;
   endDate: string;
+  daysCount?: number;
   reason: string;
   gatePassNo: string;
+  status?: 'Pending' | 'Approved' | 'Rejected';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: string | null;
   parentConsentVerified: boolean;
   enteredByResidentialWardenId: string;
   residentialWardenName: string;

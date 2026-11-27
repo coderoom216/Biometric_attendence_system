@@ -18,7 +18,7 @@ class AttendanceFactory extends Factory
         $punchTime = in_array($status, ['present', 'late'])
             ? ($status === 'late'
                 ? $this->faker->time('H:i:s', '22:00:00')
-                : $this->faker->time('H:i:s', '19:00:00'))
+                : $this->faker->time('H:i:s', '19:29:59'))
             : null;
 
         return [

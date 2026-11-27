@@ -19,6 +19,9 @@ import { apiService } from '../services/api';
 import { Student, AttendanceRecord, LeaveRecord } from '../types';
 import { HostelAttendanceBarChart } from '../components/dashboard/HostelAttendanceBarChart';
 import { WarningTicketsTable } from '../components/dashboard/WarningTicketsTable';
+import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
+import { EditLeaveModal } from '../components/dashboard/EditLeaveModal';
+import { LeaveDecisionConfirmModal } from '../components/dashboard/LeaveDecisionConfirmModal';
 
 type SummaryCategory = 'residents' | 'present' | 'late' | 'leave' | 'follow-up';
 
@@ -37,17 +40,23 @@ export const ResidentialWardenDashboard: React.FC = () => {
   const [selectedSummary, setSelectedSummary] = useState<SummaryCategory | null>(null);
 
   // Leave Modal State
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [leaveForm, setLeaveForm] = useState({
     studentId: '',
-    startDate: '2026-10-27',
-    endDate: '2026-10-29',
+    startDate: todayIst,
+    endDate: todayIst,
     reason: '',
     gatePassNo: `GP-${Date.now().toString().slice(-4)}`,
     parentConsentVerified: true,
     notes: ''
   });
   const [leaveSubmitMsg, setLeaveSubmitMsg] = useState<string | null>(null);
+  const [leaveActionMsg, setLeaveActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [updatingLeaveId, setUpdatingLeaveId] = useState<string | null>(null);
+  const [editingLeave, setEditingLeave] = useState<LeaveRecord | null>(null);
+  const [confirmDecision, setConfirmDecision] = useState<{ leave: LeaveRecord; action: 'approved' | 'rejected' } | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Correction Modal State
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
@@ -95,30 +104,47 @@ export const ResidentialWardenDashboard: React.FC = () => {
     if (!attendanceDate) return;
 
     let isCurrentRequest = true;
-    setIsSummaryLoading(true);
-    setSummaryError(null);
+    const fetchDateSummary = (showSpinner: boolean) => {
+      if (showSpinner) setIsSummaryLoading(true);
+      setSummaryError(null);
 
-    apiService.getAttendanceHistory({ startDate: attendanceDate, endDate: attendanceDate })
-      .then((res) => {
-        if (isCurrentRequest && res.success) {
-          setDateAttendance(res.records);
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-        if (isCurrentRequest) {
-          setDateAttendance([]);
-          setSummaryError('Unable to load attendance records for this date.');
-        }
-      })
-      .finally(() => {
-        if (isCurrentRequest) setIsSummaryLoading(false);
-      });
+      Promise.all([
+        apiService.getAttendanceHistory({ startDate: attendanceDate, endDate: attendanceDate }),
+        apiService.getDefaulters(attendanceDate),
+        apiService.getLeaves()
+      ])
+        .then(([res, defRes, lvRes]) => {
+          if (!isCurrentRequest) return;
+          if (res.success) {
+            setDateAttendance(res.records);
+          }
+          if (defRes.success) {
+            setDefaulters(defRes.defaulters);
+          }
+          if (lvRes.success) {
+            setLeaves(lvRes.leaves);
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          if (isCurrentRequest && showSpinner) {
+            setDateAttendance([]);
+            setSummaryError('Unable to load attendance records for this date.');
+          }
+        })
+        .finally(() => {
+          if (isCurrentRequest && showSpinner) setIsSummaryLoading(false);
+        });
+    };
+
+    fetchDateSummary(true);
+    const intervalId = window.setInterval(() => fetchDateSummary(false), 5000);
 
     return () => {
       isCurrentRequest = false;
+      window.clearInterval(intervalId);
     };
-  }, [attendanceDate, user]);
+  }, [attendanceDate, user, refreshTick]);
 
   // Handle Leave Submission (FR-11)
   const handleLeaveSubmit = async (e: React.FormEvent) => {
@@ -128,6 +154,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
       const res = await apiService.enterLeave(leaveForm);
       if (res.success) {
         setLeaveSubmitMsg('Leave successfully entered and verified. Automated absence alerts suppressed.');
+        setRefreshTick((t) => t + 1);
         setTimeout(() => {
           setIsLeaveModalOpen(false);
           setLeaveSubmitMsg(null);
@@ -153,11 +180,23 @@ export const ResidentialWardenDashboard: React.FC = () => {
 
   // Handle Pending Leave Approval / Rejection (Warden Only)
   const handleLeaveApproval = async (leaveId: string, status: 'approved' | 'rejected') => {
+    setLeaveActionMsg(null);
+    setUpdatingLeaveId(leaveId);
     try {
-      await apiService.updateLeaveStatus(leaveId, status);
-      loadData();
-    } catch (err) {
-      console.error(err);
+      const res = await apiService.updateLeaveStatus(leaveId, status);
+      await loadData();
+      setRefreshTick((t) => t + 1);
+      setLeaveActionMsg({
+        type: 'success',
+        text: res?.message || (status === 'approved' ? 'Leave approved and attendance updated.' : 'Leave request rejected.'),
+      });
+    } catch (err: any) {
+      setLeaveActionMsg({
+        type: 'error',
+        text: err.response?.data?.message || 'Unable to update leave status.',
+      });
+    } finally {
+      setUpdatingLeaveId(null);
     }
   };
 
@@ -239,17 +278,19 @@ export const ResidentialWardenDashboard: React.FC = () => {
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-slate-800">Attendance summary</h2>
-          <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-xs">
             <Calendar className="h-4 w-4 text-indigo-600" />
-            <span>Attendance date</span>
+            <label htmlFor="rw-attendance-date">Attendance date</label>
             <input
+              id="rw-attendance-date"
               type="date"
               value={attendanceDate}
               onChange={(event) => setAttendanceDate(event.target.value)}
               aria-label="Select attendance summary date"
               className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900"
             />
-          </label>
+            <DateQuickPresets value={attendanceDate} onChange={setAttendanceDate} tone="indigo" />
+          </div>
         </div>
 
         {summaryError && (
@@ -261,8 +302,8 @@ export const ResidentialWardenDashboard: React.FC = () => {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {([
             { key: 'residents', label: 'Residents', value: activeResidents.length, note: 'Current active residents', color: 'text-slate-900' },
-            { key: 'present', label: 'Present', value: presentRecords.length, note: 'By 7:00 PM IST', color: 'text-emerald-600' },
-            { key: 'late', label: 'Late arrivals', value: lateRecords.length, note: 'After 7:00 PM through 10:00 PM IST', color: 'text-amber-600' },
+            { key: 'present', label: 'Present', value: presentRecords.length, note: 'Before 7:30 PM IST', color: 'text-emerald-600' },
+            { key: 'late', label: 'Late arrivals', value: lateRecords.length, note: '7:30 PM to 10:00 PM IST', color: 'text-amber-600' },
             { key: 'leave', label: 'On approved leave', value: leaveRecords.length, note: 'No absence alerts during leave', color: 'text-blue-600' },
             { key: 'follow-up', label: 'Needs follow-up', value: followUpRecords.length, note: 'Follow-up notifications sent', color: 'text-rose-600' }
           ] as const).map((card) => (
@@ -286,7 +327,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
 
       {/* Date-Wise Longitudinal Attendance Bar Chart */}
       <HostelAttendanceBarChart
-        currentDate="2026-10-27"
+        currentDate={attendanceDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}
         hostelId={user?.hostelId || 'h-shivalik'}
         allowHostelSwitch={false}
       />
@@ -533,11 +574,24 @@ export const ResidentialWardenDashboard: React.FC = () => {
             </h2>
           </div>
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-            {leaves.filter((l) => l.status === 'Pending').length} pending approval
+            {leaves.filter((l) => l.status === 'Pending' || l.approvalStatus === 'pending').length} pending approval
           </span>
         </div>
 
-        {leaves.filter((l) => l.status === 'Pending').length === 0 ? (
+        {leaveActionMsg && (
+          <div
+            role={leaveActionMsg.type === 'error' ? 'alert' : 'status'}
+            className={`mb-3 rounded-lg border px-3 py-2 text-xs font-medium ${
+              leaveActionMsg.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-rose-200 bg-rose-50 text-rose-800'
+            }`}
+          >
+            {leaveActionMsg.text}
+          </div>
+        )}
+
+        {leaves.filter((l) => l.status === 'Pending' || l.approvalStatus === 'pending').length === 0 ? (
           <div className="p-4 text-center text-slate-400 text-xs">
             No pending leave requests awaiting approval.
           </div>
@@ -546,32 +600,54 @@ export const ResidentialWardenDashboard: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
-                  <th className="py-2.5 px-3">Student</th>
+                  <th className="py-2.5 px-3">Student &amp; Hostel</th>
                   <th className="py-2.5 px-3">Gate Pass</th>
                   <th className="py-2.5 px-3">Dates</th>
                   <th className="py-2.5 px-3">Reason</th>
+                  <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {leaves.filter((l) => l.status === 'Pending').map((l) => (
+                {leaves.filter((l) => l.status === 'Pending' || l.approvalStatus === 'pending').map((l) => (
                   <tr key={l.id}>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">{l.studentName} ({l.enrollmentNo})</td>
+                    <td className="py-2.5 px-3">
+                      <div className="font-semibold text-slate-900">{l.studentName} ({l.enrollmentNo})</div>
+                      <div className="text-[11px] text-slate-500">
+                        {l.hostelCode || l.hostel || l.block || 'Hostel'} · Room {l.roomNumber || '—'}
+                      </div>
+                    </td>
                     <td className="py-2.5 px-3 font-mono text-slate-700">{l.gatePassNo}</td>
                     <td className="py-2.5 px-3 text-slate-600">{l.startDate} to {l.endDate}</td>
                     <td className="py-2.5 px-3 text-slate-600">{l.reason}</td>
+                    <td className="py-2.5 px-3">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                        Pending
+                      </span>
+                    </td>
                     <td className="py-2.5 px-3 text-right space-x-2">
                       <button
-                        onClick={() => handleLeaveApproval(l.id, 'approved')}
-                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold transition cursor-pointer"
+                        type="button"
+                        disabled={updatingLeaveId === l.id}
+                        onClick={() => setConfirmDecision({ leave: l, action: 'approved' })}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
                       >
                         Approve
                       </button>
                       <button
-                        onClick={() => handleLeaveApproval(l.id, 'rejected')}
-                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-[11px] font-semibold transition cursor-pointer"
+                        type="button"
+                        disabled={updatingLeaveId === l.id}
+                        onClick={() => setConfirmDecision({ leave: l, action: 'rejected' })}
+                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
                       >
                         Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingLeave(l)}
+                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[11px] font-semibold transition cursor-pointer"
+                      >
+                        Edit
                       </button>
                     </td>
                   </tr>
@@ -580,12 +656,96 @@ export const ResidentialWardenDashboard: React.FC = () => {
             </table>
           </div>
         )}
+
+        {/* Approved & Processed Hostel Leaves (Editable by Warden) */}
+        <div className="mt-5 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+              Approved &amp; Processed Leaves
+            </h3>
+            <span className="text-[11px] text-slate-500">
+              {leaves.filter((l) => l.status !== 'Pending' && l.approvalStatus !== 'pending').length} record(s)
+            </span>
+          </div>
+          {leaves.filter((l) => l.status !== 'Pending' && l.approvalStatus !== 'pending').length === 0 ? (
+            <div className="p-3 text-center text-slate-400 text-xs">
+              No approved leaves logged yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-2 px-3">Student</th>
+                    <th className="py-2 px-3">Gate Pass</th>
+                    <th className="py-2 px-3">Dates</th>
+                    <th className="py-2 px-3">Reason</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {leaves.filter((l) => l.status !== 'Pending' && l.approvalStatus !== 'pending').map((l) => (
+                    <tr key={l.id}>
+                      <td className="py-2 px-3 font-semibold text-slate-900">{l.studentName} ({l.enrollmentNo})</td>
+                      <td className="py-2 px-3 font-mono text-slate-700">{l.gatePassNo}</td>
+                      <td className="py-2 px-3 text-slate-600">{l.startDate} to {l.endDate}</td>
+                      <td className="py-2 px-3 text-slate-600">{l.reason}</td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          l.status === 'Rejected' || l.approvalStatus === 'rejected'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {l.status === 'Rejected' || l.approvalStatus === 'rejected' ? 'Rejected' : 'Approved'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setEditingLeave(l)}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[11px] font-semibold transition cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+
+      <EditLeaveModal
+        leave={editingLeave}
+        onClose={() => setEditingLeave(null)}
+        onSaved={async (_updated, message) => {
+          setEditingLeave(null);
+          await loadData();
+          setRefreshTick((t) => t + 1);
+          setLeaveActionMsg({ type: 'success', text: message });
+        }}
+      />
+
+      <LeaveDecisionConfirmModal
+        leave={confirmDecision?.leave || null}
+        action={confirmDecision?.action || null}
+        isSubmitting={Boolean(confirmDecision && updatingLeaveId === confirmDecision.leave.id)}
+        onCancel={() => setConfirmDecision(null)}
+        onConfirm={async () => {
+          if (!confirmDecision) return;
+          const { leave, action } = confirmDecision;
+          await handleLeaveApproval(leave.id, action);
+          setConfirmDecision(null);
+        }}
+      />
 
       {/* Enter Approved Leave Modal (FR-11) */}
       {isLeaveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <FileText className="w-5 h-5 text-indigo-400" />
@@ -623,7 +783,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">
                     Start Date

@@ -47,9 +47,9 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-8 sm:py-12 sm:px-6 lg:px-8 relative overflow-x-hidden">
       {/* Background architectural glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[350px] bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="sm:mx-auto w-full max-w-4xl relative z-10 px-4 sm:px-6 my-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
@@ -174,7 +174,7 @@ export const LoginPage: React.FC = () => {
 
           <div className="mt-6 pt-4 border-t border-slate-100 flex items-center space-x-2 text-[11px] text-slate-500">
             <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span>On-time cutoff is 7:00 PM IST; punches after 7:00 PM through 10:00 PM are late, and punches after 10:00 PM are defaulters. No-punch evaluation runs at 10:00 PM.</span>
+            <span>On-time cutoff is 7:30 PM IST; punches from 7:30 PM through 10:00 PM are late, and punches after 10:00 PM are defaulters. No-punch evaluation runs at 10:00 PM.</span>
           </div>
         </div>
       </div>

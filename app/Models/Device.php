@@ -19,6 +19,10 @@ class Device extends Model
         'hostel_id',
         'device_name',
         'device_serial',
+        'model_no',
+        'ip_address',
+        'firmware_version',
+        'location',
         'device_status',
         'last_sync',
     ];

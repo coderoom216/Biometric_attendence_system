@@ -10,14 +10,18 @@ import {
   Search,
   Filter,
   RefreshCw,
-  Building2
+  Building2,
+  Calendar
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { AttendanceRecord, NotificationLog } from '../types';
+import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
 
 export const DefaultersPage: React.FC = () => {
   const { user } = useAuth();
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const [selectedDate, setSelectedDate] = useState<string>(todayIst);
   const [defaulters, setDefaulters] = useState<AttendanceRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationLog[]>([]);
   const [search, setSearch] = useState('');
@@ -26,17 +30,17 @@ export const DefaultersPage: React.FC = () => {
   const [isPastDefaulter, setIsPastDefaulter] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = async () => {
+  const loadData = async (dateToLoad = selectedDate) => {
     setIsLoading(true);
     try {
-      const defRes = await apiService.getDefaulters();
+      const defRes = await apiService.getDefaulters(dateToLoad);
       if (defRes.success) {
         setDefaulters(defRes.defaulters);
         setVirtualTime(defRes.virtualTime);
         setIsPastDefaulter(defRes.isDefaulterListVisible);
       }
 
-      const notifRes = await apiService.getNotificationLogs();
+      const notifRes = await apiService.getNotificationLogs({ date: dateToLoad });
       if (notifRes.success) {
         setNotifications(notifRes.logs);
       }
@@ -48,15 +52,17 @@ export const DefaultersPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
-  }, [user]);
+    loadData(selectedDate);
+  }, [user, selectedDate]);
 
   const filteredDefaulters = defaulters.filter((d) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      d.studentName.toLowerCase().includes(search.toLowerCase()) ||
-      d.enrollmentNo.toLowerCase().includes(search.toLowerCase()) ||
-      d.roomNumber.includes(search);
-    const matchesHostel = selectedHostel === 'all' || d.hostelId === selectedHostel;
+      !q ||
+      (d.studentName || '').toLowerCase().includes(q) ||
+      (d.enrollmentNo || '').toLowerCase().includes(q) ||
+      (d.roomNumber || '').includes(search);
+    const matchesHostel = selectedHostel === 'all' || String(d.hostelId) === String(selectedHostel);
     return matchesSearch && matchesHostel;
   });
 
@@ -78,7 +84,7 @@ export const DefaultersPage: React.FC = () => {
 
         <div className="flex items-center space-x-2">
           <a
-            href="/api/reports/export-defaulters-csv"
+            href={`/api/reports/export-defaulters-csv?startDate=${selectedDate}&endDate=${selectedDate}`}
             download
             className="flex items-center space-x-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
           >
@@ -86,17 +92,18 @@ export const DefaultersPage: React.FC = () => {
             <span>Export Defaulter List (CSV)</span>
           </a>
           <button
-            onClick={loadData}
-            className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-600"
+            type="button"
+            onClick={() => loadData(selectedDate)}
+            className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-600 cursor-pointer"
             title="Refresh List"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* Timing Warning / Status */}
-      <div className={`p-4 rounded-xl border flex items-center justify-between text-xs ${isPastDefaulter ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+      <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs ${isPastDefaulter ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
         <div className="flex items-center space-x-3">
           <Clock className={`w-5 h-5 ${isPastDefaulter ? 'text-rose-600' : 'text-amber-600'}`} />
           <div>
@@ -106,19 +113,19 @@ export const DefaultersPage: React.FC = () => {
                 : `Simulated Time: ${virtualTime} IST — Late punches accepted through 10:00 PM`}
             </div>
             <div className="text-[11px] opacity-80 mt-0.5">
-              Punches after 7:00 PM through 10:00 PM IST are late. Punches after 10:00 PM are defaulters; students without a punch are flagged at 10:00 PM.
+              Punches from 7:30 PM through 10:00 PM IST are Late Punches. Punches after 10:00 PM are defaulters; students without a punch are flagged at 10:00 PM.
             </div>
           </div>
         </div>
 
         <span className="font-mono text-xs font-bold px-2.5 py-1 rounded bg-white border border-slate-200 text-slate-800">
-          Cutoff: 19:00 IST • Late through 22:00
+          Cutoff: 19:30 IST • Late 19:30–22:00
         </span>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-72">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="relative w-full lg:w-72">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
           <input
             type="text"
@@ -129,22 +136,41 @@ export const DefaultersPage: React.FC = () => {
           />
         </div>
 
-        {/* Hostel Selector if privileged */}
-        {['director', 'chief_warden', 'caretaker_operator'].includes(user?.role || '') && (
-          <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <span className="text-xs text-slate-500 font-medium">Hostel:</span>
-            <select
-              value={selectedHostel}
-              onChange={(e) => setSelectedHostel(e.target.value)}
-              className="text-xs border border-slate-300 rounded-lg p-2 bg-white"
-            >
-              <option value="all">All Hostels</option>
-              <option value="h-shivalik">Boys Hostel 1 (Capacity: 180 beds)</option>
-              <option value="h-mandakini">Girls Hostel (Capacity: 165 beds)</option>
-              <option value="h-nilgiri">Boys Hostel 2 (Capacity: 180 beds)</option>
-            </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rose-200 bg-rose-50/40 px-2.5 py-1.5 text-xs">
+            <Calendar className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+            <label htmlFor="defaulters-page-date" className="font-medium text-slate-600 whitespace-nowrap">
+              Select Date:
+            </label>
+            <input
+              id="defaulters-page-date"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                if (e.target.value) setSelectedDate(e.target.value);
+              }}
+              className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-rose-500 focus:outline-hidden"
+            />
+            <DateQuickPresets value={selectedDate} onChange={setSelectedDate} tone="rose" />
           </div>
-        )}
+
+          {/* Hostel Selector if privileged */}
+          {['director', 'chief_warden', 'caretaker_operator'].includes(user?.role || '') && (
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <span className="text-xs text-slate-500 font-medium">Hostel:</span>
+              <select
+                value={selectedHostel}
+                onChange={(e) => setSelectedHostel(e.target.value)}
+                className="text-xs border border-slate-300 rounded-lg p-2 bg-white"
+              >
+                <option value="all">All Hostels</option>
+                <option value="h-shivalik">Boys Hostel 1 (Capacity: 180 beds)</option>
+                <option value="h-mandakini">Girls Hostel (Capacity: 165 beds)</option>
+                <option value="h-nilgiri">Boys Hostel 2 (Capacity: 180 beds)</option>
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Defaulters Roster Table */}

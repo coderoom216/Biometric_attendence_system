@@ -9,7 +9,7 @@ class ClockService
 {
     public const TIMEZONE = 'Asia/Kolkata';
 
-    public const CUTOFF_TIME = '19:00:00';
+    public const CUTOFF_TIME = '19:30:00';
 
     public const DEFAULTER_TIME = '22:00:00';
 
@@ -64,7 +64,7 @@ class ClockService
 
     public function isPastCutoff(): bool
     {
-        return $this->current()->format('H:i:s') > self::CUTOFF_TIME;
+        return $this->current()->format('H:i:s') >= self::CUTOFF_TIME;
     }
 
     public function isPastDefaulterTime(): bool
@@ -76,7 +76,36 @@ class ClockService
     {
         $time = $this->current()->format('H:i:s');
 
-        return $time > self::CUTOFF_TIME
-            && $time < self::DEFAULTER_TIME;
+        return $time >= self::CUTOFF_TIME
+            && $time <= self::DEFAULTER_TIME;
+    }
+
+    /**
+     * Classify a punch timestamp (HH:MM:SS) into attendance status and defaulter flag.
+     *
+     * @return array{status: string, is_defaulter: bool}
+     */
+    public static function classifyPunchTime(string $time): array
+    {
+        $normalized = substr(trim($time), 0, 8);
+
+        if ($normalized > self::DEFAULTER_TIME) {
+            return [
+                'status' => 'absent',
+                'is_defaulter' => true,
+            ];
+        }
+
+        if ($normalized >= self::CUTOFF_TIME) {
+            return [
+                'status' => 'late',
+                'is_defaulter' => false,
+            ];
+        }
+
+        return [
+            'status' => 'present',
+            'is_defaulter' => false,
+        ];
     }
 }

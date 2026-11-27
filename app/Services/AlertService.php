@@ -9,27 +9,28 @@ use App\Models\Role;
 use App\Models\Student;
 use App\Models\Token;
 use App\Models\User;
+use Carbon\Carbon;
 
 class AlertService
 {
     public function __construct(
-        private ClockService $clockService
+        private ClockService $clockService,
+        private SemesterService $semesterService
     ) {}
 
-    public function checkStudentAlerts(Student $student): void
+    public function checkStudentAlerts(Student $student, ?Carbon $evaluatedAt = null): void
     {
-        $current = $this->clockService->current();
+        $current = $evaluatedAt
+            ? $evaluatedAt->copy()->setTimezone(ClockService::TIMEZONE)
+            : $this->clockService->current();
 
-        $monthStart = $current->copy()
-            ->startOfMonth()
-            ->toDateString();
-
-        $monthEnd = $current->copy()
-            ->endOfMonth()
-            ->toDateString();
+        $semester = $this->semesterService->active();
+        $semesterStart = $semester['startDate'];
+        $semesterEnd = $semester['endDate'];
 
         $totalTokens = Token::where('student_id', $student->id)
-            ->where('month_start', $monthStart)
+            ->whereDate('issued_date', '>=', $semesterStart)
+            ->whereDate('issued_date', '<=', $semesterEnd)
             ->sum('token_count');
 
         $tiers = AlertTier::orderBy('threshold')->get();
@@ -42,8 +43,8 @@ class AlertService
             $alreadyExists = Alert::where('student_id', $student->id)
                 ->where('tier_id', $tier->id)
                 ->whereBetween('triggered_at', [
-                    $monthStart.' 00:00:00',
-                    $monthEnd.' 23:59:59',
+                    $semesterStart.' 00:00:00',
+                    $semesterEnd.' 23:59:59',
                 ])
                 ->exists();
 

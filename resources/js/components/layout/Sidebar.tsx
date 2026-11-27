@@ -187,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             <NavLink
               key={item.path + item.name}
               to={item.path}
-              end={item.path === '/'}
+              end={item.path === '/' || item.path === '/students'}
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition ${
@@ -217,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <p className="text-[10px] text-slate-400 leading-tight">
             {isMehraDashboard
               ? 'Sync offline terminal punches and maintain verified student biometric records.'
-              : '7:00 PM IST Attendance Cutoff. Sequentially escalated absence notifications to 6 tiers.'}
+              : '7:30 PM IST Attendance Cutoff (19:30-22:00 Late, >22:00 Defaulter). Sequentially escalated absence notifications to 6 tiers.'}
           </p>
         </div>
       </aside>

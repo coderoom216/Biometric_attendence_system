@@ -15,7 +15,16 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import { DisciplinaryCardStatus, Student, StudentTokenSummary, AttendanceRecord, LeaveRecord } from '../types';
+import {
+  DisciplinaryCardStatus,
+  InstitutionalHoliday,
+  LeaveRecord,
+  AttendanceRecord,
+  SemesterSettings,
+  Student,
+  StudentTokenSummary,
+} from '../types';
+import { StudentLeaveApplicationSection } from '../components/dashboard/StudentLeaveApplicationSection';
 
 const disciplinaryStatusLabels: Record<DisciplinaryCardStatus, string> = {
   none: 'Good Standing',
@@ -30,61 +39,129 @@ const warningCardStages: { status: DisciplinaryCardStatus; label: string; range:
   { status: 'red_card_blacklist', label: 'Red Card + Blacklist', range: 'More than 10 tokens', startsAt: 11 }
 ];
 
-const demoTokenCount = 2;
-const demoDisciplinaryStatus: DisciplinaryCardStatus =
-  demoTokenCount > 10 ? 'red_card_blacklist' :
-  demoTokenCount >= 6 ? 'yellow_card' :
-  demoTokenCount >= 1 ? 'normal_warning' : 'none';
-const isDemoBlacklisted = demoTokenCount > 10;
+const getExpandedHolidayDates = (holidays: InstitutionalHoliday[], upToDate: string): Map<string, string> => {
+  const map = new Map<string, string>();
+  holidays.forEach((h) => {
+    const start = new Date(`${h.startDate}T00:00:00Z`);
+    const endCapStr = h.endDate < upToDate ? h.endDate : upToDate;
+    const end = new Date(`${endCapStr}T00:00:00Z`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return;
+    for (let cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      const dateStr = cursor.toISOString().slice(0, 10);
+      if (!map.has(dateStr)) {
+        map.set(dateStr, h.reason);
+      }
+    }
+  });
+  return map;
+};
 
 export const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Student | null>(null);
   const [disciplinary, setDisciplinary] = useState<StudentTokenSummary | null>(null);
+  const [semester, setSemester] = useState<SemesterSettings | null>(null);
+  const [upcomingHolidays, setUpcomingHolidays] = useState<InstitutionalHoliday[]>([]);
+  const [allHolidays, setAllHolidays] = useState<InstitutionalHoliday[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (showSpinner = true) => {
+    if (showSpinner) setIsLoading(true);
     try {
-      if (user?.studentId) {
-        const studentRes = await apiService.getStudentById(user.studentId);
-        if (studentRes.success) {
-          setProfile(studentRes.student);
-          setDisciplinary(studentRes.disciplinary);
-        }
+      const [studentRes, attRes, leaveRes, semRes, holRes] = await Promise.allSettled([
+        user?.studentId ? apiService.getStudentById(user.studentId) : Promise.resolve(null),
+        apiService.getAttendanceHistory(),
+        apiService.getMyLeaves(),
+        apiService.getSemester(),
+        apiService.getHolidays(),
+      ]);
+
+      if (studentRes.status === 'fulfilled' && studentRes.value?.success) {
+        setProfile(studentRes.value.student);
+        setDisciplinary(studentRes.value.disciplinary);
       }
 
-      const attRes = await apiService.getAttendanceHistory();
-      if (attRes.success) {
-        setAttendance(attRes.records);
-        const today = attRes.records.find((r) => r.date === '2026-10-27');
-        if (today) setTodayRecord(today);
+      if (attRes.status === 'fulfilled' && attRes.value?.success) {
+        setAttendance(attRes.value.records);
+        const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const today = attRes.value.records.find((r) => r.date === todayDate);
+        setTodayRecord(today || null);
       }
 
-      const leaveRes = await apiService.getLeaves();
-      if (leaveRes.success) {
-        setLeaves(leaveRes.leaves);
+      if (leaveRes.status === 'fulfilled' && Array.isArray(leaveRes.value?.leaves)) {
+        setLeaves(leaveRes.value.leaves);
+      }
+
+      if (semRes.status === 'fulfilled' && semRes.value?.success) {
+        setSemester(semRes.value.semester);
+      }
+
+      if (holRes.status === 'fulfilled' && holRes.value?.success) {
+        setUpcomingHolidays(holRes.value.upcomingHolidays || []);
+        setAllHolidays(holRes.value.holidays || []);
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setIsLoading(false);
+      if (showSpinner) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+
+    const intervalId = window.setInterval(() => {
+      loadData(false);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
   }, [user]);
+
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const holidayDatesMap = getExpandedHolidayDates(allHolidays, todayIst);
+  const todayHolidayReason = holidayDatesMap.get(todayIst);
 
   const presentCount = attendance.filter((a) => a.status === 'present').length;
   const lateCount = attendance.filter((a) => a.status === 'late').length;
   const leaveCount = attendance.filter((a) => a.status === 'approved_leave').length;
   const absentCount = attendance.filter((a) => a.status === 'absent').length;
-  const totalDays = attendance.length || 1;
-  const complianceRate = Math.round(((presentCount + lateCount + leaveCount) / totalDays) * 100);
+
+  const semesterTokenCount = disciplinary?.currentSemesterTokens ?? disciplinary?.currentMonthTokens ?? 0;
+  const lifetimeTokenCount = disciplinary?.lifetimeTokens ?? 0;
+  const currentStatus: DisciplinaryCardStatus = disciplinary?.disciplinaryStatus || 'none';
+  const isBlacklisted = Boolean(disciplinary?.isBlacklisted);
+  const semRangeLabel = semester
+    ? `${semester.startDate} to ${semester.endDate}`
+    : (disciplinary?.currentSemester || disciplinary?.currentMonth || 'Current Semester');
+
+  const mergedAttendanceHistory = React.useMemo(() => {
+    const existingDates = new Set(attendance.map((a) => a.date));
+    const holidayEntries: Array<AttendanceRecord & { isHoliday?: boolean }> = [];
+    holidayDatesMap.forEach((reason, date) => {
+      if (!existingDates.has(date)) {
+        holidayEntries.push({
+          id: `holiday-${date}`,
+          studentId: profile?.id || '',
+          enrollmentNo: profile?.enrollmentNo || '',
+          studentName: profile?.name || user?.name || '',
+          hostelId: profile?.hostelId || '',
+          block: profile?.block || '',
+          roomNumber: profile?.roomNumber || '',
+          date,
+          status: 'present',
+          isDefaulter: false,
+          remarks: `Official Holiday: ${reason}`,
+          isHoliday: true,
+        });
+      }
+    });
+
+    return [...attendance.map((a) => ({ ...a, isHoliday: false })), ...holidayEntries]
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [attendance, holidayDatesMap, profile, user]);
 
   if (isLoading) {
     return (
@@ -132,8 +209,10 @@ export const StudentDashboard: React.FC = () => {
                 <span className="text-rose-700 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1 inline" /> Flagged Defaulter
                 </span>
+              ) : todayHolidayReason ? (
+                <span className="text-indigo-700">Official Holiday ({todayHolidayReason})</span>
               ) : (
-                <span className="text-slate-600">Pending biometric punch (Cutoff: 7:00 PM IST)</span>
+                <span className="text-slate-600">Pending biometric punch (Cutoff: 7:30 PM IST)</span>
               )}
             </div>
           </div>
@@ -141,23 +220,17 @@ export const StudentDashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
-          <div className="text-xs font-semibold text-slate-500 uppercase">Compliance Rate</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{complianceRate}%</div>
-          <div className="text-[11px] text-emerald-600 font-medium mt-1">Institutional requirement: 85%</div>
-        </div>
-
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-xs font-semibold text-slate-500 uppercase">Present</div>
           <div className="text-2xl font-bold text-emerald-600 mt-1">{presentCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Punched by 7:00 PM</div>
+          <div className="text-[11px] text-slate-400 mt-1">Punched before 7:30 PM</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="text-xs font-semibold text-slate-500 uppercase">Late</div>
           <div className="text-2xl font-bold text-amber-600 mt-1">{lateCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">After 7:00 PM through 10:00 PM IST</div>
+          <div className="text-[11px] text-slate-400 mt-1">7:30 PM through 10:00 PM IST</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -174,18 +247,18 @@ export const StudentDashboard: React.FC = () => {
       </div>
 
       {disciplinary && (
-        <section className={`rounded-2xl border p-5 shadow-xs sm:p-6 ${isDemoBlacklisted ? 'border-rose-300 bg-rose-50/70' : 'border-slate-200 bg-white'}`}>
+        <section className={`rounded-2xl border p-5 shadow-xs sm:p-6 ${isBlacklisted ? 'border-rose-300 bg-rose-50/70' : 'border-slate-200 bg-white'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                <ShieldAlert className={`h-5 w-5 ${isDemoBlacklisted ? 'text-rose-600' : 'text-indigo-600'}`} />
+                <ShieldAlert className={`h-5 w-5 ${isBlacklisted ? 'text-rose-600' : 'text-indigo-600'}`} />
                 <h2>Token &amp; Disciplinary Management</h2>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Demo display: current-month and lifetime counts are shown as {demoTokenCount}. Stored token records are unchanged.
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Active semester: <strong>{semRangeLabel}</strong>. Warnings use attendance events in this date range.
               </p>
             </div>
-            {isDemoBlacklisted && (
+            {isBlacklisted && (
               <div role="status" className="inline-flex items-center gap-2 self-start rounded-lg border-2 border-rose-600 bg-rose-600 px-4 py-2 text-sm font-black tracking-widest text-white shadow-sm">
                 <Ban className="h-5 w-5" />
                 BLACKLISTED
@@ -195,38 +268,38 @@ export const StudentDashboard: React.FC = () => {
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Month Tokens</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Semester Tokens</div>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+                <span className="text-3xl font-bold text-slate-900">{semesterTokenCount}</span>
                 <span className="text-xs text-slate-500">tokens</span>
               </div>
-              <div className="mt-1 text-[11px] text-slate-500">{disciplinary.currentMonth}</div>
+              <div className="mt-1 text-[11px] text-slate-500 font-mono">{semRangeLabel}</div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Lifetime Tokens</div>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+                <span className="text-3xl font-bold text-slate-900">{lifetimeTokenCount}</span>
                 <span className="text-xs text-slate-500">tokens</span>
               </div>
-              <div className="mt-1 text-[11px] text-slate-500">Across all recorded months</div>
+              <div className="mt-1 text-[11px] text-slate-500">Across all recorded semesters</div>
             </div>
-            <div className={`rounded-xl border p-4 ${isDemoBlacklisted ? 'border-rose-200 bg-white' : 'border-indigo-100 bg-indigo-50/60'}`}>
+            <div className={`rounded-xl border p-4 ${isBlacklisted ? 'border-rose-200 bg-white' : 'border-indigo-100 bg-indigo-50/60'}`}>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Disciplinary Status</div>
-              <div className={`mt-2 flex items-center gap-2 text-base font-bold ${isDemoBlacklisted ? 'text-rose-700' : demoDisciplinaryStatus === 'yellow_card' ? 'text-amber-700' : demoDisciplinaryStatus === 'normal_warning' ? 'text-orange-700' : 'text-emerald-700'}`}>
-                {isDemoBlacklisted ? <Ban className="h-5 w-5" /> : <Award className="h-5 w-5" />}
-                {disciplinaryStatusLabels[demoDisciplinaryStatus]}
+              <div className={`mt-2 flex items-center gap-2 text-base font-bold ${isBlacklisted ? 'text-rose-700' : currentStatus === 'yellow_card' ? 'text-amber-700' : currentStatus === 'normal_warning' ? 'text-orange-700' : 'text-emerald-700'}`}>
+                {isBlacklisted ? <Ban className="h-5 w-5" /> : <Award className="h-5 w-5" />}
+                {disciplinaryStatusLabels[currentStatus]}
               </div>
-              <div className="mt-1 text-[11px] text-slate-500">Based on the demo count</div>
+              <div className="mt-1 text-[11px] text-slate-500">Based on active-semester tokens</div>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
             {warningCardStages.map((stage) => {
               const isCurrent =
-                (stage.status === 'normal_warning' && demoTokenCount >= 1 && demoTokenCount <= 5) ||
-                (stage.status === 'yellow_card' && demoTokenCount >= 6 && demoTokenCount <= 10) ||
-                (stage.status === 'red_card_blacklist' && isDemoBlacklisted);
-              const hasBeenReached = demoTokenCount >= stage.startsAt;
+                (stage.status === 'normal_warning' && semesterTokenCount >= 1 && semesterTokenCount <= 5) ||
+                (stage.status === 'yellow_card' && semesterTokenCount >= 6 && semesterTokenCount <= 10) ||
+                (stage.status === 'red_card_blacklist' && isBlacklisted);
+              const hasBeenReached = semesterTokenCount >= stage.startsAt;
               const stageTone = stage.status === 'normal_warning'
                 ? 'border-orange-200 bg-orange-50 text-orange-800'
                 : stage.status === 'yellow_card'
@@ -240,11 +313,14 @@ export const StudentDashboard: React.FC = () => {
                     {isCurrent && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold uppercase">Current</span>}
                   </div>
                   <div className="mt-1 text-[11px]">{stage.range}</div>
-                  {!isCurrent && <div className="mt-1 text-[10px]">{hasBeenReached ? 'Reached this month' : 'Not reached'}</div>}
+                  {!isCurrent && <div className="mt-1 text-[10px]">{hasBeenReached ? 'Reached this semester' : 'Not reached'}</div>}
                 </div>
               );
             })}
           </div>
+          <p className="mt-3 text-[11px] text-slate-500">
+            One token is added for each attendance defaulter within the active semester. Semester warning totals use the dates set by the Chief Warden; token history from other date ranges remains on record.
+          </p>
         </section>
       )}
 
@@ -286,18 +362,49 @@ export const StudentDashboard: React.FC = () => {
           </div>
 
           <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-800 leading-snug">
-            <strong>Director's Directive:</strong> Punches after 7:00 PM through 10:00 PM IST are marked Late; punches after 10:00 PM are defaulters. Students without a punch are flagged at the 10:00 PM IST evaluation, and sequential notifications are dispatched to Residential Warden, Warden, Chief Warden, Director Sir, and your Parents.
+            <strong>Director's Directive:</strong> Punches from 7:30 PM through 10:00 PM IST are marked Late; punches after 10:00 PM are defaulters. Students without a punch are flagged at the 10:00 PM IST evaluation, and sequential notifications are dispatched to Residential Warden, Warden, Chief Warden, Director Sir, and your Parents.
           </div>
         </div>
 
         {/* Personal Attendance Records Table */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs md:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs md:col-span-2 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center space-x-2 font-bold text-slate-800 text-sm">
               <CalendarCheck className="w-4 h-4 text-indigo-600" />
               <span>My Personal Attendance History</span>
             </div>
             <span className="text-xs text-slate-400 font-medium">Isolated to student ID ({profile?.enrollmentNo})</span>
+          </div>
+
+          {semester && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 flex items-center justify-between text-xs">
+              <div>
+                <div className="font-bold text-slate-800">Active Semester</div>
+                <div className="font-mono text-slate-600 mt-0.5">{semester.startDate} to {semester.endDate}</div>
+              </div>
+              <span className="text-slate-500 font-semibold">{semester.durationDays} days</span>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-3 text-xs space-y-1.5">
+            <div className="font-bold text-slate-800">Official Holidays &amp; Days Off</div>
+            {upcomingHolidays.length === 0 ? (
+              <p className="text-slate-600">No current or upcoming official holidays are scheduled.</p>
+            ) : (
+              <ul className="space-y-1 text-slate-700">
+                {upcomingHolidays.map((h) => (
+                  <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-white border border-slate-200 px-2.5 py-1.5">
+                    <span className="font-mono font-semibold text-indigo-700">
+                      {h.startDate === h.endDate ? h.startDate : `${h.startDate} to ${h.endDate}`}
+                    </span>
+                    <span className="text-slate-700">{h.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-[11px] text-slate-500">
+              Past holidays leave this upcoming list automatically. You can still see past holiday dates in your attendance history.
+            </p>
           </div>
 
           <div className="overflow-x-auto">
@@ -311,32 +418,40 @@ export const StudentDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {attendance.map((rec) => (
+                {mergedAttendanceHistory.map((rec) => (
                   <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-2.5 px-3 font-medium text-slate-800">{rec.date}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-600">
                       {rec.punchTime ? `${rec.punchTime} IST` : '—'}
                     </td>
                     <td className="py-2.5 px-3">
-                      {rec.status === 'present' && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                          Present
+                      {rec.isHoliday ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800">
+                          Official Holiday
                         </span>
-                      )}
-                      {rec.status === 'late' && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
-                          Late Punch
-                        </span>
-                      )}
-                      {rec.status === 'approved_leave' && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-800">
-                          Approved Leave
-                        </span>
-                      )}
-                      {rec.status === 'absent' && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800">
-                          Defaulter
-                        </span>
+                      ) : (
+                        <>
+                          {rec.status === 'present' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                              Present
+                            </span>
+                          )}
+                          {rec.status === 'late' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                              Late Punch
+                            </span>
+                          )}
+                          {rec.status === 'approved_leave' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-800">
+                              Approved Leave
+                            </span>
+                          )}
+                          {rec.status === 'absent' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800">
+                              Defaulter
+                            </span>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-slate-500 text-[11px]">
@@ -350,62 +465,13 @@ export const StudentDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Approved Leaves History & Rules Notice */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-          <div className="flex items-center space-x-2 font-bold text-slate-800 text-sm">
-            <FileText className="w-4 h-4 text-blue-600" />
-            <span>My Approved Leave Records (FR-11)</span>
-          </div>
-          <span className="text-xs text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full font-medium">
-            Automated Absence Suppression Active
-          </span>
-        </div>
-
-        {leaves.length === 0 ? (
-          <div className="text-center py-6 text-slate-400 text-xs">
-            No leave records on file. To take leave, submit a physical formal application to your Residential Warden.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="py-2.5 px-3">Gate Pass No</th>
-                  <th className="py-2.5 px-3">Duration</th>
-                  <th className="py-2.5 px-3">Reason</th>
-                  <th className="py-2.5 px-3">Parent Consent</th>
-                  <th className="py-2.5 px-3">Approved By</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {leaves.map((l) => (
-                  <tr key={l.id}>
-                    <td className="py-2.5 px-3 font-mono font-semibold text-slate-800">{l.gatePassNo}</td>
-                    <td className="py-2.5 px-3 text-slate-700">
-                      {l.startDate} to {l.endDate}
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-600">{l.reason}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="text-emerald-700 font-medium flex items-center">
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Verified
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-600 font-medium">{l.residentialWardenName}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 text-slate-600 text-xs flex items-start space-x-2">
-          <AlertCircle className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-          <p className="text-[11px] leading-relaxed">
-            <strong>Mandatory Policy Notice:</strong> As instructed by the Director Sir, students cannot directly self-apply or approve leave online. You must present formal written parental permission to your Residential Warden, who will verify and enter the leave into the central system to suppress automated absence emails.
-          </p>
-        </div>
-      </div>
+      {/* Student Leave Application & Status Section */}
+      <StudentLeaveApplicationSection
+        profile={profile}
+        studentName={user?.name || 'Student'}
+        leaves={leaves}
+        onSubmitted={() => loadData(false)}
+      />
     </div>
   );
 };
@@ -468,6 +534,12 @@ export const StudentDisciplinaryDashboard: React.FC = () => {
     );
   }
 
+  const discSemesterTokenCount = disciplinary?.currentSemesterTokens ?? disciplinary?.currentMonthTokens ?? 0;
+  const discLifetimeTokenCount = disciplinary?.lifetimeTokens ?? 0;
+  const discStatus: DisciplinaryCardStatus = disciplinary?.disciplinaryStatus || 'none';
+  const discBlacklisted = Boolean(disciplinary?.isBlacklisted);
+  const discSemesterRange = disciplinary?.currentSemester || disciplinary?.currentMonth || 'Active Semester';
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-6">
@@ -484,7 +556,7 @@ export const StudentDisciplinaryDashboard: React.FC = () => {
             {profile?.name} · {profile?.enrollmentNo} · {profile?.course}
           </p>
         </div>
-        {isDemoBlacklisted && (
+        {discBlacklisted && (
           <div role="status" className="inline-flex items-center gap-2 self-start rounded-lg border-2 border-rose-600 bg-rose-600 px-4 py-2 text-sm font-black tracking-widest text-white shadow-sm sm:self-center">
             <Ban className="h-5 w-5" />
             BLACKLISTED
@@ -492,44 +564,44 @@ export const StudentDisciplinaryDashboard: React.FC = () => {
         )}
       </div>
 
-      <section className={`rounded-2xl border p-5 shadow-xs sm:p-6 ${isDemoBlacklisted ? 'border-rose-300 bg-rose-50/70' : 'border-slate-200 bg-white'}`}>
+      <section className={`rounded-2xl border p-5 shadow-xs sm:p-6 ${discBlacklisted ? 'border-rose-300 bg-rose-50/70' : 'border-slate-200 bg-white'}`}>
         <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          Demo display only: current-month and lifetime counts are shown as {demoTokenCount}. Stored token records and history are unchanged.
+          Active semester: <strong>{discSemesterRange}</strong>. Warnings use attendance events in this date range.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Month Tokens</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Semester Tokens</div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+              <span className="text-3xl font-bold text-slate-900">{discSemesterTokenCount}</span>
               <span className="text-xs text-slate-500">tokens</span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-500">{disciplinary.currentMonth}</div>
+            <div className="mt-1 text-[11px] text-slate-500 font-mono">{discSemesterRange}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Lifetime Tokens</div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-900">{demoTokenCount}</span>
+              <span className="text-3xl font-bold text-slate-900">{discLifetimeTokenCount}</span>
               <span className="text-xs text-slate-500">tokens</span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-500">Demo count</div>
+            <div className="mt-1 text-[11px] text-slate-500">Across all recorded semesters</div>
           </div>
-          <div className={`rounded-xl border p-4 ${isDemoBlacklisted ? 'border-rose-200 bg-white' : 'border-indigo-100 bg-indigo-50/60'}`}>
+          <div className={`rounded-xl border p-4 ${discBlacklisted ? 'border-rose-200 bg-white' : 'border-indigo-100 bg-indigo-50/60'}`}>
             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Disciplinary Status</div>
-            <div className={`mt-2 flex items-center gap-2 text-base font-bold ${isDemoBlacklisted ? 'text-rose-700' : demoDisciplinaryStatus === 'yellow_card' ? 'text-amber-700' : demoDisciplinaryStatus === 'normal_warning' ? 'text-orange-700' : 'text-emerald-700'}`}>
-              {isDemoBlacklisted ? <Ban className="h-5 w-5" /> : <Award className="h-5 w-5" />}
-              {disciplinaryStatusLabels[demoDisciplinaryStatus]}
+            <div className={`mt-2 flex items-center gap-2 text-base font-bold ${discBlacklisted ? 'text-rose-700' : discStatus === 'yellow_card' ? 'text-amber-700' : discStatus === 'normal_warning' ? 'text-orange-700' : 'text-emerald-700'}`}>
+              {discBlacklisted ? <Ban className="h-5 w-5" /> : <Award className="h-5 w-5" />}
+              {disciplinaryStatusLabels[discStatus]}
             </div>
-            <div className="mt-1 text-[11px] text-slate-500">Based on the demo count</div>
+            <div className="mt-1 text-[11px] text-slate-500">Based on active-semester tokens</div>
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
           {warningCardStages.map((stage) => {
             const isCurrent =
-              (stage.status === 'normal_warning' && demoTokenCount >= 1 && demoTokenCount <= 5) ||
-              (stage.status === 'yellow_card' && demoTokenCount >= 6 && demoTokenCount <= 10) ||
-              (stage.status === 'red_card_blacklist' && isDemoBlacklisted);
-            const hasBeenReached = demoTokenCount >= stage.startsAt;
+              (stage.status === 'normal_warning' && discSemesterTokenCount >= 1 && discSemesterTokenCount <= 5) ||
+              (stage.status === 'yellow_card' && discSemesterTokenCount >= 6 && discSemesterTokenCount <= 10) ||
+              (stage.status === 'red_card_blacklist' && discBlacklisted);
+            const hasBeenReached = discSemesterTokenCount >= stage.startsAt;
             const stageTone = stage.status === 'normal_warning'
               ? 'border-orange-200 bg-orange-50 text-orange-800'
               : stage.status === 'yellow_card'
@@ -543,20 +615,20 @@ export const StudentDisciplinaryDashboard: React.FC = () => {
                   {isCurrent && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold uppercase">Current</span>}
                 </div>
                 <div className="mt-1 text-[11px]">{stage.range}</div>
-                {!isCurrent && <div className="mt-1 text-[10px]">{hasBeenReached ? 'Reached this month' : 'Not reached'}</div>}
+                {!isCurrent && <div className="mt-1 text-[10px]">{hasBeenReached ? 'Reached this semester' : 'Not reached'}</div>}
               </div>
             );
           })}
         </div>
 
-        {isDemoBlacklisted && (
+        {discBlacklisted && (
           <div className="mt-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-white p-3 text-xs leading-relaxed text-rose-800">
             <Ban className="mt-0.5 h-4 w-4 shrink-0" />
-            <p><strong>Monthly blacklist active.</strong> Your current month total is above 10 tokens. The temporary blacklist clears at the start of the next month; token history remains on record.</p>
+            <p><strong>Semester blacklist active.</strong> Your active semester total is above 10 tokens. Token history from other date ranges remains on record.</p>
           </div>
         )}
         <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
-          One token is normally added for each attendance defaulter. Monthly token and warning status reset on the first day of a new month, while previous token and card history is retained.
+          One token is added for each attendance defaulter within the active semester. Semester warning totals use the dates set by the Chief Warden; token history from other date ranges remains on record.
         </p>
       </section>
 

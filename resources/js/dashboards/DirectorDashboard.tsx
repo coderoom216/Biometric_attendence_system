@@ -18,8 +18,9 @@ import {
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { AttendanceRecord, ScheduledJobLog, Student } from '../types';
+import { AttendanceRecord, ScheduledJobLog, SemesterSettings, Student } from '../types';
 import { HostelAttendanceBarChart } from '../components/dashboard/HostelAttendanceBarChart';
+import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
 import { WarningTicketsTable } from '../components/dashboard/WarningTicketsTable';
 import { DefaultersRoster } from '../components/dashboard/DefaultersRoster';
 import { LatePunchesRoster } from '../components/dashboard/LatePunchesRoster';
@@ -56,6 +57,14 @@ const getAttendanceStatusClass = (record?: AttendanceRecord) => {
   if (record.status === 'approved_leave') return 'bg-blue-100 text-blue-800';
   if (record.status === 'late') return 'bg-amber-100 text-amber-800';
   return 'bg-emerald-100 text-emerald-800';
+};
+
+const normalizeHostelKey = (value?: string): string => {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === '1' || normalized === 'bh1' || normalized === 'h-shivalik') return 'h-shivalik';
+  if (normalized === '2' || normalized === 'gh' || normalized === 'h-mandakini') return 'h-mandakini';
+  if (normalized === '3' || normalized === 'bh2' || normalized === 'h-nilgiri') return 'h-nilgiri';
+  return normalized;
 };
 
 const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({
@@ -112,12 +121,13 @@ const DirectorAttendanceDrilldown: React.FC<AttendanceDrilldownProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  const targetHostelKey = normalizeHostelKey(hostelId);
   const attendanceByStudentId = new Map(attendance.map((record) => [record.studentId, record]));
   const filteredStudents = students
     .filter((student) =>
       student.checkoutStatus === 'active' &&
       student.verificationStatus === 'verified' &&
-      (!hostelId || student.hostelId === hostelId)
+      (!targetHostelKey || normalizeHostelKey(student.hostelId) === targetHostelKey)
     )
     .map((student) => ({ student, record: attendanceByStudentId.get(student.id) }))
     .filter(({ record }) => {
@@ -256,9 +266,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
   const { user } = useAuth();
   const officeTitle = officeRole === 'chief_warden' ? 'Chief Warden' : 'Director';
   const officePossessive = officeRole === 'chief_warden' ? 'Chief Warden’s' : 'Director Sir’s';
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const dayBeforeStr = new Date(Date.now() - 86400000 * 2).toISOString().slice(0, 10);
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [drilldownSelection, setDrilldownSelection] = useState<{
     category: AttendanceDrilldownCategory;
@@ -270,33 +278,83 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
   const [latePunches, setLatePunches] = useState<AttendanceRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeSemester, setActiveSemester] = useState<SemesterSettings | null>(null);
+  const [semesterStartInput, setSemesterStartInput] = useState('');
+  const [semesterEndInput, setSemesterEndInput] = useState('');
+  const [isSavingSemester, setIsSavingSemester] = useState(false);
+  const [semesterFeedback, setSemesterFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const loadDataForDate = async (date: string) => {
-    setIsLoading(true);
+  useEffect(() => {
+    if (officeRole !== 'chief_warden') return;
+    apiService.getSemester()
+      .then((res) => {
+        if (res.success && res.semester) {
+          setActiveSemester(res.semester);
+          setSemesterStartInput(res.semester.startDate);
+          setSemesterEndInput(res.semester.endDate);
+        }
+      })
+      .catch(() => {});
+  }, [officeRole]);
+
+  const handleSaveSemester = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSemesterFeedback(null);
+    if (!semesterStartInput || !semesterEndInput || semesterEndInput < semesterStartInput) {
+      setSemesterFeedback({ type: 'error', text: 'Semester end date cannot be earlier than start date.' });
+      return;
+    }
+    setIsSavingSemester(true);
     try {
-      const repRes = await apiService.getReportSummary(date);
-      if (repRes.success) setReportData(repRes);
+      const res = await apiService.updateSemester(semesterStartInput, semesterEndInput);
+      if (res.success && res.semester) {
+        setActiveSemester(res.semester);
+        setSemesterFeedback({ type: 'success', text: res.message || 'Semester dates updated successfully.' });
+      }
+    } catch (err: any) {
+      setSemesterFeedback({ type: 'error', text: err.response?.data?.message || 'Unable to save semester dates.' });
+    } finally {
+      setIsSavingSemester(false);
+    }
+  };
 
-      const schRes = await apiService.getSchedulerStatus();
-      if (schRes.success) setSchedulerStatus(schRes);
+  const loadDataForDate = async (date: string, showSpinner = true) => {
+    if (showSpinner) setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [repRes, schRes, defRes, lateRes, auditRes] = await Promise.allSettled([
+        apiService.getReportSummary(date),
+        apiService.getSchedulerStatus(),
+        apiService.getDefaulters(date),
+        apiService.getLatePunches(date),
+        apiService.getAuditLogs()
+      ]);
 
-      const defRes = await apiService.getDefaulters(date);
-      if (defRes.success) setDefaulters(defRes.defaulters);
+      if (repRes.status === 'fulfilled' && repRes.value.success) {
+        setReportData(repRes.value);
+      } else if (repRes.status === 'rejected') {
+        setLoadError('Unable to load attendance summary from server. Please refresh.');
+      }
 
-      const lateRes = await apiService.getLatePunches(date);
-      if (lateRes.success) setLatePunches(lateRes.latePunches);
-
-      const auditRes = await apiService.getAuditLogs();
-      if (auditRes.success) setAuditLogs(auditRes.logs.slice(0, 8));
+      if (schRes.status === 'fulfilled' && schRes.value.success) setSchedulerStatus(schRes.value);
+      if (defRes.status === 'fulfilled' && defRes.value.success) setDefaulters(defRes.value.defaulters);
+      if (lateRes.status === 'fulfilled' && lateRes.value.success) setLatePunches(lateRes.value.latePunches);
+      if (auditRes.status === 'fulfilled' && auditRes.value.success) setAuditLogs(auditRes.value.logs.slice(0, 8));
     } catch (err) {
       console.error(err);
+      setLoadError('Failed to fetch dashboard data.');
     } finally {
-      setIsLoading(false);
+      if (showSpinner) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadDataForDate(selectedDate);
+    loadDataForDate(selectedDate, true);
+    const intervalId = window.setInterval(() => {
+      loadDataForDate(selectedDate, false);
+    }, 5000);
+    return () => window.clearInterval(intervalId);
   }, [selectedDate]);
 
   const handleDateChange = (newDate: string) => {
@@ -351,10 +409,12 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
 
         {/* Date Filter Bar */}
         <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-lg">
-              <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
-              <label htmlFor="director-date-picker" className="text-xs text-slate-300 font-medium">Select Date:</label>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-lg w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
+                <label htmlFor="director-date-picker" className="text-xs text-slate-300 font-medium whitespace-nowrap">Select Date:</label>
+              </div>
               <input
                 id="director-date-picker"
                 type="date"
@@ -370,44 +430,21 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           </div>
 
           {/* Quick Date Presets */}
-          <div className="flex items-center space-x-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-slate-400 text-[11px] font-medium hidden sm:inline">Quick Presets:</span>
-            <button
-              onClick={() => handleDateChange(todayStr)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                selectedDate === todayStr
-                  ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-              }`}
-            >
-              Today
-            </button>
-            <button
-              onClick={() => handleDateChange(yesterdayStr)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                selectedDate === yesterdayStr
-                  ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-              }`}
-            >
-              Yesterday
-            </button>
-            <button
-              onClick={() => handleDateChange(dayBeforeStr)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                selectedDate === dayBeforeStr
-                  ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-              }`}
-            >
-              2 Days Ago
-            </button>
+            <DateQuickPresets value={selectedDate} onChange={handleDateChange} tone="dark" />
           </div>
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium">
+          {loadError}
+        </div>
+      )}
+
       {/* High-level Director KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <button
           type="button"
           onClick={() => setDrilldownSelection({ category: 'all' })}
@@ -428,7 +465,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
         >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Present Rate</div>
           <div className="text-2xl font-bold text-emerald-600 mt-1">{consolidated?.totalPresent ?? consolidated?.presentCount ?? 0}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">On-time biometric</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">On-time biometric · {consolidated?.overallPercentage ?? 0}%</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>
 
@@ -440,7 +477,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
         >
           <div className="text-[10px] font-bold text-slate-400 uppercase">Late Punches</div>
           <div className="text-2xl font-bold text-amber-600 mt-1">{consolidated?.totalLate ?? consolidated?.lateCount ?? 0}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Pre-cutoff entry</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">19:30 – 22:00 IST</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>
 
@@ -467,19 +504,87 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
           <div className="text-[10px] text-rose-600 font-semibold mt-0.5">Missing students</div>
           <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view students</div>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setDrilldownSelection({ category: 'compliant' })}
-          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
-          aria-label="View compliant residents"
-        >
-          <div className="text-[10px] font-bold text-slate-400 uppercase">Institutional Compliance</div>
-          <div className="text-2xl font-bold text-indigo-600 mt-1">{consolidated?.overallComplianceRate || 0}%</div>
-          <div className="text-[10px] text-emerald-600 font-medium mt-0.5">Selected Date: {selectedDate}</div>
-          <div className="mt-1 text-[10px] font-medium text-indigo-600">Click to view compliant students</div>
-        </button>
       </div>
+
+      {/* Chief Warden Semester Settings */}
+      {officeRole === 'chief_warden' && (
+        <section className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4">
+          <div className="flex items-start gap-2.5">
+            <Calendar className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+            <div>
+              <h2 className="font-bold text-slate-900 text-sm">Semester Settings</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                The default semester is six months. Set the start and end dates here; warning tokens and attendance warning summaries count events within this inclusive date range.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveSemester} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end text-xs">
+            <div>
+              <label htmlFor="semester-start-date" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                Semester Start Date
+              </label>
+              <input
+                id="semester-start-date"
+                type="date"
+                required
+                value={semesterStartInput}
+                onChange={(e) => setSemesterStartInput(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="semester-end-date" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                Semester End Date
+              </label>
+              <input
+                id="semester-end-date"
+                type="date"
+                required
+                value={semesterEndInput}
+                onChange={(e) => setSemesterEndInput(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSavingSemester}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              {isSavingSemester ? 'Saving...' : 'Save Semester Dates'}
+            </button>
+          </form>
+
+          {semesterFeedback && (
+            <div
+              role={semesterFeedback.type === 'error' ? 'alert' : 'status'}
+              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                semesterFeedback.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-800'
+              }`}
+            >
+              {semesterFeedback.text}
+            </div>
+          )}
+
+          {activeSemester && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between text-xs">
+              <div>
+                <div className="text-[10px] font-bold uppercase text-indigo-700">Active Semester</div>
+                <div className="font-mono font-bold text-slate-800 mt-0.5">
+                  {activeSemester.startDate} to {activeSemester.endDate}
+                </div>
+              </div>
+              <div className="text-slate-600 font-semibold">
+                {activeSemester.durationDays} days
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Hostel & Block Strategic Breakdown */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5">
@@ -490,7 +595,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
               Hostel Breakdown — Boys Hostel 1 (180), Girls Hostel (165), Boys Hostel 2 (180)
             </h2>
           </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
             <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
             <label htmlFor="director-hostel-breakdown-date" className="text-xs text-slate-600 font-medium whitespace-nowrap">
               Select Date:
@@ -502,22 +607,24 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
               onChange={(e) => handleDateChange(e.target.value)}
               className="bg-white text-slate-900 text-xs font-mono px-2 py-1 rounded border border-slate-300 focus:outline-hidden focus:border-indigo-500"
             />
+            <DateQuickPresets value={selectedDate} onChange={handleDateChange} tone="indigo" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {hostelReports.map((h: any) => {
+            const hostelKey = normalizeHostelKey(h.hostelId || h.code);
             const wardenDisplayName =
-              h.hostelId === 'h-shivalik'
+              hostelKey === 'h-shivalik'
                 ? 'Dr. Sati Sir'
-                : h.hostelId === 'h-mandakini'
+                : hostelKey === 'h-mandakini'
                 ? 'Dr. Kavita Tariyal'
                 : 'Dr. Pathak Sir';
 
             const capacityDisplay =
-              h.hostelId === 'h-shivalik'
+              hostelKey === 'h-shivalik'
                 ? 180
-                : h.hostelId === 'h-mandakini'
+                : hostelKey === 'h-mandakini'
                 ? 165
                 : 180;
             const hostelMetrics: {
@@ -530,8 +637,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
               { category: 'present', label: 'Present:', value: h.present ?? 0, className: 'text-emerald-700 bg-emerald-50/70 border-emerald-100' },
               { category: 'late', label: 'Late Punch:', value: h.late ?? 0, className: 'text-amber-700 bg-amber-50/70 border-amber-100' },
               { category: 'approved_leave', label: 'Approved Leave:', value: h.leave ?? 0, className: 'text-blue-700 bg-blue-50/70 border-blue-100' },
-              { category: 'defaulters', label: 'Defaulters:', value: h.defaulters ?? 0, className: 'text-rose-700 bg-rose-50/70 border-rose-100' },
-              { category: 'compliant', label: 'Compliance:', value: `${h.complianceRate ?? 0}%`, className: 'text-indigo-700 bg-indigo-50/70 border-indigo-100' }
+              { category: 'defaulters', label: 'Defaulters:', value: h.defaulters ?? 0, className: 'text-rose-700 bg-rose-50/70 border-rose-100' }
             ];
 
             return (
@@ -546,9 +652,6 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
                       Strength: {capacityDisplay} beds ({h.code})
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${h.complianceRate >= 80 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                    {h.complianceRate}%
-                  </span>
                 </div>
 
                 {/* Progress bar */}
@@ -579,7 +682,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
                   {h.blockStats?.map((b: any) => (
                     <div key={b.block} className="flex justify-between text-slate-600 py-0.5 border-b border-slate-100/60 last:border-0">
                       <span>{b.block}:</span>
-                      <span className="font-medium text-slate-900">{b.present + b.late + b.leave} / {b.total} ({b.complianceRate}%)</span>
+                      <span className="font-medium text-slate-900">{b.present + b.late + b.leave} / {b.total}</span>
                     </div>
                   ))}
                 </div>
@@ -595,6 +698,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({ officeRole
         hostelId="all"
         allowHostelSwitch={true}
         onDateChange={handleDateChange}
+        summaryData={reportData}
       />
 
       {/* Institution-Wide Post-Grace Cutoff Defaulters Roster */}

@@ -7,11 +7,15 @@ import {
   Search,
   Building2,
   Calendar,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import { LeaveRecord, Student } from '../types';
+import { InstitutionalHoliday, LeaveRecord, Student } from '../types';
+import { EditLeaveModal } from '../components/dashboard/EditLeaveModal';
+import { LeaveDecisionConfirmModal } from '../components/dashboard/LeaveDecisionConfirmModal';
+import { StudentLeaveApplicationSection } from '../components/dashboard/StudentLeaveApplicationSection';
 
 export const LeaveManagementPage: React.FC = () => {
   const { user } = useAuth();
@@ -21,23 +25,55 @@ export const LeaveManagementPage: React.FC = () => {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const [leaveForm, setLeaveForm] = useState({
     studentId: '',
-    startDate: '2026-10-27',
-    endDate: '2026-10-29',
+    startDate: todayIst,
+    endDate: todayIst,
     reason: '',
     gatePassNo: `GP-${Date.now().toString().slice(-4)}`,
     parentConsentVerified: true,
     notes: ''
   });
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [updatingLeaveId, setUpdatingLeaveId] = useState<string | null>(null);
+  const [editingLeave, setEditingLeave] = useState<LeaveRecord | null>(null);
+  const [confirmDecision, setConfirmDecision] = useState<{ leave: LeaveRecord; action: 'approved' | 'rejected' } | null>(null);
 
+  // Student view state
+  const [studentProfile, setStudentProfile] = useState<Student | null>(null);
+
+  // Chief Warden holiday calendar state
+  const [holidays, setHolidays] = useState<InstitutionalHoliday[]>([]);
+  const [holidayStartDate, setHolidayStartDate] = useState('');
+  const [holidayEndDate, setHolidayEndDate] = useState('');
+  const [holidayReason, setHolidayReason] = useState('');
+  const [isSavingHoliday, setIsSavingHoliday] = useState(false);
+  const [holidayFeedback, setHolidayFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const isStudent = user?.role === 'student';
+  const isChiefWarden = user?.role === 'chief_warden' || String(user?.role) === 'admin';
   const isCaretaker = user?.role === 'caretaker';
-  const canEnterLeave = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker'].includes(user?.role || '');
-  const canApproveLeave = ['residential_warden', 'warden', 'chief_warden', 'director'].includes(user?.role || '');
+  const canEnterLeave = ['residential_warden', 'warden', 'chief_warden', 'director', 'admin', 'caretaker'].includes(user?.role || '');
+  const canApproveLeave = ['residential_warden', 'warden', 'chief_warden', 'director', 'admin'].includes(user?.role || '');
 
   const loadData = async () => {
     try {
+      if (isStudent) {
+        const [stuRes, myLeavesRes] = await Promise.allSettled([
+          user?.studentId ? apiService.getStudentById(user.studentId) : Promise.resolve(null),
+          apiService.getMyLeaves(),
+        ]);
+        if (stuRes.status === 'fulfilled' && stuRes.value?.success) {
+          setStudentProfile(stuRes.value.student);
+        }
+        if (myLeavesRes.status === 'fulfilled' && Array.isArray(myLeavesRes.value?.leaves)) {
+          setLeaves(myLeavesRes.value.leaves);
+        }
+        return;
+      }
+
       const lRes = await apiService.getLeaves();
       if (lRes.success) setLeaves(lRes.leaves);
 
@@ -49,8 +85,71 @@ export const LeaveManagementPage: React.FC = () => {
           ));
         }
       }
+
+      if (isChiefWarden) {
+        const hRes = await apiService.getHolidays();
+        if (hRes.success) setHolidays(hRes.holidays || []);
+      }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleMarkHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setHolidayFeedback(null);
+
+    if (!holidayStartDate) {
+      setHolidayFeedback({ type: 'error', text: 'Please select a holiday start date.' });
+      return;
+    }
+    const effectiveEnd = holidayEndDate || holidayStartDate;
+    if (effectiveEnd < holidayStartDate) {
+      setHolidayFeedback({ type: 'error', text: 'Holiday end date cannot be earlier than start date.' });
+      return;
+    }
+    if (holidayReason.trim().length < 2) {
+      setHolidayFeedback({ type: 'error', text: 'Please enter the reason for this day off.' });
+      return;
+    }
+
+    setIsSavingHoliday(true);
+    try {
+      const res = await apiService.createHoliday({
+        startDate: holidayStartDate,
+        endDate: effectiveEnd,
+        reason: holidayReason.trim(),
+      });
+      if (res.success) {
+        setHolidayStartDate('');
+        setHolidayEndDate('');
+        setHolidayReason('');
+        setHolidayFeedback({ type: 'success', text: res.message || 'Institutional holiday added successfully.' });
+        await loadData();
+      }
+    } catch (err: any) {
+      setHolidayFeedback({
+        type: 'error',
+        text: err.response?.data?.message || 'Unable to schedule institutional holiday.',
+      });
+    } finally {
+      setIsSavingHoliday(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (holidayId: string) => {
+    setHolidayFeedback(null);
+    try {
+      const res = await apiService.deleteHoliday(holidayId);
+      if (res.success) {
+        setHolidayFeedback({ type: 'success', text: res.message || 'Institutional holiday removed.' });
+        await loadData();
+      }
+    } catch (err: any) {
+      setHolidayFeedback({
+        type: 'error',
+        text: err.response?.data?.message || 'Unable to remove holiday.',
+      });
     }
   };
 
@@ -84,12 +183,22 @@ export const LeaveManagementPage: React.FC = () => {
   };
 
   const handleLeaveStatusUpdate = async (leaveId: string, status: 'approved' | 'rejected') => {
-    setFeedback(null);
+    setActionFeedback(null);
+    setUpdatingLeaveId(leaveId);
     try {
-      await apiService.updateLeaveStatus(leaveId, status);
+      const res = await apiService.updateLeaveStatus(leaveId, status);
       await loadData();
+      setActionFeedback({
+        type: 'success',
+        message: res?.message || (status === 'approved' ? 'Leave approved and attendance updated.' : 'Leave request rejected.'),
+      });
     } catch (err: any) {
-      setFeedback(err.response?.data?.message || 'Unable to update leave status.');
+      setActionFeedback({
+        type: 'error',
+        message: err.response?.data?.message || 'Unable to update leave status.',
+      });
+    } finally {
+      setUpdatingLeaveId(null);
     }
   };
 
@@ -109,6 +218,31 @@ export const LeaveManagementPage: React.FC = () => {
       l.enrollmentNo.toLowerCase().includes(search.toLowerCase()) ||
       l.gatePassNo.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (isStudent) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl font-bold text-slate-900">My Approved Leaves &amp; Applications</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+              Warden Approval Workflow
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Submit leave applications directly to your Residential Warden and track approval status in real time.
+          </p>
+        </div>
+
+        <StudentLeaveApplicationSection
+          profile={studentProfile}
+          studentName={user?.name || 'Student'}
+          leaves={leaves}
+          onSubmitted={loadData}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -149,10 +283,162 @@ export const LeaveManagementPage: React.FC = () => {
         <div className="space-y-1">
           <div className="font-bold">Leave approval procedure:</div>
           <p className="leading-relaxed text-[11px] text-blue-800">
-            Students cannot directly approve leave in the system. An authorized warden records approved leave after verifying the application and parent consent. Once logged, automated absence emails are suppressed for the approved dates.
+            Students cannot directly approve leave in the system. An authorized warden reviews and approves submitted applications. Once approved, automated absence emails are suppressed for the approved dates.
           </p>
         </div>
       </div>
+
+      {/* Chief Warden Institutional Holiday Calendar */}
+      {isChiefWarden && (
+        <section className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4">
+          <div className="flex items-start gap-2.5">
+            <Calendar className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+            <div>
+              <h2 className="font-bold text-slate-900 text-sm">Institutional Holiday Calendar</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Official holidays apply to every active student across all hostels. Attendance is not required and no absence defaulters are created.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleMarkHoliday} className="space-y-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="holiday-start-date" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Date
+                </label>
+                <input
+                  id="holiday-start-date"
+                  type="date"
+                  required
+                  value={holidayStartDate}
+                  onChange={(e) => {
+                    setHolidayStartDate(e.target.value);
+                    if (!holidayEndDate || holidayEndDate < e.target.value) {
+                      setHolidayEndDate(e.target.value);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="holiday-end-date" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  End Date
+                </label>
+                <input
+                  id="holiday-end-date"
+                  type="date"
+                  min={holidayStartDate || undefined}
+                  value={holidayEndDate}
+                  onChange={(e) => setHolidayEndDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+              <div>
+                <label htmlFor="holiday-reason" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Reason
+                </label>
+                <input
+                  id="holiday-reason"
+                  type="text"
+                  required
+                  placeholder="Enter the reason for this day off"
+                  value={holidayReason}
+                  onChange={(e) => setHolidayReason(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingHoliday}
+                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              >
+                {isSavingHoliday ? 'Saving...' : 'Mark Holiday'}
+              </button>
+            </div>
+          </form>
+
+          {holidayFeedback && (
+            <div
+              role={holidayFeedback.type === 'error' ? 'alert' : 'status'}
+              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                holidayFeedback.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-800'
+              }`}
+            >
+              {holidayFeedback.text}
+            </div>
+          )}
+
+          {holidays.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500">
+              No current or upcoming holiday dates are listed. Choose a start date, end date, and reason above to add one.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-2 px-3">Date Range</th>
+                    <th className="py-2 px-3">Days</th>
+                    <th className="py-2 px-3">Reason</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {holidays.map((h) => (
+                    <tr key={h.id} className="hover:bg-slate-50/70">
+                      <td className="py-2 px-3 font-mono font-semibold text-slate-800">
+                        {h.startDate === h.endDate ? h.startDate : `${h.startDate} to ${h.endDate}`}
+                      </td>
+                      <td className="py-2 px-3 text-slate-600">{h.durationDays}</td>
+                      <td className="py-2 px-3 text-slate-700">{h.reason}</td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          h.isPast ? 'bg-slate-100 text-slate-600' : 'bg-indigo-100 text-indigo-800'
+                        }`}>
+                          {h.isPast ? 'Past' : 'Upcoming'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteHoliday(h.id)}
+                          aria-label={`Remove holiday ${h.reason}`}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {actionFeedback && (
+        <div
+          role={actionFeedback.type === 'error' ? 'alert' : 'status'}
+          className={`rounded-xl border px-4 py-3 text-xs font-medium ${
+            actionFeedback.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-rose-200 bg-rose-50 text-rose-800'
+          }`}
+        >
+          {actionFeedback.message}
+        </div>
+      )}
 
       {/* Leave Records Search & Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4">
@@ -204,7 +490,7 @@ export const LeaveManagementPage: React.FC = () => {
                       <div className="font-semibold text-slate-900">{l.studentName}</div>
                       <div className="font-mono text-[10px] text-slate-500">{l.enrollmentNo}</div>
                     </td>
-                    <td className="py-2.5 px-3 text-slate-700">{l.block}, Room {l.roomNumber}</td>
+                    <td className="py-2.5 px-3 text-slate-700">{l.hostel || l.block || 'Hostel'}, Room {l.roomNumber || '—'}</td>
                     <td className="py-2.5 px-3 text-slate-800 font-medium">
                       {l.startDate} to {l.endDate}
                     </td>
@@ -214,40 +500,59 @@ export const LeaveManagementPage: React.FC = () => {
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Phone Verified
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-slate-700 font-medium">{l.residentialWardenName}</td>
+                    <td className="py-2.5 px-3 text-slate-700 font-medium">{l.approvedBy || l.residentialWardenName || 'Pending Warden'}</td>
                     <td className="py-2.5 px-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        l.status === 'Approved'
-                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                          : l.status === 'Rejected'
+                      {(() => {
+                        const isPending = l.status === 'Pending' || l.approvalStatus === 'pending';
+                        const isRejected = l.status === 'Rejected' || l.approvalStatus === 'rejected';
+                        const badgeClass = isPending
+                          ? 'bg-amber-100 text-amber-800 border-amber-200'
+                          : isRejected
                             ? 'bg-rose-100 text-rose-800 border-rose-200'
-                            : 'bg-amber-100 text-amber-800 border-amber-200'
-                      }`}>
-                        {l.status === 'Pending' ? 'Pending Warden Approval' : (l.status || 'Approved')}
-                      </span>
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                        const label = isPending
+                          ? 'Pending Warden Approval'
+                          : isRejected
+                            ? 'Rejected'
+                            : 'Approved';
+                        return (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     {canApproveLeave && (
                       <td className="py-2.5 px-3 text-right">
-                        {l.status === 'Pending' ? (
-                          <div className="inline-flex gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleLeaveStatusUpdate(l.id, 'approved')}
-                              className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold cursor-pointer"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleLeaveStatusUpdate(l.id, 'rejected')}
-                              className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">Processed</span>
-                        )}
+                        <div className="inline-flex flex-wrap justify-end gap-1.5">
+                          {(l.status === 'Pending' || l.approvalStatus === 'pending') && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={updatingLeaveId === l.id}
+                                onClick={() => setConfirmDecision({ leave: l, action: 'approved' })}
+                                className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold cursor-pointer disabled:opacity-50"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={updatingLeaveId === l.id}
+                                onClick={() => setConfirmDecision({ leave: l, action: 'rejected' })}
+                                className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold cursor-pointer disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setEditingLeave(l)}
+                            className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-semibold cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -421,6 +726,28 @@ export const LeaveManagementPage: React.FC = () => {
           </div>
         </div>
       )}
+      <EditLeaveModal
+        leave={editingLeave}
+        onClose={() => setEditingLeave(null)}
+        onSaved={async (_updated, message) => {
+          setEditingLeave(null);
+          await loadData();
+          setActionFeedback({ type: 'success', message });
+        }}
+      />
+
+      <LeaveDecisionConfirmModal
+        leave={confirmDecision?.leave || null}
+        action={confirmDecision?.action || null}
+        isSubmitting={Boolean(confirmDecision && updatingLeaveId === confirmDecision.leave.id)}
+        onCancel={() => setConfirmDecision(null)}
+        onConfirm={async () => {
+          if (!confirmDecision) return;
+          const { leave, action } = confirmDecision;
+          await handleLeaveStatusUpdate(leave.id, action);
+          setConfirmDecision(null);
+        }}
+      />
     </div>
   );
 };

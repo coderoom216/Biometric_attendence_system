@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceWebhookController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\ExecutionController;
+use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\HostelController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\NotificationController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\ScheduledTaskController;
 use App\Http\Controllers\Api\SchedulerController;
 use App\Http\Controllers\Api\SecurityTestController;
+use App\Http\Controllers\Api\SemesterController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\SystemOverviewController;
 use App\Http\Controllers\Api\TicketController;
@@ -84,10 +86,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/admin/students', [StudentController::class, 'store']);
     Route::get('/admin/students', [StudentController::class, 'index']);
-    Route::get('/students/{id}', [StudentController::class, 'show']);
-    Route::put('/students/{id}', [StudentController::class, 'update']);
-    Route::put('/admin/students/{id}', [StudentController::class, 'update']);
-    Route::post('/admin/students/{id}/allocate-room', [StudentController::class, 'allocateRoom']);
+    Route::get('/students/warning-tickets', [StudentController::class, 'warningTickets']);
+    Route::get('/students/{id}', [StudentController::class, 'show'])->whereNumber('id');
+    Route::put('/students/{id}', [StudentController::class, 'update'])->whereNumber('id');
+    Route::put('/admin/students/{id}', [StudentController::class, 'update'])->whereNumber('id');
+    Route::post('/admin/students/{id}/allocate-room', [StudentController::class, 'allocateRoom'])->whereNumber('id');
 
     /*
     |--------------------------------------------------------------------------
@@ -269,6 +272,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
 
     Route::get('/biometric/devices', [BiometricController::class, 'devices']);
+    Route::put('/biometric/devices/{id}', [BiometricController::class, 'updateDevice'])->whereNumber('id');
     Route::get('/biometric/enrolled-users', [BiometricController::class, 'enrolledUsers']);
     Route::post('/biometric/trigger-user-fetch', [BiometricController::class, 'triggerUserFetch']);
     Route::get('/biometric/live', [BiometricController::class, 'live']);
@@ -282,7 +286,6 @@ Route::middleware('auth:sanctum')->group(function () {
     */
 
     Route::get('/students', [StudentController::class, 'index']);
-    Route::get('/students/warning-tickets', [StudentController::class, 'warningTickets']);
     Route::post('/students/onboard', [StudentController::class, 'store']);
     Route::post('/students/device-registration', [StudentController::class, 'deviceRegistration']);
     Route::post('/students/verify', [StudentController::class, 'verify']);
@@ -296,6 +299,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/leaves', [LeaveController::class, 'index']);
     Route::post('/leaves/enter', [LeaveController::class, 'enter']);
+    Route::put('/leaves/{id}', [LeaveController::class, 'update'])->whereNumber('id');
+    Route::put('/admin/leaves/{id}', [LeaveController::class, 'update'])->whereNumber('id');
 
     /*
     |--------------------------------------------------------------------------
@@ -325,6 +330,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/reports/summary', [ReportController::class, 'summary']);
     Route::get('/reports/trends', [ReportController::class, 'trends']);
+    Route::get('/semester', [SemesterController::class, 'show']);
+    Route::put('/semester', [SemesterController::class, 'update']);
+    Route::post('/semester', [SemesterController::class, 'update']);
+    Route::get('/holidays', [HolidayController::class, 'index']);
+    Route::post('/holidays', [HolidayController::class, 'store']);
+    Route::delete('/holidays/{id}', [HolidayController::class, 'destroy'])->whereNumber('id');
     Route::get('/system/audit-logs', [AuditController::class, 'index']);
     Route::get('/system/overview', [SystemOverviewController::class, 'overview']);
     Route::get('/security-test/run', [SecurityTestController::class, 'run']);

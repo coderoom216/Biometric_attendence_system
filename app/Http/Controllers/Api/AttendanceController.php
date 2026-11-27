@@ -8,6 +8,7 @@ use App\Models\Audit;
 use App\Models\Leave;
 use App\Models\Student;
 use App\Services\ClockService;
+use App\Services\DefaulterEvaluationService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -69,10 +70,8 @@ class AttendanceController extends Controller
                 'End date cannot be earlier than start date.'
             );
 
-            $query->whereBetween('attendance_date', [
-                $validated['startDate'],
-                $validated['endDate'],
-            ]);
+            $query->whereDate('attendance_date', '>=', $validated['startDate'])
+                ->whereDate('attendance_date', '<=', $validated['endDate']);
         } elseif (! empty($validated['startDate'])) {
             $query->whereDate('attendance_date', '>=', $validated['startDate']);
         } elseif (! empty($validated['endDate'])) {
@@ -226,6 +225,7 @@ class AttendanceController extends Controller
     {
         $current = $this->clock();
         $date = $current->toDateString();
+        app(DefaulterEvaluationService::class)->ensureEvaluatedForDate($date);
 
         $students = $this->scopedStudents($request)->get();
 
@@ -273,7 +273,7 @@ class AttendanceController extends Controller
             'success' => true,
             'date' => $date,
             'virtualTime' => $current->format('H:i:s'),
-            'isPastCutoff' => $current->format('H:i:s') > ClockService::CUTOFF_TIME,
+            'isPastCutoff' => $current->format('H:i:s') >= ClockService::CUTOFF_TIME,
             'isPastDefaulterTime' => $isPastDefaulterTime,
             'stats' => [
                 'total' => $students->count(),
@@ -290,7 +290,7 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Defaulter list. It becomes visible after 10 PM evaluation time.
+     * Defaulter list. Shows post-22:00 punch defaulters immediately, and all no-punch defaulters from 10 PM onward.
      */
     public function defaulters(Request $request)
     {
@@ -302,6 +302,7 @@ class AttendanceController extends Controller
         ]);
 
         $targetDate = $validated['date'] ?? $current->toDateString();
+        app(DefaulterEvaluationService::class)->ensureEvaluatedForDate($targetDate);
 
         $isVisible = $targetDate < $current->toDateString()
             || (
@@ -309,28 +310,25 @@ class AttendanceController extends Controller
                 && $current->format('H:i:s') >= ClockService::DEFAULTER_TIME
             );
 
-        if (! $isVisible) {
-            return response()->json([
-                'success' => true,
-                'targetDate' => $targetDate,
-                'virtualTime' => $current->format('H:i:s'),
-                'isDefaulterListVisible' => false,
-                'count' => 0,
-                'defaulters' => [],
-            ]);
-        }
-
         $query = Attendance::with([
             'student.user',
             'student.hostel',
             'student.room',
             'markedBy',
         ])
-            ->whereDate('attendance_date', $targetDate)
-            ->where(function (Builder $query) {
+            ->whereDate('attendance_date', $targetDate);
+
+        if ($isVisible) {
+            $query->where(function (Builder $query) {
                 $query->where('is_defaulter', true)
                     ->orWhere('status', 'absent');
             });
+        } else {
+            // Before 10 PM evaluation time, only surface explicit post-22:00 punch defaulters
+            $query->where('is_defaulter', true)
+                ->whereNotNull('punch_time')
+                ->where('punch_time', '>', ClockService::DEFAULTER_TIME);
+        }
 
         $role = strtolower(str_replace(
             ' ',
@@ -406,6 +404,7 @@ class AttendanceController extends Controller
         ]);
 
         $targetDate = $validated['date'] ?? $current->toDateString();
+        app(DefaulterEvaluationService::class)->ensureEvaluatedForDate($targetDate);
 
         $query = Attendance::with([
             'student.user',
@@ -414,7 +413,8 @@ class AttendanceController extends Controller
             'markedBy',
         ])
             ->whereDate('attendance_date', $targetDate)
-            ->where('status', 'late');
+            ->where('status', 'late')
+            ->where('is_defaulter', false);
 
         $role = strtolower(str_replace(
             ' ',
@@ -536,16 +536,23 @@ class AttendanceController extends Controller
             'Attendance punch cannot be recorded during approved leave.'
         );
 
-        $status = $punchTime <= ClockService::CUTOFF_TIME
-            ? 'present'
-            : 'late';
+        $classification = ClockService::classifyPunchTime($punchTime);
+        $status = $classification['status'];
+        $isDefaulter = $classification['is_defaulter'];
+        $remarks = $isDefaulter
+            ? 'Manual punch recorded after 10:00 PM IST (defaulter).'
+            : ($status === 'late'
+                ? 'Late punch entry (19:30 - 22:00 IST).'
+                : 'Manual attendance entry.');
 
         $attendance = DB::transaction(function () use (
             $student,
             $user,
             $date,
             $punchTime,
-            $status
+            $status,
+            $isDefaulter,
+            $remarks
         ) {
             $attendance = Attendance::updateOrCreate(
                 [
@@ -556,8 +563,8 @@ class AttendanceController extends Controller
                     'marked_by' => $user->id,
                     'punch_time' => $punchTime,
                     'status' => $status,
-                    'is_defaulter' => false,
-                    'remarks' => 'Manual attendance entry.',
+                    'is_defaulter' => $isDefaulter,
+                    'remarks' => $remarks,
                 ]
             );
 
@@ -570,6 +577,7 @@ class AttendanceController extends Controller
                     'student_id' => $student->id,
                     'punch_time' => $punchTime,
                     'status' => $status,
+                    'is_defaulter' => $isDefaulter,
                     'date' => $date,
                 ], JSON_UNESCAPED_UNICODE),
                 'activity_at' => app(ClockService::class)->current(),
@@ -594,6 +602,29 @@ class AttendanceController extends Controller
 
     public function history(Request $request)
     {
+        $startDate = $request->query('startDate');
+        $endDate = $request->query('endDate');
+        $evalService = app(DefaulterEvaluationService::class);
+
+        if (is_string($startDate) && is_string($endDate) && $startDate !== '' && $endDate !== '') {
+            if ($startDate === $endDate) {
+                $evalService->ensureEvaluatedForDate($startDate);
+            } else {
+                try {
+                    $cursor = Carbon::createFromFormat('Y-m-d', $startDate, ClockService::TIMEZONE)->startOfDay();
+                    $end = Carbon::createFromFormat('Y-m-d', $endDate, ClockService::TIMEZONE)->startOfDay();
+                    if ($cursor->diffInDays($end, false) >= 0 && $cursor->diffInDays($end, false) <= 14) {
+                        for (; $cursor->lte($end); $cursor->addDay()) {
+                            $evalService->ensureEvaluatedForDate($cursor->toDateString());
+                        }
+                    }
+                } catch (\Throwable) {
+                }
+            }
+        } elseif (! $startDate && ! $endDate) {
+            $evalService->ensureEvaluatedForDate($this->clock()->toDateString());
+        }
+
         $records = $this->filteredQuery($request)->get();
 
         return response()->json([

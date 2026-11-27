@@ -8,10 +8,12 @@ use App\Models\Device;
 use App\Models\Notification;
 use App\Models\Punch;
 use App\Models\Student;
+use App\Services\AuditService;
 use App\Services\ClockService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use MongoDB\Driver\BulkWrite;
 use MongoDB\Driver\Manager;
 use MongoDB\Driver\Query;
@@ -99,30 +101,9 @@ class BiometricController extends Controller
             $devicesQuery->where('hostel_id', $user->hostel_id);
         }
 
-        $devices = $devicesQuery->get()->map(function ($device) use ($aliveInfo) {
-            $isDeviceOnline = ($device->device_serial === 'RSS20241199684') ? $aliveInfo['online'] : false;
-            $status = $isDeviceOnline ? 'online_synced' : ($device->device_status ?: 'standby');
-            $studentCount = Student::where('hostel_id', $device->hostel_id)->count();
-
-            return [
-                'id' => (string) $device->id,
-                'deviceId' => $device->device_serial,
-                'name' => $device->device_name,
-                'deviceName' => $device->device_name,
-                'deviceSerial' => $device->device_serial,
-                'hostelId' => (string) $device->hostel_id,
-                'hostelName' => $device->hostel?->name ?? 'Unknown Hostel',
-                'hostelCode' => $device->hostel?->code ?? '',
-                'status' => $status,
-                'ipAddress' => ($device->device_serial === 'RSS20241199684') ? '192.168.1.22' : '192.168.1.'.(22 + (int) $device->id),
-                'lastSync' => $isDeviceOnline ? now()->toIso8601String() : $device->last_sync?->toIso8601String(),
-                'lastSyncAt' => $isDeviceOnline ? now()->toIso8601String() : ($device->last_sync?->toIso8601String() ?? now()->toIso8601String()),
-                'firmware' => 'S362 v3.15.630',
-                'isOnline' => $isDeviceOnline,
-                'heartbeatSecondsAgo' => $isDeviceOnline ? $aliveInfo['secondsAgo'] : null,
-                'studentCount' => $studentCount,
-            ];
-        });
+        $devices = $devicesQuery->get()->map(
+            fn (Device $device): array => $this->formatDevice($device, $aliveInfo)
+        );
 
         return response()->json([
             'success' => true,
@@ -130,6 +111,133 @@ class BiometricController extends Controller
             'devices' => $devices,
             'deviceStatus' => $aliveInfo,
         ]);
+    }
+
+    /**
+     * Update biometric terminal details (Model No, Name, Serial, IP, Firmware, Location, Hostel, Status).
+     */
+    public function updateDevice(Request $request, int $id)
+    {
+        if ($response = $this->checkBiometricAccess($request, [
+            'Admin',
+            'Caretaker Operator',
+        ])) {
+            return $response;
+        }
+
+        $device = Device::with('hostel')->findOrFail($id);
+
+        $validated = $request->validate([
+            'deviceName' => ['sometimes', 'required', 'string', 'max:255'],
+            'deviceSerial' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('devices', 'device_serial')->ignore($device->id),
+            ],
+            'modelNo' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'ipAddress' => ['sometimes', 'nullable', 'string', 'max:45'],
+            'firmwareVersion' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'location' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'hostelId' => [
+                'sometimes',
+                'required',
+                'integer',
+                'exists:hostels,id',
+                Rule::unique('devices', 'hostel_id')->ignore($device->id),
+            ],
+            'deviceStatus' => [
+                'sometimes',
+                'required',
+                Rule::in(['active', 'inactive', 'online_synced', 'standby', 'offline']),
+            ],
+        ]);
+
+        $updates = [];
+        if (array_key_exists('deviceName', $validated)) {
+            $updates['device_name'] = trim($validated['deviceName']);
+        }
+        if (array_key_exists('deviceSerial', $validated)) {
+            $updates['device_serial'] = trim($validated['deviceSerial']);
+        }
+        if (array_key_exists('modelNo', $validated)) {
+            $updates['model_no'] = $validated['modelNo'] !== null ? trim($validated['modelNo']) : null;
+        }
+        if (array_key_exists('ipAddress', $validated)) {
+            $updates['ip_address'] = $validated['ipAddress'] !== null ? trim($validated['ipAddress']) : null;
+        }
+        if (array_key_exists('firmwareVersion', $validated)) {
+            $updates['firmware_version'] = $validated['firmwareVersion'] !== null ? trim($validated['firmwareVersion']) : null;
+        }
+        if (array_key_exists('location', $validated)) {
+            $updates['location'] = $validated['location'] !== null ? trim($validated['location']) : null;
+        }
+        if (array_key_exists('hostelId', $validated)) {
+            $updates['hostel_id'] = (int) $validated['hostelId'];
+        }
+        if (array_key_exists('deviceStatus', $validated)) {
+            $updates['device_status'] = $validated['deviceStatus'];
+        }
+
+        if (! empty($updates)) {
+            $device->update($updates);
+
+            app(AuditService::class)->log(
+                'Biometric Terminal Updated',
+                'Device',
+                $device->id,
+                'Updated terminal '.$device->device_name.' (Model: '.($device->model_no ?: 'S362').', Serial: '.$device->device_serial.')',
+                $request->user()->id
+            );
+        }
+
+        $aliveInfo = $this->checkDeviceHeartbeat('RSS20241199684');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Biometric terminal updated successfully.',
+            'device' => $this->formatDevice($device->fresh('hostel'), $aliveInfo),
+        ]);
+    }
+
+    /**
+     * Format a biometric terminal record consistently for dashboard views.
+     *
+     * @param  array<string, mixed>  $aliveInfo
+     * @return array<string, mixed>
+     */
+    private function formatDevice(Device $device, array $aliveInfo): array
+    {
+        $isDeviceOnline = ($device->device_serial === ($aliveInfo['serial'] ?? 'RSS20241199684'))
+            ? (bool) ($aliveInfo['online'] ?? false)
+            : false;
+        $status = $isDeviceOnline ? 'online_synced' : ($device->device_status ?: 'standby');
+        $studentCount = Student::where('hostel_id', $device->hostel_id)->count();
+        $modelNo = $device->model_no ?: 'S362';
+        $ipAddress = $device->ip_address ?: (($device->device_serial === 'RSS20241199684') ? '192.168.1.22' : '192.168.1.'.(22 + (int) $device->id));
+
+        return [
+            'id' => (string) $device->id,
+            'deviceId' => $device->device_serial,
+            'name' => $device->device_name,
+            'deviceName' => $device->device_name,
+            'deviceSerial' => $device->device_serial,
+            'modelNo' => $modelNo,
+            'hostelId' => (string) $device->hostel_id,
+            'hostelName' => $device->hostel?->name ?? 'Unknown Hostel',
+            'hostelCode' => $device->hostel?->code ?? '',
+            'status' => $status,
+            'deviceStatus' => $device->device_status,
+            'ipAddress' => $ipAddress,
+            'location' => $device->location,
+            'lastSync' => $isDeviceOnline ? now()->toIso8601String() : $device->last_sync?->toIso8601String(),
+            'lastSyncAt' => $isDeviceOnline ? now()->toIso8601String() : ($device->last_sync?->toIso8601String() ?? now()->toIso8601String()),
+            'firmware' => $device->firmware_version ?: "{$modelNo} v3.15.630",
+            'isOnline' => $isDeviceOnline,
+            'heartbeatSecondsAgo' => $isDeviceOnline ? ($aliveInfo['secondsAgo'] ?? null) : null,
+            'studentCount' => $studentCount,
+        ];
     }
 
     public function sync(Request $request)
@@ -160,7 +268,14 @@ class BiometricController extends Controller
 
         DB::transaction(function () use ($data, $device, $current, &$processed, &$duplicates, &$unrecognized) {
             foreach ($data['punches'] as $punchItem) {
-                $student = Student::where('biometric_id', $punchItem['biometricId'])->first();
+                $rawBioId = trim((string) $punchItem['biometricId']);
+                $cleanBioId = ltrim($rawBioId, '0') ?: $rawBioId;
+                $candidates = array_values(array_unique(array_filter([
+                    $rawBioId,
+                    $cleanBioId,
+                    str_pad($cleanBioId, 8, '0', STR_PAD_LEFT),
+                ])));
+                $student = Student::whereIn('biometric_id', $candidates)->first();
 
                 if (! $student) {
                     $unrecognized++;
@@ -278,6 +393,7 @@ class BiometricController extends Controller
 
         $idDocs = [];
         $infoMap = [];
+        $glogDocs = [];
 
         try {
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
@@ -289,6 +405,9 @@ class BiometricController extends Controller
             $infoQuery = new Query([], ['sort' => ['created_at' => -1, '_id' => -1]]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
 
+            $glogQuery = new Query([], ['sort' => ['_id' => -1], 'limit' => 50]);
+            $glogDocs = iterator_to_array($manager->executeQuery('biometric_db.glog_data', $glogQuery));
+
             foreach ($infoDocs as $doc) {
                 $uid = trim((string) ($doc->user_id ?? ''));
                 if (! $uid) {
@@ -298,6 +417,7 @@ class BiometricController extends Controller
                 $mName = $infoObj->user_name ?? ($doc->name ?? null);
                 $cleanName = (! empty(trim((string) $mName))) ? trim((string) $mName) : null;
                 $privilege = $infoObj->user_privilege ?? ($infoObj->privilege ?? ($doc->privilege ?? null));
+                $docDev = trim((string) ($doc->dev_id ?? '')) ?: 'RSS20241199684';
 
                 $enrollArray = is_array($infoObj->enroll_data_array ?? null) ? $infoObj->enroll_data_array : [];
                 $fpSlots = 0;
@@ -310,6 +430,7 @@ class BiometricController extends Controller
 
                 $hasFp = $fpSlots > 0 || ! empty($doc->backup_number) || ! empty($doc->raw_size) || ! empty($doc->fp_template_size);
                 $fpCount = $fpSlots > 0 ? $fpSlots : (! empty($doc->backup_number) || ! empty($doc->raw_size) ? 1 : 0);
+                $infoTs = $this->extractMongoTimestamp($doc);
 
                 if (! isset($infoMap[$uid])) {
                     $infoMap[$uid] = [
@@ -318,6 +439,8 @@ class BiometricController extends Controller
                         'hasFingerprint' => $hasFp,
                         'fingerprintCount' => $fpCount,
                         'hasInfo' => true,
+                        'timestamp' => $infoTs,
+                        'devId' => $docDev,
                     ];
                 } else {
                     if ($infoMap[$uid]['name'] === null && $cleanName !== null) {
@@ -328,6 +451,7 @@ class BiometricController extends Controller
                     }
                     $infoMap[$uid]['hasFingerprint'] = $infoMap[$uid]['hasFingerprint'] || $hasFp;
                     $infoMap[$uid]['fingerprintCount'] = max($infoMap[$uid]['fingerprintCount'], $fpCount);
+                    $infoMap[$uid]['timestamp'] = max($infoMap[$uid]['timestamp'], $infoTs);
                 }
             }
         } catch (\Throwable $e) {
@@ -336,14 +460,18 @@ class BiometricController extends Controller
 
         $users = [];
         $seenUserIds = [];
+        $missingInfoTargets = [];
 
-        // Process machine users from MongoDB
+        // 1. Process machine users from get_user_id (most recent first)
         foreach ($idDocs as $doc) {
             $uid = trim((string) ($doc->user_id ?? ''));
             if (! $uid || $uid === '0') {
                 continue;
             }
             $cleanUid = ltrim($uid, '0') ?: $uid;
+            if (isset($seenUserIds[$uid]) || isset($seenUserIds[$cleanUid])) {
+                continue;
+            }
             $seenUserIds[$uid] = true;
             $seenUserIds[$cleanUid] = true;
 
@@ -354,39 +482,91 @@ class BiometricController extends Controller
                 'hasFingerprint' => false,
                 'fingerprintCount' => 0,
                 'hasInfo' => false,
+                'timestamp' => 0,
             ]);
 
-            $devSerial = $doc->dev_id ?? 'RSS20241199684';
+            $devSerial = $doc->dev_id ?? ($info['devId'] ?? 'RSS20241199684');
             $matchedDev = $deviceBySerial->get($devSerial);
 
-            // Determine hostel: student's hostel takes priority, then device's hostel
-            $hostelId = $student ? (string) $student->hostel_id : ($matchedDev ? (string) $matchedDev->hostel_id : '1');
-            $hostelName = $student?->hostel?->name ?? ($matchedDev?->hostel?->name ?? 'Boys Hostel 1');
-            $hostelCode = $student?->hostel?->code ?? ($matchedDev?->hostel?->code ?? 'BH1');
+            if (! $info['hasInfo'] && count($missingInfoTargets) < 15) {
+                $missingInfoTargets[$devSerial.'|'.$uid] = [
+                    'dev_id' => $devSerial,
+                    'user_id' => $uid,
+                ];
+            }
 
-            // Determine resolved name: MySQL student user name takes priority over raw machine string
-            $resolvedName = ($student && $student->user && ! empty(trim((string) $student->user->name)))
-                ? trim($student->user->name)
-                : $info['name'];
+            $sortTimestamp = max(
+                $this->extractMongoTimestamp($doc),
+                (int) ($info['timestamp'] ?? 0),
+                $student?->created_at?->timestamp ?? 0
+            );
 
-            $users[] = [
-                'userId' => $uid,
-                'deviceSerial' => $devSerial,
-                'deviceName' => $matchedDev?->device_name ?? 'Biometric Terminal',
-                'name' => $resolvedName,
-                'hostelId' => $hostelId,
-                'hostelName' => $hostelName,
-                'hostelCode' => $hostelCode,
-                'privilege' => $info['privilege'],
-                'fingerprintEnrolled' => $info['hasFingerprint'] || ($student !== null),
-                'fingerprintCount' => $info['fingerprintCount'] > 0 ? $info['fingerprintCount'] : ($student ? 1 : 0),
-                'hasInfo' => $info['hasInfo'] || ($student !== null),
-                'isRegistered' => ($student !== null),
-                'studentId' => $student ? (string) $student->id : null,
-                'enrollmentNo' => $student?->enrollment_no,
-                'roomNumber' => $student?->room?->room_number,
-                'bedNumber' => $student?->bed_number,
+            $users[] = $this->buildMachineUserEntry($uid, $devSerial, $student, $info, $matchedDev, $sortTimestamp);
+        }
+
+        // 2. Include recently fetched machine users already in user_info_result (before get_user_id refreshes)
+        foreach ($infoMap as $uid => $info) {
+            $uidStr = trim((string) $uid);
+            $cleanUid = ltrim($uidStr, '0') ?: $uidStr;
+            if (! $uidStr || $uidStr === '0' || isset($seenUserIds[$uidStr]) || isset($seenUserIds[$cleanUid])) {
+                continue;
+            }
+            $seenUserIds[$uidStr] = true;
+            $seenUserIds[$cleanUid] = true;
+
+            $student = $studentsByBioId[$uidStr] ?? ($studentsByBioId[$cleanUid] ?? null);
+            $devSerial = $info['devId'] ?? 'RSS20241199684';
+            $matchedDev = $deviceBySerial->get($devSerial);
+            $sortTimestamp = max((int) ($info['timestamp'] ?? 0), $student?->created_at?->timestamp ?? 0);
+
+            $users[] = $this->buildMachineUserEntry($uidStr, $devSerial, $student, $info, $matchedDev, $sortTimestamp);
+        }
+
+        // 3. Include recent glog_data machine IDs not yet in get_user_id or user_info_result, and queue fetch
+        foreach ($glogDocs as $gDoc) {
+            $uid = trim((string) ($gDoc->user_id ?? ''));
+            $cleanUid = ltrim($uid, '0') ?: $uid;
+            if (! $uid || $uid === '0' || isset($seenUserIds[$uid]) || isset($seenUserIds[$cleanUid])) {
+                continue;
+            }
+            $seenUserIds[$uid] = true;
+            $seenUserIds[$cleanUid] = true;
+
+            $student = $studentsByBioId[$uid] ?? ($studentsByBioId[$cleanUid] ?? null);
+            $devSerial = trim((string) ($gDoc->dev_id ?? '')) ?: 'RSS20241199684';
+            $matchedDev = $deviceBySerial->get($devSerial);
+
+            if (count($missingInfoTargets) < 15) {
+                $missingInfoTargets[$devSerial.'|'.$uid] = [
+                    'dev_id' => $devSerial,
+                    'user_id' => $uid,
+                ];
+            }
+
+            $emptyInfo = [
+                'name' => null,
+                'privilege' => 'User',
+                'hasFingerprint' => false,
+                'fingerprintCount' => 0,
+                'hasInfo' => false,
+                'timestamp' => 0,
             ];
+            $sortTimestamp = max($this->extractMongoTimestamp($gDoc), $student?->created_at?->timestamp ?? 0);
+
+            $users[] = $this->buildMachineUserEntry($uid, $devSerial, $student, $emptyInfo, $matchedDev, $sortTimestamp);
+        }
+
+        if (isset($manager)) {
+            if (! empty($missingInfoTargets)) {
+                $this->queueMissingUserInfoCommands($manager, array_values($missingInfoTargets));
+            }
+
+            if (! app()->runningUnitTests()) {
+                $discoverySerial = $currentUser->isHostelScoped()
+                    ? ($deviceByHostelId->get($currentUser->hostel_id)?->device_serial ?? 'RSS20241199684')
+                    : ($allDevices->first()?->device_serial ?? 'RSS20241199684');
+                $this->queuePeriodicUserIdDiscovery($manager, $discoverySerial);
+            }
         }
 
         // Also include registered students from MySQL that were not in MongoDB get_user_id yet
@@ -420,16 +600,25 @@ class BiometricController extends Controller
                 'enrollmentNo' => $student->enrollment_no,
                 'roomNumber' => $student->room?->room_number,
                 'bedNumber' => $student->bed_number,
+                '_sortTimestamp' => $student->created_at?->timestamp ?? 0,
             ];
         }
 
-        // Sort users numerically by userId
-        usort($users, function ($a, $b) {
-            $numA = (int) $a['userId'];
-            $numB = (int) $b['userId'];
+        // Sort most recently discovered/enrolled users first, falling back to higher numeric userId
+        usort($users, function (array $a, array $b): int {
+            $timeCmp = ($b['_sortTimestamp'] ?? 0) <=> ($a['_sortTimestamp'] ?? 0);
+            if ($timeCmp !== 0) {
+                return $timeCmp;
+            }
 
-            return $numA <=> $numB;
+            return (int) $b['userId'] <=> (int) $a['userId'];
         });
+
+        $users = array_map(function (array $user): array {
+            unset($user['_sortTimestamp']);
+
+            return $user;
+        }, $users);
 
         if ($currentUser->isHostelScoped()) {
             $scopedHostelId = (string) $currentUser->hostel_id;
@@ -479,50 +668,76 @@ class BiometricController extends Controller
             $mongoUri = env('BIOMETRIC_MONGO_URI', 'mongodb://127.0.0.1:27017');
             $manager = new Manager($mongoUri);
 
-            $maxTransId = 100000;
-            $maxId = 0;
-            $cmdQuery = new Query([], ['projection' => ['trans_id' => 1, 'id' => 1]]);
-            foreach ($manager->executeQuery('biometric_db.command_request_pending', $cmdQuery) as $cDoc) {
-                $t = $cDoc->trans_id ?? null;
-                if (is_numeric($t)) {
-                    $tInt = (int) $t;
-                    if ($tInt < 1000000000 && $tInt > $maxTransId) {
-                        $maxTransId = $tInt;
-                    }
+            [$baseTransId, $nextId] = $this->nextSequentialCommandIds($manager);
+            $bulk = new BulkWrite;
+            $queuedCommands = 0;
+            $transId = (string) $baseTransId;
+            $nowTimestamp = now()->timestamp;
+
+            $pendingQuery = new Query([
+                'dev_id' => $devId,
+                'cmd_code' => ['$in' => ['GET_USER_ID_LIST', 'GET_USER_INFO']],
+            ]);
+            $hasRecentIdList = false;
+            $activeOrRecentInfoIds = [];
+
+            foreach ($manager->executeQuery('biometric_db.command_request_pending', $pendingQuery) as $pDoc) {
+                $status = strtolower((string) ($pDoc->trans_status ?? ''));
+                $queuedAt = $this->extractMongoTimestamp($pDoc);
+                $isActiveOrRecent = in_array($status, ['pending', 'running'], true)
+                    || ($queuedAt > 0 && $queuedAt <= $nowTimestamp && ($nowTimestamp - $queuedAt) < 15);
+
+                if (! $isActiveOrRecent) {
+                    continue;
                 }
-                $cId = $cDoc->id ?? null;
-                if (is_numeric($cId) && (int) $cId > $maxId) {
-                    $maxId = (int) $cId;
+
+                if (($pDoc->cmd_code ?? '') === 'GET_USER_ID_LIST') {
+                    $hasRecentIdList = true;
+                } elseif (($pDoc->cmd_code ?? '') === 'GET_USER_INFO') {
+                    $paramObj = is_string($pDoc->cmd_param ?? null) ? json_decode($pDoc->cmd_param) : ($pDoc->cmd_param ?? null);
+                    $pUid = trim((string) ($paramObj->user_id ?? ''));
+                    if ($pUid !== '') {
+                        $activeOrRecentInfoIds[$pUid] = true;
+                    }
                 }
             }
 
-            $baseTransId = $maxTransId + 1;
-            $nextId = $maxId + 1;
-            $bulk = new BulkWrite;
-            $transId = (string) $baseTransId;
+            if (! $hasRecentIdList) {
+                $bulk->insert([
+                    'trans_id' => $transId,
+                    'dev_id' => $devId,
+                    'cmd_code' => 'GET_USER_ID_LIST',
+                    'cmd_param' => '{}',
+                    'trans_status' => 'pending',
+                    'trans_status_update_time' => now()->format('Y-m-d H:i:s'),
+                    'result' => null,
+                    'id' => $nextId,
+                ]);
+                $queuedCommands++;
+            }
 
-            $bulk->insert([
-                'trans_id' => $transId,
-                'dev_id' => $devId,
-                'cmd_code' => 'GET_USER_ID_LIST',
-                'cmd_param' => '{}',
-                'trans_status' => 'pending',
-                'trans_status_update_time' => now()->format('Y-m-d H:i:s'),
-                'result' => null,
-                'id' => $nextId,
-            ]);
-
-            $idQuery = new Query(['dev_id' => $devId]);
+            $idQuery = new Query(['dev_id' => $devId], ['sort' => ['_id' => -1]]);
             $idDocs = iterator_to_array($manager->executeQuery('biometric_db.get_user_id', $idQuery));
 
             $infoQuery = new Query(['dev_id' => $devId]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
             $resolvedUserIds = [];
+            $forceRefresh = $request->boolean('force');
+
             foreach ($infoDocs as $infoDoc) {
                 $iUid = trim((string) ($infoDoc->user_id ?? ''));
+                if ($iUid === '') {
+                    continue;
+                }
                 $infoObj = is_string($infoDoc->info ?? null) ? json_decode($infoDoc->info) : ($infoDoc->info ?? null);
                 $hasName = ! empty(trim((string) ($infoObj->user_name ?? ($infoDoc->name ?? ''))));
-                if ($iUid !== '' && $hasName) {
+                $hasPayload = ! empty($infoDoc->raw_size)
+                    || ! empty($infoDoc->fp_template_size)
+                    || ! empty($infoDoc->backup_number)
+                    || ! empty($infoObj->enroll_data_array);
+
+                // Avoid re-queuing IDs that the terminal already returned unless force=true
+                if ($hasName || (! $forceRefresh && $hasPayload)) {
                     $resolvedUserIds[$iUid] = true;
                 }
             }
@@ -531,23 +746,32 @@ class BiometricController extends Controller
             $seenUids = [];
             foreach ($idDocs as $doc) {
                 $uid = trim((string) ($doc->user_id ?? ''));
-                if ($uid && $uid !== '0' && ! isset($seenUids[$uid]) && ! isset($resolvedUserIds[$uid])) {
+                if (
+                    $uid !== ''
+                    && $uid !== '0'
+                    && ! isset($seenUids[$uid])
+                    && ! isset($resolvedUserIds[$uid])
+                    && ! isset($activeOrRecentInfoIds[$uid])
+                ) {
                     $seenUids[$uid] = true;
+                    $offset = $queuedCommands + $queuedCount;
                     $queuedCount++;
                     $bulk->insert([
-                        'trans_id' => (string) ($baseTransId + $queuedCount),
+                        'trans_id' => (string) ($baseTransId + $offset),
                         'dev_id' => $devId,
                         'cmd_code' => 'GET_USER_INFO',
                         'cmd_param' => json_encode(['user_id' => $uid]),
                         'trans_status' => 'pending',
                         'trans_status_update_time' => now()->format('Y-m-d H:i:s'),
                         'result' => null,
-                        'id' => $nextId + $queuedCount,
+                        'id' => $nextId + $offset,
                     ]);
                 }
             }
 
-            $manager->executeBulkWrite('biometric_db.command_request_pending', $bulk);
+            if ($bulk->count() > 0) {
+                $manager->executeBulkWrite('biometric_db.command_request_pending', $bulk);
+            }
 
             return response()->json([
                 'success' => true,
@@ -597,11 +821,14 @@ class BiometricController extends Controller
             $infoQuery = new Query([], ['sort' => ['created_at' => -1]]);
             $infoDocs = iterator_to_array($manager->executeQuery('biometric_db.user_info_result', $infoQuery));
             $machineNames = [];
+            $fetchedInfoIds = [];
             foreach ($infoDocs as $rec) {
                 $uid = trim((string) ($rec->user_id ?? ''));
                 if (! $uid) {
                     continue;
                 }
+                $fetchedInfoIds[$uid] = true;
+                $fetchedInfoIds[ltrim($uid, '0') ?: $uid] = true;
                 $infoObj = is_string($rec->info ?? null) ? json_decode($rec->info) : ($rec->info ?? null);
                 if (! isset($machineNames[$uid]) && ! empty($infoObj->user_name)) {
                     $machineNames[$uid] = (string) $infoObj->user_name;
@@ -613,6 +840,8 @@ class BiometricController extends Controller
             $deviceBySerial = $allDevices->keyBy('device_serial');
 
             $punches = [];
+            $missingInfoTargets = [];
+            $syncedAttendanceKeys = [];
             foreach ($records as $record) {
                 $bioId = trim((string) ($record->user_id ?? ''));
                 $cleanId = ltrim($bioId, '0') ?: $bioId;
@@ -622,6 +851,19 @@ class BiometricController extends Controller
 
                 $devSerial = $record->dev_id ?? 'RSS20241199684';
                 $matchedDev = $deviceBySerial->get($devSerial) ?? $allDevices->first();
+
+                if (
+                    $bioId !== ''
+                    && $bioId !== '0'
+                    && ! isset($fetchedInfoIds[$bioId])
+                    && ! isset($fetchedInfoIds[$cleanId])
+                    && count($missingInfoTargets) < 10
+                ) {
+                    $missingInfoTargets[$devSerial.'|'.$bioId] = [
+                        'dev_id' => $devSerial,
+                        'user_id' => $bioId,
+                    ];
+                }
 
                 $hostelId = $student ? (string) $student->hostel_id : ($matchedDev ? (string) $matchedDev->hostel_id : '1');
                 if ($currentUser->isHostelScoped() && $hostelId !== (string) $currentUser->hostel_id) {
@@ -650,21 +892,40 @@ class BiometricController extends Controller
                         );
 
                         $attDate = $punchAt->toDateString();
-                        $cutoff = Carbon::parse($attDate.' 21:00:00', ClockService::TIMEZONE);
-                        $status = $punchAt->gt($cutoff) ? 'late' : 'present';
+                        $attKey = $student->id.'|'.$attDate;
 
-                        Attendance::updateOrCreate(
-                            [
-                                'student_id' => $student->id,
-                                'attendance_date' => $attDate,
-                            ],
-                            [
-                                'punch_time' => $punchAt->toTimeString(),
-                                'status' => $status,
-                                'is_defaulter' => false,
-                                'remarks' => 'Biometric machine punch',
-                            ]
-                        );
+                        if (! isset($syncedAttendanceKeys[$attKey])) {
+                            $syncedAttendanceKeys[$attKey] = true;
+                            $existingAttendance = Attendance::query()
+                                ->where('student_id', $student->id)
+                                ->whereDate('attendance_date', $attDate)
+                                ->first();
+
+                            if (
+                                ! $existingAttendance ||
+                                $existingAttendance->punch_time === null ||
+                                (string) $existingAttendance->punch_time > $punchAt->toTimeString()
+                            ) {
+                                $classification = ClockService::classifyPunchTime($punchAt->format('H:i:s'));
+
+                                Attendance::updateOrCreate(
+                                    [
+                                        'student_id' => $student->id,
+                                        'attendance_date' => $attDate,
+                                    ],
+                                    [
+                                        'punch_time' => $punchAt->toTimeString(),
+                                        'status' => $classification['status'],
+                                        'is_defaulter' => $classification['is_defaulter'],
+                                        'remarks' => $classification['is_defaulter']
+                                            ? 'Biometric punch recorded after 10:00 PM IST (defaulter).'
+                                            : ($classification['status'] === 'late'
+                                                ? 'Biometric late punch (19:30 - 22:00 IST).'
+                                                : 'Biometric machine punch'),
+                                    ]
+                                );
+                            }
+                        }
                     } catch (\Throwable) {
                     }
                 }
@@ -687,7 +948,12 @@ class BiometricController extends Controller
                     'direction' => $direction,
                     'punchTime' => $record->io_time ?? null,
                     'recognized' => $isRecognized,
+                    'isRegistered' => $student !== null,
                 ];
+            }
+
+            if (! empty($missingInfoTargets)) {
+                $this->queueMissingUserInfoCommands($manager, array_values($missingInfoTargets));
             }
 
             $aliveInfo = $this->checkDeviceHeartbeat('RSS20241199684');
@@ -704,6 +970,223 @@ class BiometricController extends Controller
                 'success' => false,
                 'message' => 'Unable to read biometric records: '.$e->getMessage(),
             ], 503);
+        }
+    }
+
+    /**
+     * Extract a UTC Unix timestamp from a MongoDB document, preferring ObjectId time to avoid PHP ini timezone drift.
+     */
+    private function extractMongoTimestamp(object $doc): int
+    {
+        if (isset($doc->_id) && method_exists($doc->_id, 'getTimestamp')) {
+            return (int) $doc->_id->getTimestamp();
+        }
+
+        if (! empty($doc->created_at)) {
+            $parsed = strtotime((string) $doc->created_at);
+            if ($parsed !== false) {
+                return $parsed;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Build a normalized machine user payload row for enrolledUsers().
+     *
+     * @param  array{name: ?string, privilege: string, hasFingerprint: bool, fingerprintCount: int, hasInfo: bool, timestamp: int, devId?: string}  $info
+     * @return array<string, mixed>
+     */
+    private function buildMachineUserEntry(
+        string $uid,
+        string $devSerial,
+        ?Student $student,
+        array $info,
+        mixed $matchedDev,
+        int $sortTimestamp
+    ): array {
+        $hostelId = $student ? (string) $student->hostel_id : ($matchedDev ? (string) $matchedDev->hostel_id : '1');
+        $hostelName = $student?->hostel?->name ?? ($matchedDev?->hostel?->name ?? 'Boys Hostel 1');
+        $hostelCode = $student?->hostel?->code ?? ($matchedDev?->hostel?->code ?? 'BH1');
+
+        $resolvedName = ($student && $student->user && ! empty(trim((string) $student->user->name)))
+            ? trim($student->user->name)
+            : $info['name'];
+
+        $enrolledAt = $sortTimestamp > 0
+            ? Carbon::createFromTimestamp($sortTimestamp, ClockService::TIMEZONE)
+            : null;
+
+        return [
+            'userId' => $uid,
+            'deviceSerial' => $devSerial,
+            'deviceName' => $matchedDev?->device_name ?? 'Biometric Terminal',
+            'name' => $resolvedName,
+            'hostelId' => $hostelId,
+            'hostelName' => $hostelName,
+            'hostelCode' => $hostelCode,
+            'privilege' => $info['privilege'],
+            'fingerprintEnrolled' => $info['hasFingerprint'] || ($student !== null),
+            'fingerprintCount' => $info['fingerprintCount'] > 0 ? $info['fingerprintCount'] : ($student ? 1 : 0),
+            'hasInfo' => $info['hasInfo'] || ($student !== null),
+            'enrolledDate' => $enrolledAt?->toDateString(),
+            'infoFetchedAt' => $enrolledAt?->format('Y-m-d H:i:s'),
+            'isRegistered' => ($student !== null),
+            'studentId' => $student ? (string) $student->id : null,
+            'enrollmentNo' => $student?->enrollment_no,
+            'roomNumber' => $student?->room?->room_number,
+            'bedNumber' => $student?->bed_number,
+            '_sortTimestamp' => $sortTimestamp,
+        ];
+    }
+
+    /**
+     * Periodically queue GET_USER_ID_LIST (cooldown 20s) so newly enrolled machine users are discovered automatically.
+     */
+    private function queuePeriodicUserIdDiscovery(Manager $manager, string $devId): void
+    {
+        if (trim($devId) === '') {
+            return;
+        }
+
+        try {
+            $latestQuery = new Query(
+                ['dev_id' => $devId, 'cmd_code' => 'GET_USER_ID_LIST'],
+                ['sort' => ['_id' => -1], 'limit' => 1]
+            );
+            $latestDocs = iterator_to_array($manager->executeQuery('biometric_db.command_request_pending', $latestQuery));
+            $latest = $latestDocs[0] ?? null;
+            $nowTimestamp = now()->timestamp;
+
+            if ($latest) {
+                $status = strtolower((string) ($latest->trans_status ?? ''));
+                $queuedAt = $this->extractMongoTimestamp($latest);
+                if (
+                    in_array($status, ['pending', 'running'], true)
+                    || ($queuedAt > 0 && $queuedAt <= $nowTimestamp && ($nowTimestamp - $queuedAt) < 20)
+                ) {
+                    return;
+                }
+            }
+
+            [$baseTransId, $nextId] = $this->nextSequentialCommandIds($manager);
+            $bulk = new BulkWrite;
+            $bulk->insert([
+                'trans_id' => (string) $baseTransId,
+                'dev_id' => $devId,
+                'cmd_code' => 'GET_USER_ID_LIST',
+                'cmd_param' => '{}',
+                'trans_status' => 'pending',
+                'trans_status_update_time' => now()->format('Y-m-d H:i:s'),
+                'result' => null,
+                'id' => $nextId,
+            ]);
+            $manager->executeBulkWrite('biometric_db.command_request_pending', $bulk);
+        } catch (\Throwable $e) {
+            \Log::warning('Failed periodic GET_USER_ID_LIST discovery: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Compute the next compact sequential trans_id and integer id for command_request_pending.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private function nextSequentialCommandIds(Manager $manager): array
+    {
+        $maxTransId = 100000;
+        $maxId = 0;
+
+        $cmdQuery = new Query([], ['projection' => ['trans_id' => 1, 'id' => 1]]);
+        foreach ($manager->executeQuery('biometric_db.command_request_pending', $cmdQuery) as $cDoc) {
+            $t = $cDoc->trans_id ?? null;
+            if (is_numeric($t)) {
+                $tInt = (int) $t;
+                if ($tInt < 1000000000 && $tInt > $maxTransId) {
+                    $maxTransId = $tInt;
+                }
+            }
+
+            $cId = $cDoc->id ?? null;
+            if (is_numeric($cId) && (int) $cId > $maxId) {
+                $maxId = (int) $cId;
+            }
+        }
+
+        return [$maxTransId + 1, $maxId + 1];
+    }
+
+    /**
+     * Queue GET_USER_INFO commands for machine users missing from user_info_result, with deduplication.
+     *
+     * @param  array<int, array{dev_id: string, user_id: string}>  $targets
+     */
+    private function queueMissingUserInfoCommands(Manager $manager, array $targets): void
+    {
+        if (empty($targets)) {
+            return;
+        }
+
+        try {
+            $devIds = array_values(array_unique(array_column($targets, 'dev_id')));
+            $pendingQuery = new Query([
+                'dev_id' => ['$in' => $devIds],
+                'cmd_code' => 'GET_USER_INFO',
+            ]);
+
+            $nowTimestamp = now()->timestamp;
+            $alreadyQueued = [];
+
+            foreach ($manager->executeQuery('biometric_db.command_request_pending', $pendingQuery) as $pDoc) {
+                $status = strtolower((string) ($pDoc->trans_status ?? ''));
+                $queuedAt = $this->extractMongoTimestamp($pDoc);
+
+                if (
+                    ! in_array($status, ['pending', 'running'], true)
+                    && ($queuedAt === 0 || $queuedAt > $nowTimestamp || ($nowTimestamp - $queuedAt) >= 30)
+                ) {
+                    continue;
+                }
+
+                $paramObj = is_string($pDoc->cmd_param ?? null) ? json_decode($pDoc->cmd_param) : ($pDoc->cmd_param ?? null);
+                $pUid = trim((string) ($paramObj->user_id ?? ''));
+                $pDev = trim((string) ($pDoc->dev_id ?? ''));
+                if ($pDev !== '' && $pUid !== '') {
+                    $alreadyQueued[$pDev.'|'.$pUid] = true;
+                }
+            }
+
+            [$baseTransId, $nextId] = $this->nextSequentialCommandIds($manager);
+            $bulk = new BulkWrite;
+            $offset = 0;
+
+            foreach ($targets as $target) {
+                $devId = trim((string) ($target['dev_id'] ?? ''));
+                $uid = trim((string) ($target['user_id'] ?? ''));
+                if ($devId === '' || $uid === '' || isset($alreadyQueued[$devId.'|'.$uid])) {
+                    continue;
+                }
+
+                $alreadyQueued[$devId.'|'.$uid] = true;
+                $bulk->insert([
+                    'trans_id' => (string) ($baseTransId + $offset),
+                    'dev_id' => $devId,
+                    'cmd_code' => 'GET_USER_INFO',
+                    'cmd_param' => json_encode(['user_id' => $uid]),
+                    'trans_status' => 'pending',
+                    'trans_status_update_time' => now()->format('Y-m-d H:i:s'),
+                    'result' => null,
+                    'id' => $nextId + $offset,
+                ]);
+                $offset++;
+            }
+
+            if ($offset > 0) {
+                $manager->executeBulkWrite('biometric_db.command_request_pending', $bulk);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to auto-queue GET_USER_INFO: '.$e->getMessage());
         }
     }
 }

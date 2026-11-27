@@ -75,7 +75,7 @@ class DemoDataSeeder extends Seeder
 
                 $isDefaulter = $status === 'absent';
                 $punchTime = match ($status) {
-                    'present' => fake()->time('H:i:s', '19:00:00'),
+                    'present' => fake()->time('H:i:s', '19:29:59'),
                     'late' => fake()->time('H:i:s', '22:00:00'),
                     default => null,
                 };

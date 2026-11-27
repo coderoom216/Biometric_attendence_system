@@ -74,7 +74,7 @@ export const ClockModal: React.FC<ClockModalProps> = ({
 
         <div className="p-6 space-y-6">
           <p className="text-sm text-slate-600 leading-relaxed">
-                Punches through <strong className="text-slate-900">7:00 PM IST</strong> are on time; punches after 7:00 PM through <strong className="text-slate-900">10:00 PM IST</strong> are late. Punches after 10:00 PM are categorized as Defaulters. Students without a punch are flagged by the <strong className="text-slate-900">10:00 PM IST</strong> evaluation.
+                Punches before <strong className="text-slate-900">7:30 PM IST</strong> are on time; punches from 7:30 PM through <strong className="text-slate-900">10:00 PM IST</strong> are Late Punches. Punches after 10:00 PM are categorized as Defaulters. Students without a punch are flagged by the <strong className="text-slate-900">10:00 PM IST</strong> evaluation.
           </p>
 
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -91,7 +91,7 @@ export const ClockModal: React.FC<ClockModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2">
               Quick Timing Presets
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 disabled={isExecuting}
                 onClick={() => handleSetTime('18:45:00')}
@@ -102,9 +102,9 @@ export const ClockModal: React.FC<ClockModalProps> = ({
               <button
                 disabled={isExecuting}
                 onClick={() => handleSetTime('19:15:00')}
-                className="flex items-center justify-center space-x-2 p-2.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-medium transition cursor-pointer"
+                className="flex items-center justify-center space-x-2 p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-medium transition cursor-pointer"
               >
-                <span>7:15 PM (Grace Window: Late)</span>
+                <span>7:15 PM (On-Time Cutoff)</span>
               </button>
               <button
                 disabled={isExecuting}

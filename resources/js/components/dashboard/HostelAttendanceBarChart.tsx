@@ -5,6 +5,8 @@ import {
   Building2,
   Clock,
 } from 'lucide-react';
+import { apiService } from '../../services/api';
+import { DateQuickPresets } from './DateQuickPresets';
 
 export interface HostelMetricData {
   hostelId: string;
@@ -39,6 +41,7 @@ interface HostelAttendanceBarChartProps {
   hostelId?: string; // 'all' | '1' | '2' | '3' | 'h-shivalik' | 'h-mandakini' | 'h-nilgiri'
   allowHostelSwitch?: boolean;
   onDateChange?: (date: string) => void;
+  summaryData?: any;
 }
 
 /**
@@ -203,55 +206,212 @@ const computeBarHeight = (value: number, maxVal: number, maxPx: number = 130, mi
 };
 
 export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> = ({
-  currentDate = '2026-10-27',
+  currentDate,
   hostelId = 'all',
   allowHostelSwitch = true,
-  onDateChange
+  onDateChange,
+  summaryData
 }) => {
+  const defaultToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const effectiveInitialDate = currentDate || defaultToday;
   const [selectedHostel, setSelectedHostel] = useState<string>(() => normalizeHostelId(hostelId));
-  const [selectedChartDate, setSelectedChartDate] = useState<string>(currentDate);
+  const [selectedChartDate, setSelectedChartDate] = useState<string>(effectiveInitialDate);
   const [chartMode, setChartMode] = useState<'comparative' | 'daily_trend'>('comparative');
   const [activeMetricFilter, setActiveMetricFilter] = useState<'all' | 'present' | 'late' | 'leave' | 'defaulters'>('all');
   const [, setHoveredBar] = useState<string | null>(null);
+  const [liveSummary, setLiveSummary] = useState<any>(summaryData ?? null);
+  const [liveTrends, setLiveTrends] = useState<any[] | null>(null);
 
   useEffect(() => {
-    setSelectedChartDate(currentDate);
+    if (currentDate) {
+      setSelectedChartDate(currentDate);
+    }
   }, [currentDate]);
 
   useEffect(() => {
     setSelectedHostel(normalizeHostelId(hostelId));
   }, [hostelId]);
 
-  // Dynamically generated 7-day history matching selected date
-  const multiDayHistory = useMemo(() => {
-    return generateMultiDayHistory(selectedChartDate);
-  }, [selectedChartDate]);
+  useEffect(() => {
+    if (summaryData && (!summaryData.date || summaryData.date === selectedChartDate)) {
+      setLiveSummary(summaryData);
+    }
+  }, [summaryData, selectedChartDate]);
 
-  // Active day data: find exact match or use the latest day in history
-  const currentDayData = useMemo(() => {
-    return multiDayHistory.find((d) => d.date === selectedChartDate) || multiDayHistory[multiDayHistory.length - 1];
-  }, [multiDayHistory, selectedChartDate]);
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadLiveChartData = async () => {
+      try {
+        const shouldFetchSummary = !summaryData || (summaryData.date && summaryData.date !== selectedChartDate);
+        const [summaryRes, trendsRes] = await Promise.allSettled([
+          shouldFetchSummary ? apiService.getReportSummary(selectedChartDate) : Promise.resolve(summaryData),
+          apiService.getReportTrends(selectedChartDate)
+        ]);
+
+        if (isCancelled) return;
+
+        if (summaryRes.status === 'fulfilled' && summaryRes.value?.success) {
+          setLiveSummary(summaryRes.value);
+        }
+        if (trendsRes.status === 'fulfilled' && trendsRes.value?.success && Array.isArray(trendsRes.value.trends)) {
+          setLiveTrends(trendsRes.value.trends);
+        }
+      } catch {
+        // Keep last valid chart state on transient network failure
+      }
+    };
+
+    loadLiveChartData();
+    const interval = setInterval(loadLiveChartData, 5000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [selectedChartDate, summaryData]);
+
+  const mapHostelReportToMetric = (h: any): HostelMetricData => {
+    const slug = normalizeHostelId(h.hostelId || h.code || h.hostelName);
+    const metaBySlug: Record<string, { name: string; code: string; warden: string; capacity: number }> = {
+      'h-shivalik': { name: 'Boys Hostel 1', code: 'BH1', warden: 'Mr. Sachin Sati', capacity: 180 },
+      'h-mandakini': { name: 'Girls Hostel', code: 'GH', warden: 'Dr. Kavita Tariyal', capacity: 165 },
+      'h-nilgiri': { name: 'Boys Hostel 2', code: 'BH2', warden: 'Dr. Pathak Sir', capacity: 180 },
+    };
+    const meta = metaBySlug[slug] ?? {
+      name: h.hostelName || 'Hostel',
+      code: h.code || 'H',
+      warden: 'Assigned Warden',
+      capacity: 180,
+    };
+    const present = Number(h.present ?? h.presentCount ?? 0);
+    const late = Number(h.late ?? h.lateCount ?? 0);
+    const leave = Number(h.leave ?? h.leaveCount ?? 0);
+    const defaulters = Number(h.defaulters ?? h.defaulterCount ?? 0);
+    const enrolled = Number(h.totalEnrolled ?? h.totalResidents ?? h.enrolled ?? 0);
+    const denom = present + late + defaulters;
+
+    return {
+      hostelId: slug,
+      hostelName: h.hostelName || meta.name,
+      code: h.code || meta.code,
+      warden: meta.warden,
+      capacity: meta.capacity,
+      enrolled,
+      present,
+      late,
+      leave,
+      defaulters,
+      complianceRate: Number(h.complianceRate ?? (denom > 0 ? Math.round(((present + late) / denom) * 100) : 0)),
+    };
+  };
+
+  // Live 7-day trend built from /api/reports/trends (falls back to empty 0-baseline if unavailable)
+  const multiDayHistory = useMemo(() => {
+    if (liveTrends && liveTrends.length > 0) {
+      return liveTrends.map((t: any): DayBarData => {
+        const mappedHostels: HostelMetricData[] = Array.isArray(t.hostels)
+          ? t.hostels.map(mapHostelReportToMetric)
+          : [];
+        const present = Number(t.present ?? 0);
+        const late = Number(t.late ?? 0);
+        const leave = Number(t.leave ?? 0);
+        const defaulters = Number(t.defaulters ?? 0);
+        const enrolled = Number(t.enrolled ?? 0);
+        const denom = present + late + defaulters;
+
+        return {
+          date: t.isoDate || selectedChartDate,
+          label: t.label || t.date || selectedChartDate,
+          hostels: mappedHostels,
+          consolidated: {
+            enrolled,
+            present,
+            late,
+            leave,
+            defaulters,
+            complianceRate: denom > 0 ? Number((((present + late) / denom) * 100).toFixed(1)) : 0,
+          },
+        };
+      });
+    }
+
+    return generateMultiDayHistory(selectedChartDate).map((day) => ({
+      ...day,
+      hostels: day.hostels.map((h) => ({ ...h, enrolled: 0, present: 0, late: 0, leave: 0, defaulters: 0, complianceRate: 0 })),
+      consolidated: { enrolled: 0, present: 0, late: 0, leave: 0, defaulters: 0, complianceRate: 0 },
+    }));
+  }, [liveTrends, selectedChartDate]);
+
+  // Active day data: prefer live /api/reports/summary for selectedChartDate
+  const currentDayData = useMemo((): DayBarData => {
+    const matchingTrendDay = multiDayHistory.find((d) => d.date === selectedChartDate) || multiDayHistory[multiDayHistory.length - 1];
+    if (liveSummary?.hostelReports && Array.isArray(liveSummary.hostelReports) && liveSummary.hostelReports.length > 0) {
+      const hostels = liveSummary.hostelReports.map(mapHostelReportToMetric);
+      const c = liveSummary.consolidated ?? {};
+      const present = Number(c.presentCount ?? c.totalPresent ?? 0);
+      const late = Number(c.lateCount ?? c.totalLate ?? 0);
+      const leave = Number(c.leaveCount ?? c.totalLeave ?? 0);
+      const defaulters = Number(c.defaultersCount ?? c.totalDefaulters ?? 0);
+      const enrolled = Number(c.totalEnrolled ?? c.totalStudents ?? 0);
+      const denom = present + late + defaulters;
+      const parts = selectedChartDate.split('-');
+      const d = parts.length === 3
+        ? new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+        : new Date();
+      const label = !isNaN(d.getTime())
+        ? `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]}, ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()}`
+        : selectedChartDate;
+
+      return {
+        date: liveSummary.date || selectedChartDate,
+        label,
+        hostels,
+        consolidated: {
+          enrolled,
+          present,
+          late,
+          leave,
+          defaulters,
+          complianceRate: denom > 0 ? Number((((present + late) / denom) * 100).toFixed(1)) : 0,
+        },
+      };
+    }
+
+    return matchingTrendDay;
+  }, [liveSummary, multiDayHistory, selectedChartDate]);
 
   // Effective hostels to display with guaranteed fallback so it never disappears
-  const displayedHostels = useMemo(() => {
+  const displayedHostels = useMemo((): HostelMetricData[] => {
     const normalized = normalizeHostelId(selectedHostel);
     if (normalized === 'all') {
       return currentDayData.hostels;
     }
-    const filtered = currentDayData.hostels.filter((h) => normalizeHostelId(h.hostelId) === normalized);
+    const filtered = currentDayData.hostels.filter((h: HostelMetricData) => normalizeHostelId(h.hostelId) === normalized);
     return filtered.length > 0 ? filtered : currentDayData.hostels;
   }, [currentDayData, selectedHostel]);
 
   // Dynamic max value for proportional bar scaling
   const maxBarValue = useMemo(() => {
-    const vals = displayedHostels.flatMap((h) => [h.present, h.late, h.leave, h.defaulters, 100]);
-    return Math.max(100, ...vals);
+    const vals = displayedHostels.flatMap((h: HostelMetricData) => [h.present, h.late, h.leave, h.defaulters]);
+    return Math.max(10, ...vals);
   }, [displayedHostels]);
+
+  const maxTrendValue = useMemo(() => {
+    const normalized = normalizeHostelId(selectedHostel);
+    const vals = multiDayHistory.flatMap((day) => {
+      if (normalized === 'all') {
+        return [day.consolidated.present, day.consolidated.late, day.consolidated.leave, day.consolidated.defaulters];
+      }
+      const h = day.hostels.find((item) => normalizeHostelId(item.hostelId) === normalized);
+      return h ? [h.present, h.late, h.leave, h.defaulters] : [0];
+    });
+    return Math.max(10, ...vals);
+  }, [multiDayHistory, selectedHostel]);
 
   // Metrics colors and metadata
   const metricConfigs = [
-    { key: 'present', label: 'Present On-Time (<= 7:00 PM)', color: 'bg-emerald-500' },
-    { key: 'late', label: 'Late Punch (after 7:00 PM through 10:00 PM)', color: 'bg-amber-500' },
+    { key: 'present', label: 'Present On-Time (< 7:30 PM)', color: 'bg-emerald-500' },
+    { key: 'late', label: 'Late Punch (7:30 PM through 10:00 PM)', color: 'bg-amber-500' },
     { key: 'leave', label: 'Approved Leave (FR-11)', color: 'bg-sky-500' },
     { key: 'defaulters', label: 'Defaulters (after 10:00 PM / no punch)', color: 'bg-red-500' }
   ];
@@ -275,12 +435,12 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                7:00 PM on-time cutoff, late punches through 10:00 PM, and 10:00 PM no-punch evaluation.
+                7:30 PM on-time cutoff, late punches through 10:00 PM, and after-10:00 PM / no-punch defaulter evaluation.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 sm:self-auto">
             <Calendar className="h-3.5 w-3.5 text-blue-600" />
             <label htmlFor="hostel-attendance-chart-date" className="font-medium whitespace-nowrap">
               Select Date:
@@ -297,13 +457,21 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
               aria-label="Select chart date"
               className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-blue-500 focus:outline-hidden"
             />
+            <DateQuickPresets
+              value={selectedChartDate}
+              onChange={(date) => {
+                setSelectedChartDate(date);
+                onDateChange?.(date);
+              }}
+              tone="indigo"
+            />
           </div>
         </div>
 
         {/* View Switchers */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2">
           {allowHostelSwitch && (
-            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600">
+            <div className="flex flex-wrap bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600">
               <button
                 type="button"
                 onClick={() => setSelectedHostel('all')}
@@ -343,7 +511,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
             </div>
           )}
 
-          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600">
+          <div className="flex flex-wrap bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600">
             <button
               type="button"
               onClick={() => setChartMode('comparative')}
@@ -402,7 +570,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
 
         <div className="text-slate-500 flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 text-slate-400" />
-          <span>On-time cutoff: <strong>7:00 PM</strong> | Late through: <strong>10:00 PM</strong></span>
+          <span>On-time cutoff: <strong>7:30 PM</strong> | Late through: <strong>10:00 PM</strong></span>
         </div>
       </div>
 
@@ -420,14 +588,10 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                   Showing active residents, present check-ins, late grace entries, approved leaves, and defaulters.
                 </p>
               </div>
-              <div className="text-right">
-                <span className="text-xs text-slate-500 block">Consolidated Compliance</span>
-                <span className="text-sm font-bold text-emerald-600">{currentDayData.consolidated.complianceRate}%</span>
-              </div>
             </div>
 
             <div className={`grid grid-cols-1 ${displayedHostels.length === 1 ? 'max-w-xl mx-auto' : 'md:grid-cols-3'} gap-5`}>
-              {displayedHostels.map((hostel) => (
+              {displayedHostels.map((hostel: HostelMetricData) => (
                 <div
                   key={hostel.hostelId}
                   className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all hover:border-blue-300 hover:shadow-xs"
@@ -526,12 +690,8 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                     </div>
                   </div>
 
-                  {/* Summary Metric Badges */}
-                  <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
-                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-between">
-                      <span className="text-emerald-800 font-medium">Compliance</span>
-                      <span className="font-bold text-emerald-900">{hostel.complianceRate}%</span>
-                    </div>
+                  {/* Summary Metric Badge */}
+                  <div className="mt-4 text-xs">
                     <div className="p-2 rounded-lg bg-red-50 border border-red-100 flex items-center justify-between">
                       <span className="text-red-800 font-medium">Defaulters</span>
                       <span className="font-bold text-red-900">{hostel.defaulters} students</span>
@@ -551,13 +711,13 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                 </h4>
                 <p className="text-xs text-slate-500">
                   {normalizedCurrentHostel === 'all'
-                    ? 'Aggregated average across all 3 hostels (BH1, GH, BH2).'
+                    ? 'Total daily counts across all 3 hostels (BH1, GH, BH2).'
                     : `Filtered to ${displayedHostels[0]?.hostelName || selectedHostel}.`}{' '}
                   Click any day to audit detailed rosters.
                 </p>
               </div>
               <div className="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                Audited Cut-off Time: <strong className="text-slate-800">7:00 PM IST</strong>
+                Audited Cut-off Time: <strong className="text-slate-800">7:30 PM IST</strong>
               </div>
             </div>
 
@@ -567,16 +727,16 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                 {multiDayHistory.map((day) => {
                   const dataForScope = normalizedCurrentHostel === 'all'
                     ? {
-                        present: Math.round(day.consolidated.present / 3),
-                        late: Math.round(day.consolidated.late / 3),
-                        leave: Math.round(day.consolidated.leave / 3),
-                        defaulters: Math.round(day.consolidated.defaulters / 3)
+                        present: day.consolidated.present,
+                        late: day.consolidated.late,
+                        leave: day.consolidated.leave,
+                        defaulters: day.consolidated.defaulters
                       }
                     : day.hostels.find((h) => normalizeHostelId(h.hostelId) === normalizedCurrentHostel) || {
-                        present: 80,
-                        late: 10,
-                        leave: 5,
-                        defaulters: 5
+                        present: 0,
+                        late: 0,
+                        leave: 0,
+                        defaulters: 0
                       };
 
                   const isCurrent = day.date === selectedChartDate;
@@ -601,7 +761,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                           <div
                             title={`Present: ${dataForScope.present}`}
                             className="flex-1 max-w-[16px] bg-emerald-500 rounded-t-sm hover:brightness-110 transition-all"
-                            style={{ height: `${computeBarHeight(dataForScope.present, 100, 150, 6)}px` }}
+                            style={{ height: `${computeBarHeight(dataForScope.present, maxTrendValue, 150, 6)}px` }}
                           />
                         )}
 
@@ -610,7 +770,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                           <div
                             title={`Late (Grace): ${dataForScope.late}`}
                             className="flex-1 max-w-[16px] bg-amber-500 rounded-t-sm hover:brightness-110 transition-all"
-                            style={{ height: `${computeBarHeight(dataForScope.late, 100, 150, 6)}px` }}
+                            style={{ height: `${computeBarHeight(dataForScope.late, maxTrendValue, 150, 6)}px` }}
                           />
                         )}
 
@@ -619,7 +779,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                           <div
                             title={`Leave: ${dataForScope.leave}`}
                             className="flex-1 max-w-[16px] bg-sky-500 rounded-t-sm hover:brightness-110 transition-all"
-                            style={{ height: `${computeBarHeight(dataForScope.leave, 100, 150, 6)}px` }}
+                            style={{ height: `${computeBarHeight(dataForScope.leave, maxTrendValue, 150, 6)}px` }}
                           />
                         )}
 
@@ -628,7 +788,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
                           <div
                             title={`Defaulters: ${dataForScope.defaulters}`}
                             className="flex-1 max-w-[16px] bg-red-500 rounded-t-sm hover:brightness-110 transition-all"
-                            style={{ height: `${computeBarHeight(dataForScope.defaulters, 100, 150, 6)}px` }}
+                            style={{ height: `${computeBarHeight(dataForScope.defaulters, maxTrendValue, 150, 6)}px` }}
                           />
                         )}
                       </div>
@@ -652,14 +812,14 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
       </div>
 
       {/* Footer Notes on Cutoff & Grace Logic */}
-      <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
-        <div className="flex items-center gap-2">
+      <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-slate-600">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>Standard Biometric Cut-Off: <strong>7:00 PM IST</strong></span>
-          <span className="text-slate-300">|</span>
+          <span>Standard Biometric Cut-Off: <strong>7:30 PM IST</strong></span>
+          <span className="text-slate-300 hidden sm:inline">|</span>
           <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-          <span>Late window: <strong>after 7:00 PM through 10:00 PM</strong></span>
-          <span className="text-slate-300">|</span>
+          <span>Late window: <strong>7:30 PM through 10:00 PM</strong></span>
+          <span className="text-slate-300 hidden sm:inline">|</span>
           <span className="w-2 h-2 rounded-full bg-red-500"></span>
           <span>After 10:00 PM: <strong>Defaulter; no-punch evaluation at 10:00 PM</strong></span>
         </div>
