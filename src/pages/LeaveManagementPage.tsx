@@ -43,6 +43,7 @@ export const LeaveManagementPage: React.FC = () => {
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
   const [reviewingApplicationId, setReviewingApplicationId] = useState<string | null>(null);
+  const [applicationToApprove, setApplicationToApprove] = useState<LeaveApplication | null>(null);
   const [studentProfile, setStudentProfile] = useState<Student | null>(null);
   const [studentApplicationForm, setStudentApplicationForm] = useState({ startDate: '', endDate: '', reason: '' });
   const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
@@ -72,6 +73,13 @@ export const LeaveManagementPage: React.FC = () => {
   const isResidentialWarden = user?.role === 'residential_warden' || user?.role === 'warden';
   const isStudent = user?.role === 'student';
   const visibleHolidays = holidays.filter((holiday) => holiday.endDate >= todayDate);
+
+  const getApplicationDuration = (application: LeaveApplication) => {
+    const start = new Date(`${application.startDate}T00:00:00Z`).getTime();
+    const end = new Date(`${application.endDate}T00:00:00Z`).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+    return Math.floor((end - start) / 86_400_000) + 1;
+  };
 
   useEffect(() => {
     const refreshToday = () => setTodayDate(getLocalDateString());
@@ -368,7 +376,7 @@ export const LeaveManagementPage: React.FC = () => {
                   {application.status === 'pending' && (
                     <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
                       <button type="button" disabled={reviewingApplicationId === application.id} onClick={() => reviewApplication(application.id, 'denied')} className="rounded-lg border border-rose-200 px-3 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">Deny</button>
-                      <button type="button" disabled={reviewingApplicationId === application.id} onClick={() => reviewApplication(application.id, 'approved')} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{reviewingApplicationId === application.id ? 'Saving…' : 'Approve'}</button>
+                      <button type="button" disabled={reviewingApplicationId === application.id} onClick={() => setApplicationToApprove(application)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Approve</button>
                     </div>
                   )}
                 </article>
@@ -377,6 +385,37 @@ export const LeaveManagementPage: React.FC = () => {
           )}
         </section>
       )}
+
+      {applicationToApprove && (() => {
+        const duration = getApplicationDuration(applicationToApprove);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4" role="presentation">
+            <section role="dialog" aria-modal="true" aria-labelledby="approve-application-title" className="my-auto w-full min-w-0 max-w-sm break-words rounded-xl bg-white p-5 shadow-xl">
+              <h2 id="approve-application-title" className="text-base font-bold text-slate-900">Approve leave application?</h2>
+              <div className="mt-2 min-w-0 text-sm leading-relaxed text-slate-600">
+                {duration === null ? (
+                  <p className="break-words">The requested dates are invalid. Please review the application before approving.</p>
+                ) : (
+                  <>
+                    <p>This application is for {duration} {duration === 1 ? 'day' : 'days'}:</p>
+                    <p className="mt-1 whitespace-nowrap font-medium text-slate-800">{applicationToApprove.startDate} to {applicationToApprove.endDate}</p>
+                    <p className="mt-1">Do you want to approve it?</p>
+                  </>
+                )}
+              </div>
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => setApplicationToApprove(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                <button type="button" disabled={duration === null || reviewingApplicationId === applicationToApprove.id} onClick={async () => {
+                  await reviewApplication(applicationToApprove.id, 'approved');
+                  setApplicationToApprove(null);
+                }} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                  {reviewingApplicationId === applicationToApprove.id ? 'Saving…' : 'Yes, approve'}
+                </button>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
 
       {isChiefWarden && (
         <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
