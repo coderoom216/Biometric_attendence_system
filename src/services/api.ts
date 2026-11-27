@@ -8,6 +8,7 @@ import {
   LeaveRecord,
   LeaveApplication,
   HolidayRecord,
+  SemesterSettings,
   NotificationLog,
   ScheduledJobLog,
   BiometricDevice,
@@ -409,6 +410,19 @@ export const apiService = {
       success: boolean;
       trends: any[];
     }>('/reports/trends');
+    return res.data;
+  },
+
+  async getSemesterSettings() {
+    const res = await api.get<{ success: boolean; settings: SemesterSettings }>('/system/semester-settings');
+    return res.data;
+  },
+  async saveSemesterSettings(startDate: string, endDate: string) {
+    const res = await api.put<{
+      success: boolean;
+      settings: SemesterSettings;
+      message: string;
+    }>('/system/semester-settings', { startDate, endDate });
     return res.data;
   },
 
