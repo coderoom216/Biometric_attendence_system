@@ -45,11 +45,11 @@ class DefaulterEvaluationService
         $now = $this->clockService->current();
         $today = $now->toDateString();
 
+        $this->syncApprovedLeavesForDate($targetDate);
+
         if ($targetDate > $today) {
             return;
         }
-
-        $this->syncApprovedLeavesForDate($targetDate);
 
         if ($this->semesterService->holidayForDate($targetDate) !== null) {
             return;
@@ -215,6 +215,13 @@ class DefaulterEvaluationService
             }
 
             $devicesBySerial = Device::query()->get()->keyBy('device_serial');
+            $approvedLeaveStudentIds = Leave::query()
+                ->where('approval_status', 'approved')
+                ->whereDate('start_date', '<=', $targetDate)
+                ->whereDate('end_date', '>=', $targetDate)
+                ->pluck('student_id')
+                ->flip()
+                ->all();
             $syncedStudentIds = [];
 
             foreach ($records as $record) {
@@ -248,6 +255,13 @@ class DefaulterEvaluationService
                     ->where('student_id', $student->id)
                     ->whereDate('attendance_date', $punchAt->toDateString())
                     ->first();
+
+                if (
+                    isset($approvedLeaveStudentIds[$student->id]) ||
+                    ($existing && $existing->status === 'approved_leave')
+                ) {
+                    continue;
+                }
 
                 if (
                     $existing &&

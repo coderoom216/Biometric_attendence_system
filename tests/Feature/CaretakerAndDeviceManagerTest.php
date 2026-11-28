@@ -239,4 +239,144 @@ class CaretakerAndDeviceManagerTest extends TestCase
             'ip_address' => '192.168.1.30',
         ]);
     }
+
+    public function test_mehra_sir_and_residential_warden_can_change_student_credentials(): void
+    {
+        $managerRole = Role::firstOrCreate(['name' => 'Caretaker Operator'], ['description' => 'Biometric Device Manager']);
+        $wardenRole = Role::firstOrCreate(['name' => 'Residential Warden'], ['description' => 'Residential Warden']);
+        $studentRole = Role::firstOrCreate(['name' => 'Student'], ['description' => 'Student']);
+
+        $bh1 = Hostel::create(['name' => 'Boys Hostel 1', 'code' => 'BH1', 'type' => 'boys', 'total_capacity' => 100]);
+        $bh2 = Hostel::create(['name' => 'Boys Hostel 2', 'code' => 'BH2', 'type' => 'boys', 'total_capacity' => 100]);
+        $r1 = Room::create(['hostel_id' => $bh1->id, 'room_number' => '101', 'capacity' => 3]);
+        $r2 = Room::create(['hostel_id' => $bh2->id, 'room_number' => '201', 'capacity' => 3]);
+
+        $mehra = User::create([
+            'name' => 'Mehra Ji',
+            'email' => 'mehra.cred@university.edu.in',
+            'password' => Hash::make('mehra123'),
+            'role_id' => $managerRole->id,
+            'is_active' => true,
+        ]);
+
+        $wardenBh1 = User::create([
+            'name' => 'Warden BH1',
+            'email' => 'warden.bh1.cred@university.edu.in',
+            'password' => Hash::make('warden123'),
+            'role_id' => $wardenRole->id,
+            'hostel_id' => $bh1->id,
+            'is_active' => true,
+        ]);
+
+        $su1 = User::create([
+            'name' => 'Student One',
+            'email' => 'stu1@student.edu.in',
+            'password' => Hash::make('student123'),
+            'role_id' => $studentRole->id,
+            'hostel_id' => $bh1->id,
+            'is_active' => true,
+        ]);
+        $s1 = Student::create([
+            'user_id' => $su1->id,
+            'hostel_id' => $bh1->id,
+            'room_id' => $r1->id,
+            'enrollment_no' => '2024CRED01',
+            'course' => 'CSE',
+            'biometric_id' => '7001',
+            'bed_number' => 'A',
+            'verification_status' => 'verified',
+        ]);
+
+        $su2 = User::create([
+            'name' => 'Student Two',
+            'email' => 'stu2@student.edu.in',
+            'password' => Hash::make('oldpass123'),
+            'role_id' => $studentRole->id,
+            'hostel_id' => $bh2->id,
+            'is_active' => true,
+        ]);
+        $s2 = Student::create([
+            'user_id' => $su2->id,
+            'hostel_id' => $bh2->id,
+            'room_id' => $r2->id,
+            'enrollment_no' => '2024CRED02',
+            'course' => 'ECE',
+            'biometric_id' => '7002',
+            'bed_number' => 'A',
+            'verification_status' => 'verified',
+        ]);
+
+        // Residential Warden BH1 can view default password (student123) and update BH1 student credentials
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->getJson("/api/students/{$s1->id}/credentials")
+            ->assertStatus(200)
+            ->assertJsonPath('credentials.studentEmail', 'stu1@student.edu.in')
+            ->assertJsonPath('credentials.loginPassword', 'student123')
+            ->assertJsonPath('credentials.hasKnownPassword', true);
+
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->putJson("/api/students/{$s1->id}/credentials", [
+                'studentEmail' => 'stu1.updated@student.edu.in',
+                'password' => 'wardenpass123',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('student.studentEmail', 'stu1.updated@student.edu.in')
+            ->assertJsonPath('student.loginPassword', 'wardenpass123');
+
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->getJson("/api/students/{$s1->id}/credentials")
+            ->assertStatus(200)
+            ->assertJsonPath('credentials.studentEmail', 'stu1.updated@student.edu.in')
+            ->assertJsonPath('credentials.loginPassword', 'wardenpass123')
+            ->assertJsonPath('credentials.hasKnownPassword', true);
+
+        // Student can log in with updated email + password
+        $this->postJson('/api/auth/login', [
+            'email' => 'stu1.updated@student.edu.in',
+            'password' => 'wardenpass123',
+        ])->assertStatus(200);
+
+        // Residential Warden BH1 cannot view or modify BH2 student credentials (403)
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->getJson("/api/students/{$s2->id}/credentials")
+            ->assertStatus(403);
+
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->putJson("/api/students/{$s2->id}/credentials", [
+                'studentEmail' => 'hacked@student.edu.in',
+                'password' => 'newpass123',
+            ])
+            ->assertStatus(403);
+
+        // Mehra Ji can view & update credentials for any hostel student (e.g. BH2)
+        $this->actingAs($mehra, 'sanctum')
+            ->putJson("/api/students/{$s2->id}/credentials", [
+                'studentEmail' => 'stu2.mehra@student.edu.in',
+                'password' => 'mehrapass123',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('student.studentEmail', 'stu2.mehra@student.edu.in')
+            ->assertJsonPath('student.loginPassword', 'mehrapass123');
+
+        $this->actingAs($mehra, 'sanctum')
+            ->getJson("/api/students/{$s2->id}/credentials")
+            ->assertStatus(200)
+            ->assertJsonPath('credentials.loginPassword', 'mehrapass123');
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'stu2.mehra@student.edu.in',
+            'password' => 'mehrapass123',
+        ])->assertStatus(200);
+
+        // Student cannot view or call credential update endpoint
+        $this->actingAs($su1, 'sanctum')
+            ->getJson("/api/students/{$s1->id}/credentials")
+            ->assertStatus(403);
+
+        $this->actingAs($su1, 'sanctum')
+            ->putJson("/api/students/{$s1->id}/credentials", [
+                'password' => 'selfreset123',
+            ])
+            ->assertStatus(403);
+    }
 }

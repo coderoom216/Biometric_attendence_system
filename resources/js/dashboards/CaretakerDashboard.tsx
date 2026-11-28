@@ -106,6 +106,7 @@ export const CaretakerDashboard: React.FC = () => {
 
   const [attendanceDate, setAttendanceDate] = useState('');
   const [dateAttendance, setDateAttendance] = useState<AttendanceRecord[]>([]);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [selectedSummary, setSelectedSummary] = useState<SummaryCategory | null>(null);
@@ -299,7 +300,7 @@ export const CaretakerDashboard: React.FC = () => {
       isCurrent = false;
       window.clearInterval(summaryTimer);
     };
-  }, [attendanceDate, assignedHostelId, user]);
+  }, [attendanceDate, assignedHostelId, user, refreshTick]);
 
   const handleSyncFromMachine = async () => {
     setIsSyncingDevice(true);
@@ -490,6 +491,7 @@ export const CaretakerDashboard: React.FC = () => {
       const res = await apiService.enterLeave(leaveForm);
       if (res.success) {
         setLeaveFeedback(res.message || 'Leave assigned (Pending Warden approval).');
+        setRefreshTick((t) => t + 1);
         window.setTimeout(() => {
           setIsLeaveModalOpen(false);
           setLeaveFeedback(null);
@@ -509,6 +511,7 @@ export const CaretakerDashboard: React.FC = () => {
       const res = await apiService.correctAttendance(correctionTarget.id, correctionStatus, correctionReason);
       if (res.success) {
         setCorrectionMsg('Attendance updated and audit log recorded.');
+        setRefreshTick((t) => t + 1);
         window.setTimeout(() => {
           setCorrectionTarget(null);
           setCorrectionMsg(null);
@@ -1154,9 +1157,10 @@ export const CaretakerDashboard: React.FC = () => {
         </div>
 
         <HostelAttendanceBarChart
-          currentDate={attendanceDate || '2026-11-26'}
+          currentDate={attendanceDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}
           hostelId={assignedHostelId || '1'}
           allowHostelSwitch={false}
+          refreshTrigger={refreshTick}
         />
       </div>
 

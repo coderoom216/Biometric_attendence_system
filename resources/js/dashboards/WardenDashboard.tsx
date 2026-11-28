@@ -46,6 +46,8 @@ export const WardenDashboard: React.FC = () => {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [selectedSummary, setSelectedSummary] = useState<SummaryCategory | null>(null);
 
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
   // Determine effective hostel scope
   const effectiveHostelId = user?.hostelId || 'h-mandakini';
   const hostelName = effectiveHostelId === 'h-shivalik'
@@ -267,10 +269,11 @@ export const WardenDashboard: React.FC = () => {
 
       {/* Date-Wise Longitudinal Attendance Bar Chart */}
       <HostelAttendanceBarChart
-        currentDate={attendanceDate || '2026-10-27'}
+        currentDate={attendanceDate || todayIst}
         hostelId={effectiveHostelId}
         allowHostelSwitch={false}
         onDateChange={setAttendanceDate}
+        refreshTrigger={refreshTick}
       />
 
       {/* Automated Strike Records & Disciplinary Warning Tickets */}
@@ -455,7 +458,7 @@ export const WardenDashboard: React.FC = () => {
       {/* Post-Grace Cutoff Defaulters Roster */}
       <DefaultersRoster
         records={defaulters}
-        targetDate={attendanceDate || '2026-10-27'}
+        targetDate={attendanceDate || todayIst}
         title={`Post-Grace Cutoff Defaulters (${hostelName})`}
         role="warden"
         hostelId={effectiveHostelId}
@@ -464,7 +467,7 @@ export const WardenDashboard: React.FC = () => {
       {/* Late Punches Roster (Late window: after 7:00 PM through 10:00 PM) */}
       <LatePunchesRoster
         records={latePunches}
-        targetDate={attendanceDate || '2026-10-27'}
+        targetDate={attendanceDate || todayIst}
         title={`Late Grace Punches (${hostelName})`}
         role="warden"
         hostelId={effectiveHostelId}

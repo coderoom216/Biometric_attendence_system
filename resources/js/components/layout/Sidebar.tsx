@@ -65,6 +65,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         ];
 
       case 'chief_warden':
+        return [
+          { name: 'Institution Oversight', path: '/', icon: LayoutDashboard },
+          { name: 'All Hostels & Rooms', path: '/hostels', icon: Building2 },
+          { name: 'All Students Directory', path: '/students', icon: Users },
+          { name: 'Defaulter Summaries', path: '/defaulters', icon: AlertOctagon, highlight: true },
+          { name: 'Leave & Correction Audits', path: '/leaves', icon: FileText },
+          { name: 'Consolidated Reports', path: '/reports', icon: BarChart3 },
+        ];
+
       case 'admin':
         return [
           { name: 'Institution Oversight', path: '/', icon: LayoutDashboard },
@@ -92,9 +101,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       case 'mehra':
         return [
           { name: 'Mehra Sir Dashboard', path: '/', icon: LayoutDashboard },
-          { name: 'System & Device Health', path: '/system-health', icon: Activity },
-        
-          
+          { name: 'Student Biometric Directory', path: '/students', icon: Users },
+          { name: 'Hostel Rooms & Vacancies', path: '/hostels', icon: Building2 },
+          { name: 'Security Verification', path: '/security', icon: ShieldCheck },
+          { name: 'System Health', path: '/system-health', icon: Activity },
         ];
 
       case 'caretaker':
@@ -112,6 +122,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           { name: 'Device Manager Dashboard', path: '/', icon: LayoutDashboard },
           { name: 'Student Biometric Directory', path: '/students', icon: Users },
           { name: 'Hostel Rooms & Vacancies', path: '/hostels', icon: Building2 },
+          { name: 'Security Verification', path: '/security', icon: ShieldCheck },
+          { name: 'System Health', path: '/system-health', icon: Activity },
         ];
 
         

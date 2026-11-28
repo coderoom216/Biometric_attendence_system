@@ -16,6 +16,7 @@ import Hostels from './pages/Hostels';
 import Biometrics from './pages/Biometrics';
 import SystemHealth from './pages/SystemHealth';
 import Registration from './pages/Registration';
+import StudentDisciplinary from './pages/StudentDisciplinary';
 
 import { UserRole } from './types';
 
@@ -142,6 +143,14 @@ export default function App() {
             }
           />
           <Route
+            path="/student/disciplinary"
+            element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <StudentDisciplinary />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/reports"
             element={
               <ProtectedRoute>
@@ -152,7 +161,7 @@ export default function App() {
           <Route
             path="/security"
             element={
-              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'warden']}>
+              <ProtectedRoute allowedRoles={['admin', 'director', 'warden', 'caretaker_operator']}>
                 <SecurityAudit />
               </ProtectedRoute>
             }
@@ -160,7 +169,7 @@ export default function App() {
           <Route
             path="/hostels"
             element={
-              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'residential_warden', 'warden', 'caretaker', 'caretaker_operator']}>
+              <ProtectedRoute allowedRoles={['admin', 'director', 'chief_warden', 'residential_warden', 'warden', 'caretaker', 'caretaker_operator']}>
                 <Hostels />
               </ProtectedRoute>
             }
@@ -168,7 +177,7 @@ export default function App() {
           <Route
             path="/biometrics"
             element={
-              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'caretaker_operator']}>
+              <ProtectedRoute allowedRoles={['admin', 'director', 'caretaker_operator']}>
                 <Biometrics />
               </ProtectedRoute>
             }
@@ -176,7 +185,7 @@ export default function App() {
           <Route
             path="/system-health"
             element={
-              <ProtectedRoute allowedRoles={['director', 'chief_warden', 'caretaker_operator']}>
+              <ProtectedRoute allowedRoles={['admin', 'director', 'caretaker_operator']}>
                 <SystemHealth />
               </ProtectedRoute>
             }

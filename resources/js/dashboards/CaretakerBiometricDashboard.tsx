@@ -20,12 +20,16 @@ import {
   Save,
   Calendar,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Search,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { BiometricDevice, Hostel, Room } from '../types';
+import { BiometricDevice, Hostel, Room, Student } from '../types';
 import { SixTierAbsenceAlerts } from '../components/dashboard/SixTierAbsenceAlerts';
 import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
+import { EditStudentCredentialsModal } from '../components/dashboard/EditStudentCredentialsModal';
 
 const DEVICE_SERIAL = 'RSS20241199684';
 
@@ -123,6 +127,11 @@ export const CaretakerBiometricDashboard: React.FC = () => {
   const [showAllEnrolledUsers, setShowAllEnrolledUsers] = useState<boolean>(false);
   const [liveDateFilter, setLiveDateFilter] = useState<string>('');
   const [showAllLivePunches, setShowAllLivePunches] = useState<boolean>(false);
+  const [registeredStudents, setRegisteredStudents] = useState<Student[]>([]);
+  const [studentCredSearch, setStudentCredSearch] = useState<string>('');
+  const [credentialStudent, setCredentialStudent] = useState<Student | null>(null);
+  const [credentialFeedback, setCredentialFeedback] = useState<string | null>(null);
+  const [revealedPasswordIds, setRevealedPasswordIds] = useState<Record<string, boolean>>({});
 
   // Edit Terminal Modal State (for Mehra Ji)
   const [editingDevice, setEditingDevice] = useState<any | null>(null);
@@ -363,6 +372,17 @@ export const CaretakerBiometricDashboard: React.FC = () => {
     }
   };
 
+  const loadRegisteredStudents = async () => {
+    try {
+      const response = await apiService.getStudents();
+      if (response.success) {
+        setRegisteredStudents(response.students || []);
+      }
+    } catch (error) {
+      console.error('Students loading failed:', error);
+    }
+  };
+
   const refreshAllData = async () => {
     setIsLoading(true);
     setPageError(null);
@@ -374,7 +394,8 @@ export const CaretakerBiometricDashboard: React.FC = () => {
       loadHostels(),
       loadDevices(),
       loadEnrolledUsers(),
-      loadLivePunches()
+      loadLivePunches(),
+      loadRegisteredStudents()
     ]);
 
     setIsLoading(false);
@@ -1003,9 +1024,26 @@ export const CaretakerBiometricDashboard: React.FC = () => {
                         </td>
                         <td className="p-3">
                           {user.isRegistered ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              Registered
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Registered
+                              </span>
+                              {user.studentId && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const matched = registeredStudents.find((s) => s.id === String(user.studentId));
+                                    if (matched) {
+                                      setCredentialStudent(matched);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
+                                >
+                                  <Key className="w-3 h-3" />
+                                  <span>Credentials</span>
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             <button
                               type="button"
@@ -1834,6 +1872,103 @@ export const CaretakerBiometricDashboard: React.FC = () => {
 
       </div>
 
+      {/* Registered Student Login Credentials (All Hostels) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <h2 className="font-bold text-sm text-slate-800">
+                Student Login Credentials (All Hostels)
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Change student login email or reset password across BH1, GH, and BH2.
+              </p>
+            </div>
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search name, enrollment, email, bio ID..."
+              value={studentCredSearch}
+              onChange={(e) => setStudentCredSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {credentialFeedback && (
+          <div role="status" className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center justify-between">
+            <span>{credentialFeedback}</span>
+            <button type="button" onClick={() => setCredentialFeedback(null)} className="font-bold text-sm leading-none ml-2">×</button>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="p-2.5">Student Name</th>
+                <th className="p-2.5">Enrollment No</th>
+                <th className="p-2.5">Biometric ID</th>
+                <th className="p-2.5">Login Email</th>
+                <th className="p-2.5">Password</th>
+                <th className="p-2.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {registeredStudents
+                .filter((s) => {
+                  const q = studentCredSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return [s.name, s.enrollmentNo, s.studentEmail, s.biometricId]
+                    .some((v) => (v || '').toLowerCase().includes(q));
+                })
+                .slice(0, 12)
+                .map((s) => (
+                  <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/50">
+                    <td className="p-2.5 font-semibold text-slate-900">{s.name}</td>
+                    <td className="p-2.5 font-mono text-slate-700">{s.enrollmentNo}</td>
+                    <td className="p-2.5 font-mono text-slate-600">{s.biometricId}</td>
+                    <td className="p-2.5 font-mono text-slate-700">{s.studentEmail}</td>
+                    <td className="p-2.5 font-mono text-slate-700">
+                      <div className="flex items-center gap-1.5">
+                        <span>
+                          {s.loginPassword
+                            ? (revealedPasswordIds[s.id] ? s.loginPassword : '••••••••')
+                            : 'Reset to view'}
+                        </span>
+                        {s.loginPassword && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRevealedPasswordIds((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
+                            }
+                            aria-label={revealedPasswordIds[s.id] ? 'Hide password' : 'Show password'}
+                            className="text-slate-400 hover:text-indigo-700 cursor-pointer"
+                          >
+                            {revealedPasswordIds[s.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setCredentialStudent(s)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold cursor-pointer"
+                      >
+                        <Key className="w-3 h-3" /> See / Change
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* 6-Tier Absence Alert Escalation Hierarchy (FR-08) */}
       <SixTierAbsenceAlerts />
 
@@ -2011,6 +2146,16 @@ export const CaretakerBiometricDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      <EditStudentCredentialsModal
+        student={credentialStudent}
+        onClose={() => setCredentialStudent(null)}
+        onSaved={async (_updated, message) => {
+          setCredentialStudent(null);
+          setCredentialFeedback(message);
+          await loadRegisteredStudents();
+        }}
+      />
 
     </div>
   );

@@ -64,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const quickLoginAsRole = async (role: UserRole) => {
     const roleCredentials: Record<UserRole, { email: string; pass: string }> = {
+      admin: { email: 'admin@university.edu.in', pass: 'admin123' },
       director: { email: 'director@university.edu.in', pass: 'director123' },
       chief_warden: { email: 'chiefwarden@university.edu.in', pass: 'chief123' },
       residential_warden: { email: 'warden.bh1@university.edu.in', pass: 'warden123' },

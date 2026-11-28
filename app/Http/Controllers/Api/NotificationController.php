@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
 use App\Models\Notification;
+use App\Models\Student;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -236,33 +237,92 @@ class NotificationController extends Controller
         }
 
         $data = $request->validate([
-            'notificationId' => ['required'],
+            'notificationId' => ['nullable'],
+            'studentId' => ['nullable', 'exists:students,id'],
             'overrideEmail' => ['nullable', 'email'],
         ]);
 
+        if (empty($data['notificationId']) && empty($data['studentId'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A notificationId or studentId is required.',
+            ], 422);
+        }
+
         $user = $request->user();
-        $query = Notification::with('alert.student');
+        $notification = null;
+
+        if (! empty($data['notificationId'])) {
+            $query = Notification::with('alert.student');
+            if ($user->isHostelScoped()) {
+                $query->whereHas('alert.student', function ($q) use ($user) {
+                    $q->where('hostel_id', $user->hostel_id);
+                });
+            }
+
+            $notification = $query->findOrFail($data['notificationId']);
+
+            if (! empty($data['overrideEmail'])) {
+                $notification->recipient = $data['overrideEmail'];
+                $student = $notification->alert?->student;
+                if ($student && empty($student->parent_email)) {
+                    $student->update(['parent_email' => $data['overrideEmail']]);
+                }
+            }
+
+            $notification->delivery_status = 'delivered';
+            $notification->sent_at = now();
+            $notification->error_message = null;
+            $notification->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Notification retried and delivered successfully.',
+                'notification' => $notification,
+            ]);
+        }
+
+        $studentQuery = Student::query();
         if ($user->isHostelScoped()) {
-            $query->whereHas('alert.student', function ($q) use ($user) {
-                $q->where('hostel_id', $user->hostel_id);
-            });
+            $studentQuery->where('hostel_id', $user->hostel_id);
         }
 
-        $notification = $query->findOrFail($data['notificationId']);
+        $student = $studentQuery->findOrFail($data['studentId']);
 
-        if (! empty($data['overrideEmail'])) {
-            $notification->recipient = $data['overrideEmail'];
+        if (empty($data['overrideEmail'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please provide a valid parent email address.',
+            ], 422);
         }
 
-        $notification->delivery_status = 'delivered';
-        $notification->sent_at = now();
-        $notification->error_message = null;
-        $notification->save();
+        $student->update(['parent_email' => $data['overrideEmail']]);
+
+        $failedNotifications = Notification::where('delivery_status', 'failed')
+            ->whereHas('alert', function ($q) use ($student) {
+                $q->where('student_id', $student->id);
+            })
+            ->get();
+
+        foreach ($failedNotifications as $failedNotification) {
+            $failedNotification->recipient = $data['overrideEmail'];
+            $failedNotification->delivery_status = 'delivered';
+            $failedNotification->sent_at = now();
+            $failedNotification->error_message = null;
+            $failedNotification->save();
+        }
+
+        app(AuditService::class)->log(
+            'Parent Email Updated',
+            'Student',
+            $student->id,
+            'Updated missing parent email via System Health console.',
+            $user->id
+        );
 
         return response()->json([
             'success' => true,
-            'message' => 'Notification retried and delivered successfully.',
-            'notification' => $notification,
+            'message' => 'Parent email saved and queued/failed alerts resolved.',
         ]);
     }
 }

@@ -42,6 +42,7 @@ interface HostelAttendanceBarChartProps {
   allowHostelSwitch?: boolean;
   onDateChange?: (date: string) => void;
   summaryData?: any;
+  refreshTrigger?: number;
 }
 
 /**
@@ -210,7 +211,8 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
   hostelId = 'all',
   allowHostelSwitch = true,
   onDateChange,
-  summaryData
+  summaryData,
+  refreshTrigger = 0
 }) => {
   const defaultToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const effectiveInitialDate = currentDate || defaultToday;
@@ -268,7 +270,7 @@ export const HostelAttendanceBarChart: React.FC<HostelAttendanceBarChartProps> =
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [selectedChartDate, summaryData]);
+  }, [selectedChartDate, summaryData, refreshTrigger]);
 
   const mapHostelReportToMetric = (h: any): HostelMetricData => {
     const slug = normalizeHostelId(h.hostelId || h.code || h.hostelName);

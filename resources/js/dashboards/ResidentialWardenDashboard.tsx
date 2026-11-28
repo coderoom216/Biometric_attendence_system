@@ -12,6 +12,9 @@ import {
   Search,
   Building2,
   Edit3,
+  Key,
+  Eye,
+  EyeOff,
   Calendar
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +25,7 @@ import { WarningTicketsTable } from '../components/dashboard/WarningTicketsTable
 import { DateQuickPresets } from '../components/dashboard/DateQuickPresets';
 import { EditLeaveModal } from '../components/dashboard/EditLeaveModal';
 import { LeaveDecisionConfirmModal } from '../components/dashboard/LeaveDecisionConfirmModal';
+import { EditStudentCredentialsModal } from '../components/dashboard/EditStudentCredentialsModal';
 
 type SummaryCategory = 'residents' | 'present' | 'late' | 'leave' | 'follow-up';
 
@@ -56,6 +60,10 @@ export const ResidentialWardenDashboard: React.FC = () => {
   const [updatingLeaveId, setUpdatingLeaveId] = useState<string | null>(null);
   const [editingLeave, setEditingLeave] = useState<LeaveRecord | null>(null);
   const [confirmDecision, setConfirmDecision] = useState<{ leave: LeaveRecord; action: 'approved' | 'rejected' } | null>(null);
+  const [credentialStudent, setCredentialStudent] = useState<Student | null>(null);
+  const [credentialSearch, setCredentialSearch] = useState('');
+  const [credentialMsg, setCredentialMsg] = useState<string | null>(null);
+  const [revealedPasswordIds, setRevealedPasswordIds] = useState<Record<string, boolean>>({});
   const [refreshTick, setRefreshTick] = useState(0);
 
   // Correction Modal State
@@ -248,6 +256,14 @@ export const ResidentialWardenDashboard: React.FC = () => {
           ? followUpRecords
           : [];
 
+  const normalizedHostel = String(user?.hostelId || '').toLowerCase();
+  const hostelBadgeLabel =
+    normalizedHostel === '2' || normalizedHostel === 'h-mandakini' || normalizedHostel === 'gh'
+      ? 'Girls Hostel · 165 beds'
+      : normalizedHostel === '3' || normalizedHostel === 'h-nilgiri' || normalizedHostel === 'bh2'
+        ? 'Boys Hostel 2 · 180 beds'
+        : 'Boys Hostel 1 · 180 beds';
+
   return (
     <div className="space-y-6">
       {/* Scope Header */}
@@ -256,7 +272,7 @@ export const ResidentialWardenDashboard: React.FC = () => {
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold text-slate-900">Hostel overview</h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-              Boys Hostel 1 · 180 beds
+              {hostelBadgeLabel}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -327,9 +343,10 @@ export const ResidentialWardenDashboard: React.FC = () => {
 
       {/* Date-Wise Longitudinal Attendance Bar Chart */}
       <HostelAttendanceBarChart
-        currentDate={attendanceDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}
+        currentDate={attendanceDate || todayIst}
         hostelId={user?.hostelId || 'h-shivalik'}
         allowHostelSwitch={false}
+        refreshTrigger={refreshTick}
       />
 
       {/* Automated Strike Records & Disciplinary Warning Tickets */}
@@ -381,7 +398,8 @@ export const ResidentialWardenDashboard: React.FC = () => {
                         <th className="px-4 py-3">Student</th>
                         <th className="px-4 py-3">Enrollment No</th>
                         <th className="px-4 py-3">Block / Room</th>
-                        <th className="px-4 py-3">Course</th>
+                        <th className="px-4 py-3">Login Email</th>
+                        <th className="px-4 py-3 text-right">Credentials</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -390,7 +408,16 @@ export const ResidentialWardenDashboard: React.FC = () => {
                           <td className="px-4 py-3 font-semibold text-slate-900">{student.name}</td>
                           <td className="px-4 py-3 font-mono text-slate-600">{student.enrollmentNo}</td>
                           <td className="px-4 py-3 text-slate-700">{student.block}, Room {student.roomNumber}</td>
-                          <td className="px-4 py-3 text-slate-700">{student.course}</td>
+                          <td className="px-4 py-3 font-mono text-slate-600">{student.studentEmail}</td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setCredentialStudent(student)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold cursor-pointer"
+                            >
+                              <Key className="w-3 h-3" /> Change Credentials
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -739,6 +766,110 @@ export const ResidentialWardenDashboard: React.FC = () => {
           const { leave, action } = confirmDecision;
           await handleLeaveApproval(leave.id, action);
           setConfirmDecision(null);
+        }}
+      />
+
+      {/* Student Login Credentials Management */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center space-x-2">
+            <Key className="w-4 h-4 text-amber-600" />
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm">Student Login Credentials</h2>
+              <p className="text-[11px] text-slate-500">
+                Update login email or reset password for students assigned to your hostel.
+              </p>
+            </div>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search student, enrollment, email..."
+              value={credentialSearch}
+              onChange={(e) => setCredentialSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {credentialMsg && (
+          <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+            {credentialMsg}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+              <tr>
+                <th className="py-2 px-3">Student</th>
+                <th className="py-2 px-3">Enrollment No</th>
+                <th className="py-2 px-3">Room</th>
+                <th className="py-2 px-3">Login Email</th>
+                <th className="py-2 px-3">Password</th>
+                <th className="py-2 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {students
+                .filter((s) => {
+                  const q = credentialSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return [s.name, s.enrollmentNo, s.studentEmail, s.roomNumber]
+                    .some((v) => (v || '').toLowerCase().includes(q));
+                })
+                .slice(0, 15)
+                .map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/70">
+                    <td className="py-2 px-3 font-semibold text-slate-900">{s.name}</td>
+                    <td className="py-2 px-3 font-mono text-slate-700">{s.enrollmentNo}</td>
+                    <td className="py-2 px-3 text-slate-600">Room {s.roomNumber || '—'}</td>
+                    <td className="py-2 px-3 font-mono text-slate-600">{s.studentEmail}</td>
+                    <td className="py-2 px-3 font-mono text-slate-700">
+                      <div className="flex items-center gap-1.5">
+                        <span>
+                          {s.loginPassword
+                            ? (revealedPasswordIds[s.id] ? s.loginPassword : '••••••••')
+                            : 'Reset to view'}
+                        </span>
+                        {s.loginPassword && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRevealedPasswordIds((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
+                            }
+                            aria-label={revealedPasswordIds[s.id] ? 'Hide password' : 'Show password'}
+                            className="text-slate-400 hover:text-indigo-700 cursor-pointer"
+                          >
+                            {revealedPasswordIds[s.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setCredentialStudent(s)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold cursor-pointer"
+                      >
+                        <Key className="w-3 h-3" /> See / Change
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <EditStudentCredentialsModal
+        student={credentialStudent}
+        onClose={() => setCredentialStudent(null)}
+        onSaved={async (_updated, message) => {
+          setCredentialStudent(null);
+          setCredentialMsg(message);
+          await loadData();
         }}
       />
 

@@ -84,6 +84,8 @@ class FullSystemHealthCheckTest extends TestCase
             '/api/students',
             '/api/notifications/logs',
             '/api/system/overview',
+            '/api/system/audit-logs',
+            '/api/security-test/run',
             '/api/students/warning-tickets',
         ] as $endpoint) {
             $res = $this->actingAs($mehra, 'sanctum')->getJson($endpoint);
@@ -172,5 +174,67 @@ class FullSystemHealthCheckTest extends TestCase
         ] as $restricted) {
             $this->actingAs($studentUser, 'sanctum')->getJson($restricted)->assertStatus(403);
         }
+    }
+
+    public function test_mehra_system_health_and_missing_parent_email_retry_work_correctly(): void
+    {
+        $operatorRole = Role::firstOrCreate(['name' => 'Caretaker Operator'], ['description' => 'Biometric Device Manager']);
+        $studentRole = Role::firstOrCreate(['name' => 'Student'], ['description' => 'Student']);
+
+        $bh1 = Hostel::create(['name' => 'Boys Hostel 1', 'code' => 'BH1', 'type' => 'boys', 'total_capacity' => 180]);
+        $room1 = Room::create(['hostel_id' => $bh1->id, 'room_number' => '101', 'capacity' => 3]);
+        Device::create(['hostel_id' => $bh1->id, 'device_serial' => 'RSS20241199684', 'device_name' => 'BH1 Terminal', 'device_status' => 'standby']);
+
+        $mehra = User::create(['name' => 'Mehra Ji', 'email' => 'mehra@university.edu.in', 'password' => Hash::make('mehra123'), 'role_id' => $operatorRole->id, 'is_active' => true]);
+        $studentUser = User::create(['name' => 'Priya', 'email' => 'priya@student.edu.in', 'password' => Hash::make('student123'), 'role_id' => $studentRole->id, 'hostel_id' => $bh1->id, 'is_active' => true]);
+        $student = Student::create([
+            'user_id' => $studentUser->id,
+            'hostel_id' => $bh1->id,
+            'room_id' => $room1->id,
+            'enrollment_no' => '2024CS099',
+            'course' => 'CSE',
+            'biometric_id' => '00001099',
+            'bed_number' => 'A',
+            'verification_status' => 'verified',
+        ]);
+
+        $tier = AlertTier::create(['tier_name' => 'parent_guardian', 'threshold' => 5]);
+        $alert = Alert::create(['student_id' => $student->id, 'tier_id' => $tier->id, 'alert_type' => 'Absence Alert', 'alert_status' => 'active', 'triggered_at' => now()]);
+        Notification::create([
+            'alert_id' => $alert->id,
+            'channel' => 'Email',
+            'recipient' => '',
+            'delivery_status' => 'failed',
+            'error_message' => 'Missing parent email',
+        ]);
+
+        $this->actingAs($mehra, 'sanctum')
+            ->getJson('/api/biometric/health')
+            ->assertStatus(200)
+            ->assertJsonPath('staleDevices.0.name', 'BH1 Terminal')
+            ->assertJsonPath('staleDevices.0.lastSync', 'Never synced')
+            ->assertJsonPath('missingParentEmails.0.id', (string) $student->id)
+            ->assertJsonPath('notificationFailures.0.studentId', (string) $student->id)
+            ->assertJsonPath('notificationFailures.0.studentName', 'Priya')
+            ->assertJsonPath('notificationFailures.0.tier', $tier->id);
+
+        $this->actingAs($mehra, 'sanctum')
+            ->postJson('/api/notifications/retry', [
+                'studentId' => $student->id,
+                'overrideEmail' => 'parent.priya@example.com',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('students', [
+            'id' => $student->id,
+            'parent_email' => 'parent.priya@example.com',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'alert_id' => $alert->id,
+            'delivery_status' => 'delivered',
+            'recipient' => 'parent.priya@example.com',
+        ]);
     }
 }

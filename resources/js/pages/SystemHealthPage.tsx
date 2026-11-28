@@ -19,7 +19,8 @@ export const SystemHealthPage: React.FC = () => {
   const { user } = useAuth();
   const [healthData, setHealthData] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [retryMsg, setRetryMsg] = useState<string | null>(null);
+  const [statusFeedback, setStatusFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Parent email fix state
@@ -28,14 +29,24 @@ export const SystemHealthPage: React.FC = () => {
 
   const loadData = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
-      const hRes = await apiService.getBiometricHealth();
-      if (hRes.success) setHealthData(hRes);
+      const [hRes, aRes] = await Promise.all([
+        apiService.getBiometricHealth(),
+        apiService.getAuditLogs().catch(() => null),
+      ]);
+      if (hRes?.success) {
+        setHealthData(hRes);
+      } else {
+        setLoadError('Failed to load biometric health metrics.');
+      }
 
-      const aRes = await apiService.getAuditLogs();
-      if (aRes.success) setAuditLogs(aRes.logs);
-    } catch (err) {
+      if (aRes?.success) {
+        setAuditLogs(Array.isArray(aRes.logs) ? aRes.logs : []);
+      }
+    } catch (err: any) {
       console.error(err);
+      setLoadError(err?.response?.data?.message || 'Unable to fetch system health diagnostics.');
     } finally {
       setIsLoading(false);
     }
@@ -45,18 +56,24 @@ export const SystemHealthPage: React.FC = () => {
     loadData();
   }, [user]);
 
-  const handleRetryNotification = async (notifId: string, overrideEmail?: string) => {
-    setRetryMsg(null);
+  const handleRetryNotification = async (notifId?: string | null, overrideEmail?: string, studentId?: string) => {
+    setStatusFeedback(null);
     try {
-      const res = await apiService.retryNotification(notifId, overrideEmail);
+      const res = await apiService.retryNotification(notifId, overrideEmail, studentId);
       if (res.success) {
-        setRetryMsg(`Alert retried successfully. Status updated to delivered.`);
+        setStatusFeedback({
+          type: 'success',
+          text: res.message || 'Alert retried successfully. Status updated to delivered.',
+        });
         setFixStudentId(null);
         setNewParentEmail('');
         loadData();
       }
     } catch (err: any) {
-      setRetryMsg(err.response?.data?.message || 'Retry failed');
+      setStatusFeedback({
+        type: 'error',
+        text: err.response?.data?.message || 'Retry failed. Please verify the email address.',
+      });
     }
   };
 
@@ -68,7 +85,7 @@ export const SystemHealthPage: React.FC = () => {
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold text-slate-900">Failure Handling & System Health (FR-12)</h1>
             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${healthData?.systemHealth === 'Optimal' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-              Health Status: {healthData?.systemHealth || 'Active'}
+              Health Status: {healthData?.systemHealth || (isLoading ? 'Checking...' : 'Active')}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -77,18 +94,36 @@ export const SystemHealthPage: React.FC = () => {
         </div>
 
         <button
+          disabled={isLoading}
           onClick={loadData}
-          className="flex items-center space-x-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition"
+          className="flex items-center space-x-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh Health Diagnostics</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <span>{isLoading ? 'Refreshing...' : 'Refresh Health Diagnostics'}</span>
         </button>
       </div>
 
-      {retryMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs flex items-center space-x-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{retryMsg}</span>
+      {loadError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center space-x-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{loadError}</span>
+        </div>
+      )}
+
+      {statusFeedback && (
+        <div
+          className={`p-3 rounded-lg text-xs flex items-center space-x-2 animate-in fade-in border ${
+            statusFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          {statusFeedback.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          )}
+          <span>{statusFeedback.text}</span>
         </div>
       )}
 
@@ -192,10 +227,13 @@ export const SystemHealthPage: React.FC = () => {
                 />
                 <button
                   onClick={() => {
-                    const failNotif = healthData.notificationFailures.find((n: any) => n.studentId === stu.id);
-                    if (failNotif) {
-                      handleRetryNotification(failNotif.id, newParentEmail);
+                    const trimmedEmail = newParentEmail.trim();
+                    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+                      setStatusFeedback({ type: 'error', text: 'Please enter a valid parent email address.' });
+                      return;
                     }
+                    const failNotif = healthData?.notificationFailures?.find((n: any) => n.studentId === stu.id);
+                    handleRetryNotification(failNotif?.id ?? null, trimmedEmail, stu.id);
                   }}
                   className="px-2.5 py-1.5 bg-emerald-600 text-white rounded text-xs font-semibold hover:bg-emerald-700"
                 >
@@ -240,14 +278,14 @@ export const SystemHealthPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {healthData?.notificationFailures?.length === 0 ? (
+              {!healthData?.notificationFailures || healthData.notificationFailures.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-6 text-center text-slate-400">
                     No failed notifications currently logged.
                   </td>
                 </tr>
               ) : (
-                healthData?.notificationFailures?.map((n: NotificationLog) => (
+                healthData.notificationFailures.map((n: NotificationLog) => (
                   <tr key={n.id}>
                     <td className="py-2.5 px-4 font-semibold text-slate-800">
                       Tier {n.tier}: {n.recipientRole}
@@ -258,8 +296,10 @@ export const SystemHealthPage: React.FC = () => {
                     <td className="py-2.5 px-4 text-right">
                       <button
                         onClick={() => {
-                          const email = prompt('Enter recipient email to retry dispatch:');
-                          if (email) handleRetryNotification(n.id, email);
+                          const email = prompt('Enter recipient email to retry dispatch:', n.recipientEmail || '');
+                          if (email && email.trim()) {
+                            handleRetryNotification(n.id, email.trim());
+                          }
                         }}
                         className="inline-flex items-center space-x-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded text-[11px] font-semibold"
                       >
@@ -274,6 +314,32 @@ export const SystemHealthPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Recent System Audit Trail */}
+      {auditLogs.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm">
+              <Activity className="w-4 h-4 text-indigo-600" />
+              <span>Recent System Audit Events</span>
+            </div>
+            <span className="text-xs text-slate-500 font-mono">Latest {Math.min(auditLogs.length, 15)} events</span>
+          </div>
+          <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+            {auditLogs.slice(0, 15).map((log: any) => (
+              <div key={log.id} className="px-4 py-2.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <span className="font-semibold text-slate-900">{log.action}</span>
+                  <span className="text-slate-500 ml-2">{log.details}</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono shrink-0">
+                  {log.performedByUserName} ({log.performedByUserRole}) • {log.timestamp}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

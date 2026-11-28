@@ -97,6 +97,43 @@ class StudentController extends Controller
         return null;
     }
 
+    private function checkStudentCredentialAccess(Request $request, ?int $targetHostelId = null)
+    {
+        $user = $request->user();
+        $role = $user?->role?->name;
+
+        if (! $user || ! in_array($role, [
+            'Admin',
+            'Caretaker Operator',
+            'Residential Warden',
+            'Warden',
+            'Caretaker',
+        ], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access.',
+            ], 403);
+        }
+
+        if ($user->isHostelScoped()) {
+            if (! $user->hostel_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hostel is assigned to this account.',
+                ], 403);
+            }
+
+            if ($targetHostelId !== null && (int) $targetHostelId !== (int) $user->hostel_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can only update student credentials within your assigned hostel.',
+                ], 403);
+            }
+        }
+
+        return null;
+    }
+
     private function syncTodayPunchesAfterStudentLink(): void
     {
         try {
@@ -180,6 +217,7 @@ class StudentController extends Controller
                 'parent_guardian_name' => $data['parentName'] ?? null,
                 'parent_email' => $data['parentEmail'] ?? null,
                 'verification_status' => 'pending_verification',
+                'credential_secret' => $plainPassword,
             ]);
         });
 
@@ -206,9 +244,26 @@ class StudentController extends Controller
         ], 201);
     }
 
-    private function formatStudentResponse(Student $student): array
+    private function resolveVisibleStudentPassword(Student $student): ?string
     {
-        return [
+        try {
+            $stored = $student->credential_secret;
+            if (is_string($stored) && $stored !== '') {
+                return $stored;
+            }
+        } catch (\Throwable) {
+        }
+
+        if ($student->user && Hash::check('student123', $student->user->password)) {
+            return 'student123';
+        }
+
+        return null;
+    }
+
+    private function formatStudentResponse(Student $student, bool $includePassword = false): array
+    {
+        $payload = [
             'id' => (string) $student->id,
             'enrollmentNo' => $student->enrollment_no,
             'enrollment_no' => $student->enrollment_no,
@@ -240,6 +295,12 @@ class StudentController extends Controller
             'hostel' => $student->hostel,
             'room' => $student->room,
         ];
+
+        if ($includePassword) {
+            $payload['loginPassword'] = $this->resolveVisibleStudentPassword($student);
+        }
+
+        return $payload;
     }
 
     // View all students
@@ -250,6 +311,13 @@ class StudentController extends Controller
         }
 
         $currentUser = $request->user();
+        $canViewCredentials = in_array($currentUser->role?->name, [
+            'Admin',
+            'Caretaker Operator',
+            'Residential Warden',
+            'Warden',
+            'Caretaker',
+        ], true);
 
         $query = Student::with('user', 'hostel', 'room');
 
@@ -257,7 +325,9 @@ class StudentController extends Controller
             $query->where('hostel_id', $currentUser->hostel_id);
         }
 
-        $students = $query->latest()->get()->map(fn ($s) => $this->formatStudentResponse($s));
+        $students = $query->latest()->get()->map(
+            fn ($s) => $this->formatStudentResponse($s, $canViewCredentials)
+        );
 
         return response()->json([
             'success' => true,
@@ -610,9 +680,9 @@ class StudentController extends Controller
     // Update student details
     public function update(Request $request, $id)
     {
-        $student = Student::findOrFail($id);
+        $student = Student::with('user')->findOrFail($id);
 
-        if ($response = $this->checkStudentManageAccess($request, (int) $student->hostel_id)) {
+        if ($response = $this->checkStudentCredentialAccess($request, (int) $student->hostel_id)) {
             return $response;
         }
 
@@ -653,6 +723,7 @@ class StudentController extends Controller
                 'email',
                 Rule::unique('users', 'email')->ignore($student->user_id),
             ],
+            'password' => 'sometimes|nullable|string|min:6|max:255',
             'hostel_id' => 'sometimes|required|exists:hostels,id',
             'room_id' => 'sometimes|required|exists:rooms,id',
             'roomNumber' => 'sometimes|required|string',
@@ -674,7 +745,7 @@ class StudentController extends Controller
         ]);
 
         $hostelId = (int) ($data['hostel_id'] ?? $student->hostel_id);
-        if ($response = $this->checkStudentManageAccess($request, $hostelId)) {
+        if ($response = $this->checkStudentCredentialAccess($request, $hostelId)) {
             return $response;
         }
 
@@ -717,11 +788,12 @@ class StudentController extends Controller
         DB::transaction(function () use ($data, $student, $hostelId, $roomId) {
             $studentData = $data;
 
-            unset($studentData['name'], $studentData['email']);
+            unset($studentData['name'], $studentData['email'], $studentData['password']);
 
             $student->update(array_merge($studentData, [
                 'hostel_id' => $hostelId,
                 'room_id' => $roomId,
+                'credential_secret' => ! empty($data['password']) ? $data['password'] : $student->credential_secret,
             ]));
 
             $userData = [];
@@ -732,6 +804,10 @@ class StudentController extends Controller
 
             if (isset($data['email'])) {
                 $userData['email'] = $data['email'];
+            }
+
+            if (! empty($data['password'])) {
+                $userData['password'] = Hash::make($data['password']);
             }
 
             if (isset($data['hostel_id'])) {
@@ -762,7 +838,115 @@ class StudentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Student details updated successfully.',
-            'student' => $this->formatStudentResponse($freshStudent),
+            'student' => $this->formatStudentResponse($freshStudent, true),
+        ]);
+    }
+
+    /**
+     * View a student's login credentials (email and current password if available).
+     */
+    public function showCredentials(Request $request, $id)
+    {
+        $student = Student::with('user', 'hostel', 'room')->findOrFail($id);
+
+        if ($response = $this->checkStudentCredentialAccess($request, (int) $student->hostel_id)) {
+            return $response;
+        }
+
+        if (! $student->user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student login account not found.',
+            ], 404);
+        }
+
+        $loginPassword = $this->resolveVisibleStudentPassword($student);
+
+        return response()->json([
+            'success' => true,
+            'credentials' => [
+                'studentId' => (string) $student->id,
+                'name' => $student->user->name,
+                'enrollmentNo' => $student->enrollment_no,
+                'studentEmail' => $student->user->email,
+                'loginPassword' => $loginPassword,
+                'hasKnownPassword' => $loginPassword !== null,
+            ],
+        ]);
+    }
+
+    /**
+     * Update student login credentials (email and/or password) by Mehra Sir or Residential Warden.
+     */
+    public function updateCredentials(Request $request, $id)
+    {
+        $student = Student::with('user', 'hostel', 'room')->findOrFail($id);
+
+        if ($response = $this->checkStudentCredentialAccess($request, (int) $student->hostel_id)) {
+            return $response;
+        }
+
+        if (! $student->user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student login account not found.',
+            ], 404);
+        }
+
+        if ($request->has('studentEmail') && ! $request->has('email')) {
+            $request->merge(['email' => $request->input('studentEmail')]);
+        }
+
+        $data = $request->validate([
+            'email' => [
+                'sometimes',
+                'required',
+                'email',
+                Rule::unique('users', 'email')->ignore($student->user_id),
+            ],
+            'password' => ['sometimes', 'nullable', 'string', 'min:6', 'max:255'],
+        ]);
+
+        $userUpdates = [];
+        $changedParts = [];
+
+        if (isset($data['email']) && $data['email'] !== $student->user->email) {
+            $userUpdates['email'] = trim($data['email']);
+            $changedParts[] = 'login email';
+        }
+
+        if (! empty($data['password'])) {
+            $userUpdates['password'] = Hash::make($data['password']);
+            $changedParts[] = 'password';
+        }
+
+        if (empty($userUpdates)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter a new email address or a new password (min 6 characters).',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($student, $userUpdates, $data) {
+            $student->user->update($userUpdates);
+
+            if (! empty($data['password'])) {
+                $student->update(['credential_secret' => $data['password']]);
+            }
+        });
+
+        app(AuditService::class)->log(
+            'Student Credentials Updated',
+            'Student',
+            $student->id,
+            'Updated '.implode(' & ', $changedParts).' for student '.$student->enrollment_no,
+            $request->user()->id
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student credentials updated successfully ('.implode(' & ', $changedParts).').',
+            'student' => $this->formatStudentResponse($student->fresh()->load('user', 'hostel', 'room'), true),
         ]);
     }
 
@@ -839,6 +1023,9 @@ class StudentController extends Controller
                 'parent_guardian_name' => $request->input('parentName'),
                 'parent_email' => $request->input('parentEmail'),
                 'verification_status' => 'verified',
+                'credential_secret' => ($existingStudent && ! $request->filled('password'))
+                    ? $existingStudent->credential_secret
+                    : $plainPassword,
             ]
         );
 

@@ -30,6 +30,11 @@ class Student extends Model
         'parent_guardian_name',
         'parent_email',
         'verification_status',
+        'credential_secret',
+    ];
+
+    protected $hidden = [
+        'credential_secret',
     ];
 
     protected function casts(): array
@@ -38,6 +43,7 @@ class Student extends Model
             'user_id' => 'integer',
             'hostel_id' => 'integer',
             'room_id' => 'integer',
+            'credential_secret' => 'encrypted',
         ];
     }
 

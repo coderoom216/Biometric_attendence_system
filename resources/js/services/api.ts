@@ -218,6 +218,24 @@ export const apiService = {
     const res = await api.put<{ success: boolean; message: string; student: Student }>(`/students/${id}`, data);
     return res.data;
   },
+  async getStudentCredentials(id: string) {
+    const res = await api.get<{
+      success: boolean;
+      credentials: {
+        studentId: string;
+        name: string;
+        enrollmentNo: string;
+        studentEmail: string;
+        loginPassword: string | null;
+        hasKnownPassword: boolean;
+      };
+    }>(`/students/${id}/credentials`);
+    return res.data;
+  },
+  async updateStudentCredentials(id: string, payload: { studentEmail?: string; password?: string }) {
+    const res = await api.put<{ success: boolean; message: string; student: Student }>(`/students/${id}/credentials`, payload);
+    return res.data;
+  },
   async verifyStudentRegistration(studentId: string, action: 'approve' | 'reject', rejectionReason?: string) {
     const res = await api.post<{ success: boolean; message: string; student: Student }>('/students/verify', {
       studentId,
@@ -398,10 +416,11 @@ export const apiService = {
     }>('/notifications/logs', { params: filters });
     return res.data;
   },
-  async retryNotification(notificationId: string, overrideEmail?: string) {
-    const res = await api.post<{ success: boolean; message: string; notification: NotificationLog }>('/notifications/retry', {
-      notificationId,
-      overrideEmail
+  async retryNotification(notificationId?: string | null, overrideEmail?: string, studentId?: string) {
+    const res = await api.post<{ success: boolean; message: string; notification?: NotificationLog }>('/notifications/retry', {
+      notificationId: notificationId || undefined,
+      overrideEmail: overrideEmail || undefined,
+      studentId: studentId || undefined
     });
     return res.data;
   },

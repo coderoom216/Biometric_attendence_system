@@ -16,11 +16,15 @@ import {
   Layers,
   FileSpreadsheet,
   Pencil,
+  Key,
+  Eye,
+  EyeOff,
   X
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Hostel, Student, WarningTicket } from '../types';
+import { EditStudentCredentialsModal } from '../components/dashboard/EditStudentCredentialsModal';
 
 export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' }> = ({
   initialTab = 'directory'
@@ -37,9 +41,12 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [credentialStudent, setCredentialStudent] = useState<Student | null>(null);
+  const [revealedPasswordIds, setRevealedPasswordIds] = useState<Record<string, boolean>>({});
   const [editForm, setEditForm] = useState({
     name: '',
     studentEmail: '',
+    password: '',
     enrollmentNo: '',
     course: '',
     hostelId: '',
@@ -53,7 +60,7 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
 
   const isCaretaker = user?.role === 'caretaker';
   const isHostelScoped = isCaretaker || user?.role === 'residential_warden' || user?.role === 'warden';
-  const canEditStudents = ['caretaker', 'caretaker_operator'].includes(user?.role || '');
+  const canEditStudents = ['caretaker', 'caretaker_operator', 'residential_warden', 'warden', 'admin'].includes(user?.role || '');
   const isWardenOrAdmin = ['residential_warden', 'warden', 'chief_warden', 'director', 'caretaker', 'caretaker_operator'].includes(user?.role || '');
 
   const loadData = async () => {
@@ -94,6 +101,7 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
     setEditForm({
       name: s.name || '',
       studentEmail: s.studentEmail || '',
+      password: '',
       enrollmentNo: s.enrollmentNo || '',
       course: s.course || '',
       hostelId: String(s.hostelId || ''),
@@ -111,7 +119,22 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
     setIsSavingEdit(true);
     setActionFeedback(null);
     try {
-      const res = await apiService.updateStudent(editingStudent.id, editForm);
+      const payload: Record<string, unknown> = {
+        name: editForm.name,
+        studentEmail: editForm.studentEmail,
+        enrollmentNo: editForm.enrollmentNo,
+        course: editForm.course,
+        hostelId: editForm.hostelId,
+        roomNumber: editForm.roomNumber,
+        bedNumber: editForm.bedNumber,
+        biometricId: editForm.biometricId,
+        parentName: editForm.parentName,
+        parentEmail: editForm.parentEmail,
+      };
+      if (editForm.password.trim()) {
+        payload.password = editForm.password.trim();
+      }
+      const res = await apiService.updateStudent(editingStudent.id, payload);
       if (res.success) {
         setActionFeedback(res.message || 'Student updated successfully.');
         setEditingStudent(null);
@@ -371,6 +394,28 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
                         <td className="py-3 px-3">
                           <div className="font-bold text-slate-900">{s.name}</div>
                           <div className="text-[10px] text-slate-400">{s.studentEmail}</div>
+                          {canEditStudents && (
+                            <div className="mt-1 flex items-center gap-1.5 text-[10px] font-mono text-slate-600">
+                              <span className="text-slate-400">Pass:</span>
+                              <span>
+                                {s.loginPassword
+                                  ? (revealedPasswordIds[s.id] ? s.loginPassword : '••••••••')
+                                  : 'Reset to view'}
+                              </span>
+                              {s.loginPassword && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setRevealedPasswordIds((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
+                                  }
+                                  aria-label={revealedPasswordIds[s.id] ? 'Hide password' : 'Show password'}
+                                  className="text-slate-400 hover:text-indigo-700 cursor-pointer"
+                                >
+                                  {revealedPasswordIds[s.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Roll Number */}
@@ -427,7 +472,14 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
                           )}
                         </td>
                         {canEditStudents && (
-                          <td className="py-3 px-3 text-right">
+                          <td className="py-3 px-3 text-right whitespace-nowrap space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setCredentialStudent(s)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold cursor-pointer"
+                            >
+                              <Key className="w-3 h-3" /> Credentials
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleOpenEdit(s)}
@@ -567,13 +619,14 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
             <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="block font-semibold text-slate-700 mb-1">Full Name</label><input type="text" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
-                <div><label className="block font-semibold text-slate-700 mb-1">Email</label><input type="email" required value={editForm.studentEmail} onChange={(e) => setEditForm({ ...editForm, studentEmail: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
+                <div><label className="block font-semibold text-slate-700 mb-1">Login Email</label><input type="email" required value={editForm.studentEmail} onChange={(e) => setEditForm({ ...editForm, studentEmail: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
+                <div><label className="block font-semibold text-slate-700 mb-1">New Password (Optional)</label><input type="password" minLength={6} placeholder="Leave blank to keep unchanged" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
                 <div><label className="block font-semibold text-slate-700 mb-1">Enrollment No</label><input type="text" required value={editForm.enrollmentNo} onChange={(e) => setEditForm({ ...editForm, enrollmentNo: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg font-mono" /></div>
                 <div><label className="block font-semibold text-slate-700 mb-1">Biometric ID</label><input type="text" required value={editForm.biometricId} onChange={(e) => setEditForm({ ...editForm, biometricId: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg font-mono" /></div>
                 <div><label className="block font-semibold text-slate-700 mb-1">Course</label><input type="text" required value={editForm.course} onChange={(e) => setEditForm({ ...editForm, course: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg" /></div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Hostel</label>
-                  <select required disabled={isCaretaker} value={editForm.hostelId} onChange={(e) => setEditForm({ ...editForm, hostelId: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100">
+                  <select required disabled={isHostelScoped} value={editForm.hostelId} onChange={(e) => setEditForm({ ...editForm, hostelId: e.target.value })} className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100">
                     {hostels.map((h) => <option key={h.id} value={String(h.id)}>{h.name} ({h.code})</option>)}
                   </select>
                 </div>
@@ -588,6 +641,16 @@ export const StudentsPage: React.FC<{ initialTab?: 'directory' | 'verification' 
           </div>
         </div>
       )}
+
+      <EditStudentCredentialsModal
+        student={credentialStudent}
+        onClose={() => setCredentialStudent(null)}
+        onSaved={async (_updated, message) => {
+          setCredentialStudent(null);
+          setActionFeedback(message);
+          await loadData();
+        }}
+      />
     </div>
   );
 };

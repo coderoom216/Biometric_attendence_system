@@ -1,4 +1,5 @@
 export type UserRole = 
+  | 'admin'
   | 'student' 
   | 'residential_warden' 
   | 'warden' 
@@ -62,6 +63,7 @@ export interface Student {
   bedNumber?: string;
   biometricId: string;
   studentEmail: string;
+  loginPassword?: string | null;
   studentPhone: string;
   parentName: string;
   parentEmail: string;
@@ -170,7 +172,7 @@ export interface LeaveRecord {
 
 export interface NotificationLog {
   id: string;
-  date: string;
+  date?: string;
   studentId: string;
   studentName: string;
   enrollmentNo: string;
@@ -179,10 +181,12 @@ export interface NotificationLog {
   recipientRole: string;
   recipientName: string;
   recipientEmail: string;
+  channel?: string;
   status: 'queued' | 'sent' | 'delivered' | 'failed';
   failureReason?: string;
   timestamp: string;
-  retryCount: number;
+  message?: string;
+  retryCount?: number;
 }
 
 export interface ScheduledJobLog {
@@ -206,12 +210,23 @@ export interface BiometricDevice {
   id: string;
   deviceId: string;
   name: string;
+  deviceName?: string;
+  deviceSerial?: string;
+  modelNo?: string;
   hostelId: string;
+  hostelName?: string;
+  hostelCode?: string;
   location: string;
-  totalLogsStoredLocally: number;
+  ipAddress?: string;
+  firmware?: string;
+  totalLogsStoredLocally?: number;
+  lastSync?: string | null;
   lastSyncAt: string;
-  status: 'online_synced' | 'stale_pending_import' | 'error';
-  authorizedTechnician: string;
+  status: 'online_synced' | 'stale_pending_import' | 'error' | 'offline' | 'standby';
+  deviceStatus?: string;
+  isOnline?: boolean;
+  studentCount?: number;
+  authorizedTechnician?: string;
 }
 
 export interface AuditLog {
@@ -227,15 +242,19 @@ export interface AuditLog {
 }
 
 export interface SecurityTestCaseResult {
-  testId: string;
-  name: string;
+  id: string;
+  title: string;
   description: string;
-  targetEndpoint: string;
-  attackerRole: string;
+  targetRole: string;
   expectedStatus: number;
   actualStatus: number;
   passed: boolean;
-  securityProof: string;
+  remediation: string;
+  testId?: string;
+  name?: string;
+  targetEndpoint?: string;
+  attackerRole?: string;
+  securityProof?: string;
 }
 
 export interface WarningTicket {

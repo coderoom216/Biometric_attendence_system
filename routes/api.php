@@ -89,7 +89,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/students/warning-tickets', [StudentController::class, 'warningTickets']);
     Route::get('/students/{id}', [StudentController::class, 'show'])->whereNumber('id');
     Route::put('/students/{id}', [StudentController::class, 'update'])->whereNumber('id');
+    Route::get('/students/{id}/credentials', [StudentController::class, 'showCredentials'])->whereNumber('id');
+    Route::put('/students/{id}/credentials', [StudentController::class, 'updateCredentials'])->whereNumber('id');
     Route::put('/admin/students/{id}', [StudentController::class, 'update'])->whereNumber('id');
+    Route::get('/admin/students/{id}/credentials', [StudentController::class, 'showCredentials'])->whereNumber('id');
+    Route::put('/admin/students/{id}/credentials', [StudentController::class, 'updateCredentials'])->whereNumber('id');
     Route::post('/admin/students/{id}/allocate-room', [StudentController::class, 'allocateRoom'])->whereNumber('id');
 
     /*

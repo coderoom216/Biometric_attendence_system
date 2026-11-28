@@ -322,16 +322,24 @@ class BiometricController extends Controller
 
     public function health(Request $request)
     {
-        $devices = Device::all();
+        $devices = Device::with('hostel')->get();
         $totalDevices = $devices->count();
         $staleThreshold = Carbon::now()->subHours(24);
 
-        $staleDevices = $devices->filter(fn ($d) => ! $d->last_sync || $d->last_sync < $staleThreshold)->values();
-        $syncedDevices = $totalDevices - $staleDevices->count();
+        $staleDeviceModels = $devices->filter(fn ($d) => ! $d->last_sync || $d->last_sync < $staleThreshold)->values();
+        $syncedDevices = $totalDevices - $staleDeviceModels->count();
+
+        $staleDevices = $staleDeviceModels->map(fn (Device $d): array => [
+            'id' => (string) $d->id,
+            'deviceSerial' => $d->device_serial,
+            'name' => $d->device_name,
+            'location' => $d->location ?: ($d->hostel?->name ?? 'Hostel Gate'),
+            'lastSync' => $d->last_sync ? $d->last_sync->format('Y-m-d H:i:s') : 'Never synced',
+        ])->values();
 
         $missingParentEmails = Student::whereNull('parent_email')
             ->orWhere('parent_email', '')
-            ->with('hostel', 'room')
+            ->with('user', 'hostel', 'room')
             ->get()
             ->map(fn ($s) => [
                 'id' => (string) $s->id,
@@ -342,9 +350,29 @@ class BiometricController extends Controller
             ]);
 
         $failedNotifications = Notification::where('delivery_status', 'failed')
-            ->latest('created_at')
+            ->with(['alert.student.user', 'alert.alertTier'])
+            ->latest('id')
             ->limit(20)
-            ->get();
+            ->get()
+            ->map(function (Notification $n): array {
+                $student = $n->alert?->student;
+                $timestamp = $n->sent_at ?? $n->alert?->triggered_at ?? now();
+
+                return [
+                    'id' => (string) $n->id,
+                    'studentId' => (string) ($student?->id ?? ''),
+                    'studentName' => $student?->user?->name ?? 'Unknown Student',
+                    'enrollmentNo' => $student?->enrollment_no ?? '',
+                    'tier' => (int) ($n->alert?->tier_id ?? 1),
+                    'recipientRole' => $n->alert?->alertTier?->tier_name ?? 'Parent / Staff',
+                    'recipientEmail' => $n->recipient,
+                    'channel' => strtolower((string) $n->channel),
+                    'status' => strtolower((string) $n->delivery_status),
+                    'failureReason' => $n->error_message ?: 'Notification delivery failed.',
+                    'timestamp' => $timestamp->format('Y-m-d H:i:s'),
+                ];
+            })
+            ->values();
 
         return response()->json([
             'success' => true,

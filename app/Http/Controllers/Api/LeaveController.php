@@ -71,7 +71,6 @@ class LeaveController extends Controller
             return;
         }
 
-        $today = app(ClockService::class)->current()->toDateString();
         $startStr = $leave->start_date instanceof Carbon
             ? $leave->start_date->toDateString()
             : substr((string) $leave->start_date, 0, 10);
@@ -79,14 +78,12 @@ class LeaveController extends Controller
             ? $leave->end_date->toDateString()
             : substr((string) $leave->end_date, 0, 10);
 
-        $syncEndStr = $endStr > $today ? $today : $endStr;
-
-        if ($startStr > $syncEndStr) {
-            return;
-        }
-
         $cursor = Carbon::createFromFormat('Y-m-d', $startStr, ClockService::TIMEZONE)->startOfDay();
-        $end = Carbon::createFromFormat('Y-m-d', $syncEndStr, ClockService::TIMEZONE)->startOfDay();
+        $end = Carbon::createFromFormat('Y-m-d', $endStr, ClockService::TIMEZONE)->startOfDay();
+        $maxEnd = $cursor->copy()->addDays(90);
+        if ($end->gt($maxEnd)) {
+            $end = $maxEnd;
+        }
 
         for (; $cursor->lte($end); $cursor->addDay()) {
             $dateStr = $cursor->toDateString();
@@ -447,7 +444,11 @@ class LeaveController extends Controller
 
         $today = app(ClockService::class)->current()->toDateString();
         $oldCursor = Carbon::createFromFormat('Y-m-d', $oldStartStr, ClockService::TIMEZONE)->startOfDay();
-        $oldEnd = Carbon::createFromFormat('Y-m-d', $oldEndStr > $today ? $today : $oldEndStr, ClockService::TIMEZONE)->startOfDay();
+        $oldEnd = Carbon::createFromFormat('Y-m-d', $oldEndStr, ClockService::TIMEZONE)->startOfDay();
+        $maxOldEnd = $oldCursor->copy()->addDays(90);
+        if ($oldEnd->gt($maxOldEnd)) {
+            $oldEnd = $maxOldEnd;
+        }
         $evalService = app(DefaulterEvaluationService::class);
 
         for (; $oldCursor->lte($oldEnd); $oldCursor->addDay()) {
@@ -482,7 +483,9 @@ class LeaveController extends Controller
                         ]);
                     } else {
                         $staleAttendance->delete();
-                        $evalService->ensureEvaluatedForDate($dStr);
+                        if ($dStr <= $today) {
+                            $evalService->ensureEvaluatedForDate($dStr);
+                        }
                     }
                 }
             }

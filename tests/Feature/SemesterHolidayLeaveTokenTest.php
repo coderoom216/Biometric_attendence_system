@@ -342,5 +342,21 @@ class SemesterHolidayLeaveTokenTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('leaves.0.status', 'Approved')
             ->assertJsonPath('leaves.0.daysCount', 12);
+
+        // Dashboards & reports immediately reflect approved leave even on future dates
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->getJson("/api/attendance/history?startDate={$futureStart}&endDate={$futureStart}")
+            ->assertStatus(200)
+            ->assertJsonPath('records.0.status', 'approved_leave');
+
+        $this->actingAs($wardenBh1, 'sanctum')
+            ->getJson("/api/reports/summary?date={$futureStart}")
+            ->assertStatus(200)
+            ->assertJsonPath('consolidated.totalLeave', 1);
+
+        $this->actingAs($studentUser, 'sanctum')
+            ->getJson("/api/attendance/history?startDate={$futureStart}&endDate={$futureStart}")
+            ->assertStatus(200)
+            ->assertJsonPath('records.0.status', 'approved_leave');
     }
 }
