@@ -7,7 +7,6 @@ import {
   Menu,
   X,
   Sliders,
-  ChevronDown,
   Building2,
   AlertTriangle
 } from 'lucide-react';
@@ -22,14 +21,13 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }) => {
-  const { user, logout, quickLoginAsRole, quickLoginAsAccount } = useAuth();
+  const { user, logout } = useAuth();
   const [virtualTime, setVirtualTime] = useState<string>('19:15:00');
   const [virtualDate, setVirtualDate] = useState<string>('2026-10-27');
   const [isPastCutoff, setIsPastCutoff] = useState<boolean>(true);
   const [isWithinGraceWindow, setIsWithinGraceWindow] = useState<boolean>(true);
   const [isPastDefaulter, setIsPastDefaulter] = useState<boolean>(false);
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
-  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
   const fetchClock = async () => {
     try {
@@ -81,31 +79,41 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Left: Mobile hamburger & institutional brand */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
               <button
                 onClick={onToggleSidebar}
-                className="lg:hidden p-2 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 focus:outline-hidden"
+                className="lg:hidden p-2 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 focus:outline-hidden shrink-0"
               >
                 {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-lg bg-indigo-700 text-white flex items-center justify-center font-bold shadow-xs">
-                  <Building2 className="w-5 h-5" />
+              {/* Dual Partner Logos */}
+              <div className="flex items-center space-x-1.5 shrink-0">
+                <img
+                  src="/images/thdc-ihet-logo.jpg"
+                  alt="THDC IHET Logo"
+                  className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-contain bg-white border border-slate-200 shadow-xs p-0.5"
+                />
+                <span className="text-[11px] font-bold text-slate-400 select-none">×</span>
+                <img
+                  src="/images/spiders-logo.jpg"
+                  alt="SPIDERS TECH SERVICES Logo"
+                  className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg object-contain bg-white border border-slate-200 shadow-xs p-0.5"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="font-bold text-slate-900 tracking-tight text-sm sm:text-base truncate">
+                    Hostel Attendance Portal
+                  </span>
+                  <span className="inline-flex text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
+                    THDC IHET COLLABORATES WITH SPIDERS
+                  </span>
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-slate-900 tracking-tight text-base sm:text-lg">
-                      Hostel Attendance Portal
-                    </span>
-                    <span className="hidden sm:inline-flex text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">
-                  
-                    </span>
-                  </div>
-                  <p className="hidden md:block text-xs text-slate-500">
-                    Institutional Attendance Management System
-                  </p>
-                </div>
+                <p className="hidden md:block text-[11px] text-slate-500 truncate">
+                  THDC Institute of Hydropower Engineering &amp; Technology • Spiders Tech Services
+                </p>
               </div>
             </div>
 
@@ -139,89 +147,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                 )}
                 <Sliders className="w-3 h-3 text-slate-400 hidden md:inline ml-1" />
               </button>
-
-              {/* Demo Role Switcher Quick Pill */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-                  className="flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
-                  title="Switch Role for Verification"
-                >
-                  <span className="hidden sm:inline">Switch Role:</span>
-                  <span className="font-semibold">
-                    {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker'
-                      ? 'Caretaker'
-                      : user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'mehra'
-                        ? 'Mr. Mehra Sir'
-                        : user?.role?.replace('_', ' ')}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-
-                {showRoleDropdown && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs">
-                    <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-100">
-                      Switch Active Role
-                    </div>
-                    <button
-                      onClick={() => { quickLoginAsRole('director'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-purple-50 text-slate-700 hover:text-purple-900 flex items-center justify-between"
-                    >
-                      <span>Dr. S.K Pradhan </span>
-                      {user?.role === 'director' && <span className="text-purple-600 font-bold">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => { quickLoginAsRole('chief_warden'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-900 flex items-center justify-between"
-                    >
-                      <span>Prof. Sameer Varma (Chief Warden)</span>
-                      {user?.role === 'chief_warden' && <span className="text-indigo-600 font-bold">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => { quickLoginAsRole('residential_warden'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-blue-50 text-slate-700 hover:text-blue-900 flex items-center justify-between"
-                    >
-                      <span>Mr. Sachin Sati  (Boys Hostel 1)</span>
-                      {user?.role === 'residential_warden' && <span className="text-blue-600 font-bold">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => { quickLoginAsAccount('warden.mandakini@university.edu.in'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-teal-50 text-slate-700 hover:text-teal-900 flex items-center justify-between"
-                    >
-                      <span>Dr. Kavita Tariyal (Girls Hostel)</span>
-                      {user?.email === 'warden.mandakini@university.edu.in' && <span className="text-teal-600 font-bold">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => { quickLoginAsAccount('rw.nilgiri@university.edu.in'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-teal-50 text-slate-700 hover:text-teal-900 flex items-center justify-between"
-                    >
-                      <span>Dr. Pathak Sir (Boys Hostel 2)</span>
-                      {user?.email === 'rw.nilgiri@university.edu.in' && <span className="text-teal-600 font-bold">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => { localStorage.setItem('demo_dashboard', 'caretaker'); quickLoginAsRole('caretaker_operator'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-orange-50 text-slate-700 hover:text-orange-900 flex items-center justify-between"
-                    >
-                      <span>Caretakers</span>
-                      {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') === 'caretaker' && <span className="text-orange-600 font-bold">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => { localStorage.setItem('demo_dashboard', 'mehra'); quickLoginAsRole('caretaker_operator'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-amber-50 text-slate-700 hover:text-amber-900 flex items-center justify-between"
-                    >
-                      <span>Mr. Mehra </span>
-                      {user?.role === 'caretaker_operator' && localStorage.getItem('demo_dashboard') !== 'caretaker' && <span className="text-amber-600 font-bold">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => { quickLoginAsRole('student'); setShowRoleDropdown(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-slate-700 hover:text-emerald-900 flex items-center justify-between"
-                    >
-                      <span>Student (Rahul Sharma)</span>
-                      {user?.role === 'student' && <span className="text-emerald-600 font-bold">✓</span>}
-                    </button>
-                  </div>
-                )}
-              </div>
 
               {/* User details & Logout */}
               <div className="flex items-center space-x-2 pl-1 border-l border-slate-200">

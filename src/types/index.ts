@@ -4,6 +4,7 @@ export type UserRole =
   | 'warden' 
   | 'chief_warden' 
   | 'director' 
+  | 'caretaker'
   | 'caretaker_operator';
 
 export interface User {
@@ -41,9 +42,11 @@ export interface Room {
   capacity: number;
   currentOccupancy: number;
   status: 'available' | 'full' | 'maintenance';
-  occupants?: { id: string; name: string; enrollmentNo: string; bed?: string }[];
+  occupants?: { id: string; name: string; enrollmentNo: string; bed?: string; bedNumber?: string }[];
   isVacant?: boolean;
+  isFull?: boolean;
   availableBeds?: number;
+  vacantBeds?: string[];
 }
 
 export interface Student {

@@ -1,0 +1,541 @@
+import axios from 'axios';
+import {
+  User,
+  Hostel,
+  Room,
+  Student,
+  AttendanceRecord,
+  LeaveRecord,
+  NotificationLog,
+  ScheduledJobLog,
+  BiometricDevice,
+  AuditLog,
+  SecurityTestCaseResult,
+  StudentTokenSummary,
+  SemesterSettings,
+  InstitutionalHoliday
+} from '../types';
+
+const api = axios.create({
+  baseURL: '/api', // same origin as Laravel
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Request interceptor to attach Bearer session token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('hostel_auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for token expiration / unauthorized
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear token if expired or invalid
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('hostel_auth_token');
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const apiService = {
+ 
+  // Auth
+  async login(email: string, password: string) {
+    const res = await api.post<{ success: boolean; token: string; user: User }>('/auth/login', { email, password });
+    return res.data;
+  },
+
+  async getMe() {
+    const res = await api.get<{ success: boolean; user: User }>('/auth/me');
+    return res.data;
+  },
+
+  async logout() {
+    const res = await api.post<{ success: boolean; message: string }>('/auth/logout');
+    return res.data;
+  },
+
+  async forgotPassword(email: string) {
+    const res = await api.post<{ success: boolean; message: string }>('/auth/forgot-password', { email });
+    return res.data;
+  },
+
+  async resetPassword(email: string, token: string, password: string) {
+    const res = await api.post<{ success: boolean; message: string }>('/auth/reset-password', {
+      email,
+      token,
+      password,
+      password_confirmation: password
+    });
+    return res.data;
+  },
+
+
+  // Attendance
+  async getTodayAttendance() {
+    const res = await api.get<{
+      success: boolean;
+      date: string;
+      virtualTime: string;
+      isPastCutoff: boolean;
+      isPastDefaulterTime: boolean;
+      stats: {
+        total: number;
+        present: number;
+        late: number;
+        approvedLeave: number;
+        absent: number;
+        defaulters: number;
+      };
+      records: AttendanceRecord[];
+    }>('/attendance/today');
+    return res.data;
+  },
+  async getDefaulters(date?: string, hostelId?: string) {
+    const res = await api.get<{
+      success: boolean;
+      targetDate: string;
+      virtualTime: string;
+      isDefaulterListVisible: boolean;
+      count: number;
+      defaulters: AttendanceRecord[];
+    }>('/attendance/defaulters', { params: { date, hostelId } });
+    return res.data;
+  },
+  async getLatePunches(date?: string, hostelId?: string) {
+    const res = await api.get<{
+      success: boolean;
+      targetDate: string;
+      virtualTime: string;
+      count: number;
+      latePunches: AttendanceRecord[];
+    }>('/attendance/late-punches', { params: { date, hostelId } });
+    return res.data;
+  },
+  async getAttendanceHistory(filters?: {
+    startDate?: string;
+    endDate?: string;
+    hostelId?: string;
+    block?: string;
+    status?: string;
+    search?: string;
+  }) {
+    const res = await api.get<{
+      success: boolean;
+      totalRecords: number;
+      records: AttendanceRecord[];
+    }>('/attendance/history', { params: filters });
+    return res.data;
+  },
+  async correctAttendance(recordId: string, newStatus: string, reason: string) {
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      record: AttendanceRecord;
+    }>('/attendance/correct', { recordId, newStatus, reason });
+    return res.data;
+  },
+  async recordPunch(studentId: string, punchTime?: string) {
+    const res = await api.post<{ success: boolean; message: string; record: AttendanceRecord }>('/attendance/record-punch', {
+      studentId,
+      punchTime
+    });
+    return res.data;
+  },
+
+  // Leaves
+  async getLeaves() {
+    const res = await api.get<{ success: boolean; total: number; leaves: LeaveRecord[] }>('/leaves');
+    return res.data;
+  },
+  async getMyLeaves() {
+    const res = await api.get<{ success?: boolean; leaves: LeaveRecord[] }>('/leaves/my');
+    return res.data;
+  },
+  async applyStudentLeave(payload: { startDate: string; endDate: string; reason: string }) {
+    const res = await api.post<{ success?: boolean; message: string; leave: LeaveRecord }>('/leaves', payload);
+    return res.data;
+  },
+  async enterLeave(payload: {
+    studentId: string;
+    startDate: string;
+    endDate: string;
+    reason: string;
+    gatePassNo: string;
+    parentConsentVerified: boolean;
+    notes?: string;
+  }) {
+    const res = await api.post<{ success: boolean; message: string; leave: LeaveRecord }>('/leaves/enter', payload);
+    return res.data;
+  },
+  async updateLeaveStatus(leaveId: string, approvalStatus: 'approved' | 'rejected') {
+    const res = await api.patch<{ success?: boolean; message: string; leave: LeaveRecord }>(`/admin/leaves/${leaveId}/status`, {
+      approval_status: approvalStatus
+    });
+    return res.data;
+  },
+  async updateLeave(
+    leaveId: string,
+    payload: {
+      startDate: string;
+      endDate: string;
+      reason: string;
+      gatePassNo?: string;
+      approvalStatus?: 'pending' | 'approved' | 'rejected';
+    }
+  ) {
+    const res = await api.put<{ success: boolean; message: string; leave: LeaveRecord }>(`/leaves/${leaveId}`, payload);
+    return res.data;
+  },
+
+  // Students
+  async getStudents() {
+    const res = await api.get<{ success: boolean; total: number; students: Student[] }>('/students');
+    return res.data;
+  },
+  async getStudentById(id: string) {
+    const res = await api.get<{ success: boolean; student: Student; disciplinary: StudentTokenSummary }>(`/students/${id}`);
+    return res.data;
+  },
+  async onboardStudent(data: Partial<Student>) {
+    const res = await api.post<{ success: boolean; message: string; student: Student }>('/students/onboard', data);
+    return res.data;
+  },
+  async updateStudent(id: string, data: Record<string, unknown>) {
+    const res = await api.put<{ success: boolean; message: string; student: Student }>(`/students/${id}`, data);
+    return res.data;
+  },
+  async getStudentCredentials(id: string) {
+    const res = await api.get<{
+      success: boolean;
+      credentials: {
+        studentId: string;
+        name: string;
+        enrollmentNo: string;
+        studentEmail: string;
+        loginPassword: string | null;
+        hasKnownPassword: boolean;
+      };
+    }>(`/students/${id}/credentials`);
+    return res.data;
+  },
+  async updateStudentCredentials(id: string, payload: { studentEmail?: string; password?: string }) {
+    const res = await api.put<{ success: boolean; message: string; student: Student }>(`/students/${id}/credentials`, payload);
+    return res.data;
+  },
+  async verifyStudentRegistration(studentId: string, action: 'approve' | 'reject', rejectionReason?: string) {
+    const res = await api.post<{ success: boolean; message: string; student: Student }>('/students/verify', {
+      studentId,
+      action,
+      rejectionReason
+    });
+    return res.data;
+  },
+  async submitRegistration(data: Partial<Student>) {
+    const res = await api.post<{ success: boolean; message: string; student: Student }>('/students/submit-registration', data);
+    return res.data;
+  },
+
+  // Hostels & Rooms
+  async getHostels() {
+    const res = await api.get<{ success: boolean; hostels: Hostel[] }>('/hostels');
+    return res.data;
+  },
+  async getHostelRooms(hostelId: string) {
+    const res = await api.get<{ success: boolean; hostelId: string; totalRooms: number; rooms: Room[] }>(`/hostels/${hostelId}/rooms`);
+    return res.data;
+  },
+  async allocateRoom(payload: { studentId: string; hostelId: string; block: string; roomNumber: string; bedNumber?: string }) {
+    const res = await api.post<{ success: boolean; message: string; student: Student }>('/hostels/allocate-room', payload);
+    return res.data;
+  },
+  async checkoutHostel(payload: { studentId: string; clearanceNotes?: string }) {
+    const res = await api.post<{ success: boolean; message: string; student: Student }>('/hostels/checkout', payload);
+    return res.data;
+  },
+
+  // Biometrics
+  async getBiometricDevices() {
+    const res = await api.get<{ success: boolean; authorizedAdministrator: string; devices: BiometricDevice[] }>('/biometric/devices');
+    return res.data;
+  },
+
+  async updateBiometricDevice(
+    deviceId: string,
+    payload: {
+      deviceName?: string;
+      deviceSerial?: string;
+      modelNo?: string | null;
+      ipAddress?: string | null;
+      firmwareVersion?: string | null;
+      location?: string | null;
+      hostelId?: string | number;
+      deviceStatus?: string;
+    }
+  ) {
+    const res = await api.put<{ success: boolean; message: string; device: BiometricDevice }>(
+      `/biometric/devices/${deviceId}`,
+      payload
+    );
+    return res.data;
+  },
+
+  async getBiometricEnrolledUsers() {
+    const res = await api.get<{
+      success: boolean;
+      total: number;
+      users: Array<{
+        userId: string;
+        deviceSerial: string;
+        name: string | null;
+        privilege: string | null;
+        enabled: boolean | null;
+        hasInfo: boolean;
+        infoFetchedAt: string | null;
+        fingerprintEnrolled: boolean;
+        fingerprintCount: number;
+      }>;
+    }>('/biometric/enrolled-users');
+
+    return res.data;
+  },
+
+  async triggerBiometricUserFetch(deviceId = 'RSS20241199684') {
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      transId?: string;
+      pending?: boolean;
+    }>('/biometric/trigger-user-fetch', { deviceId });
+
+    return res.data;
+  },
+
+  // Device-linked student registration
+  async submitDeviceStudentRegistration(payload: {
+    enrollmentNo: string;
+    name: string;
+    course: string;
+    semester: number;
+    gender: 'male' | 'female' | 'other';
+    hostelId: string;
+    block: string;
+    roomNumber: string;
+    bedNumber: string;
+    biometricId: string;
+    deviceSerial: string;
+    studentEmail: string;
+    studentPhone: string;
+    parentName: string;
+    parentEmail: string;
+    parentPhone: string;
+  }) {
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      student?: Student;
+    }>('/students/device-registration', payload);
+
+    return res.data;
+  },
+
+  async syncBiometricLogs(deviceId: string, punches: { biometricId: string; punchTime?: string; punchTimestamp?: string }[]) {
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      deviceId: string;
+      processedCount: number;
+      duplicateCount: number;
+      unrecognizedCount: number;
+      lastSyncAt: string;
+    }>('/biometric/sync', { deviceId, punches });
+    return res.data;
+  },
+
+  async getLiveBiometricPunches() {
+    const res = await api.get<{
+      success: boolean;
+      mongo: {
+        connected: boolean;
+        database: string;
+        collection: string;
+        totalRecords?: number;
+        error?: string;
+      };
+      total: number;
+      punches: Array<{
+        id: string;
+        biometricId: string;
+        studentName: string | null;
+        enrollmentNo: string | null;
+        deviceSerial: string | null;
+        direction: string;
+        punchTime: string | null;
+        recognized: boolean;
+      }>;
+    }>('/biometric/live');
+    return res.data;
+  },
+
+  async getBiometricHealth() {
+    const res = await api.get<{
+      success: boolean;
+      systemHealth: string;
+      totalDevices: number;
+      syncedDevices: number;
+      staleDevicesCount: number;
+      staleDevices: any[];
+      missingParentEmailsCount: number;
+      missingParentEmails: any[];
+      notificationFailuresCount: number;
+      notificationFailures: NotificationLog[];
+    }>('/biometric/health');
+    return res.data;
+  },
+
+  // Notifications
+  async getNotificationLogs(filters?: { studentId?: string; tier?: number; status?: string; date?: string }) {
+    const res = await api.get<{
+      success: boolean;
+      stats: { total: number; delivered: number; queued: number; failed: number };
+      hierarchy: string[];
+      logs: NotificationLog[];
+    }>('/notifications/logs', { params: filters });
+    return res.data;
+  },
+  async retryNotification(notificationId?: string | null, overrideEmail?: string, studentId?: string) {
+    const res = await api.post<{ success: boolean; message: string; notification?: NotificationLog }>('/notifications/retry', {
+      notificationId: notificationId || undefined,
+      overrideEmail: overrideEmail || undefined,
+      studentId: studentId || undefined
+    });
+    return res.data;
+  },
+
+  // Scheduler & Clock
+  async getSchedulerStatus() {
+    const res = await api.get<{
+      success: boolean;
+      virtualDate: string;
+      virtualTime: string;
+      cutoffTime: string;
+      graceEndTime: string;
+      defaulterFlagTime: string;
+      isPastCutoff: boolean;
+      isWithinGraceWindow: boolean;
+      isPastDefaulterTime: boolean;
+      scheduledJobs: ScheduledJobLog[];
+    }>('/scheduler/status');
+    return res.data;
+  },
+  async triggerCutoffEvaluation() {
+    const res = await api.post<{ success: boolean; message: string; jobLog: ScheduledJobLog }>('/scheduler/evaluate-cutoff');
+    return res.data;
+  },
+  async setVirtualClock(time: string, date?: string) {
+    const res = await api.post<{
+      success: boolean;
+      message: string;
+      virtualDate: string;
+      virtualTime: string;
+      isPastCutoff: boolean;
+      isPastDefaulterTime: boolean;
+    }>('/scheduler/set-clock', { time, date });
+    return res.data;
+  },
+
+  // Reports
+  async getReportSummary(date?: string) {
+    const res = await api.get<{
+      success: boolean;
+      date: string;
+      consolidated: any;
+      hostelReports: any[];
+      dateWiseTrends?: any[];
+    }>('/reports/summary', { params: { date } });
+    return res.data;
+  },
+  async getReportTrends(date?: string) {
+    const res = await api.get<{
+      success: boolean;
+      date?: string;
+      trends: any[];
+    }>('/reports/trends', { params: date ? { date } : undefined });
+    return res.data;
+  },
+
+  // Semester Settings & Institutional Holidays (Chief Warden)
+  async getSemester() {
+    const res = await api.get<{ success: boolean; semester: SemesterSettings }>('/semester');
+    return res.data;
+  },
+  async updateSemester(startDate: string, endDate: string) {
+    const res = await api.put<{ success: boolean; message: string; semester: SemesterSettings }>('/semester', {
+      startDate,
+      endDate,
+    });
+    return res.data;
+  },
+  async getHolidays() {
+    const res = await api.get<{
+      success: boolean;
+      today: string;
+      holidays: InstitutionalHoliday[];
+      upcomingHolidays: InstitutionalHoliday[];
+      pastHolidays: InstitutionalHoliday[];
+    }>('/holidays');
+    return res.data;
+  },
+  async createHoliday(payload: { startDate: string; endDate?: string; reason: string }) {
+    const res = await api.post<{ success: boolean; message: string; holiday: InstitutionalHoliday }>('/holidays', payload);
+    return res.data;
+  },
+  async deleteHoliday(id: string) {
+    const res = await api.delete<{ success: boolean; message: string }>(`/holidays/${id}`);
+    return res.data;
+  },
+
+  // Security Tests (10 Mandatory Test Cases)
+  async runSecurityTests() {
+    const res = await api.get<{
+      success: boolean;
+      totalTests: number;
+      passedCount: number;
+      failedCount: number;
+      allPassed: boolean;
+      executedAt: string;
+      results: SecurityTestCaseResult[];
+    }>('/security-test/run');
+    return res.data;
+  },
+
+  // System
+  async getAuditLogs() {
+    const res = await api.get<{ success: boolean; total: number; logs: AuditLog[] }>('/system/audit-logs');
+    return res.data;
+  },
+  async getSystemOverview() {
+    const res = await api.get<{
+      success: boolean;
+      virtualDate: string;
+      virtualTime: string;
+      isPastCutoff: boolean;
+      isPastDefaulterTime: boolean;
+      stats: any;
+    }>('/system/overview');
+    return res.data;
+  }
+};

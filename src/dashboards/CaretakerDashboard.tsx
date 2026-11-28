@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ClipboardCheck, Cpu, Users } from 'lucide-react';
+import { SixTierAbsenceAlerts } from '../components/dashboard/SixTierAbsenceAlerts';
 
 export const CaretakerDashboard: React.FC = () => (
   <div className="space-y-6">
@@ -26,5 +27,8 @@ export const CaretakerDashboard: React.FC = () => (
         <p className="mt-1 text-sm text-slate-600">Review attendance records and daily summaries.</p>
       </Link>
     </div>
+
+    {/* 6-Tier Absence Alert Escalation Hierarchy (FR-08) */}
+    <SixTierAbsenceAlerts />
   </div>
 );

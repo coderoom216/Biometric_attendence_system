@@ -1,0 +1,282 @@
+export type UserRole = 
+  | 'admin'
+  | 'student' 
+  | 'residential_warden' 
+  | 'warden' 
+  | 'chief_warden' 
+  | 'director' 
+  | 'caretaker'
+  | 'caretaker_operator';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  phone?: string;
+  hostelId?: string;
+  blockId?: string;
+  studentId?: string;
+}
+
+export interface Hostel {
+  id: string;
+  name: string;
+  code: string;
+  type: 'boys' | 'girls';
+  blocks: string[];
+  totalFloors: number;
+  totalRooms: number;
+  capacity: number;
+  currentOccupancy?: number;
+  availableBeds?: number;
+  chiefWarden: string;
+  residentialWarden: string;
+}
+
+export interface Room {
+  id: string;
+  hostelId: string;
+  block: string;
+  floor: number;
+  roomNumber: string;
+  capacity: number;
+  currentOccupancy: number;
+  status: 'available' | 'full' | 'maintenance';
+  occupants?: { id: string; name: string; enrollmentNo: string; bed?: string; bedNumber?: string }[];
+  isVacant?: boolean;
+  isFull?: boolean;
+  availableBeds?: number;
+  vacantBeds?: string[];
+}
+
+export interface Student {
+  id: string;
+  enrollmentNo: string;
+  name: string;
+  course: string;
+  semester: number;
+  gender: 'male' | 'female' | 'other';
+  hostelId: string;
+  block: string;
+  roomNumber: string;
+  bedNumber?: string;
+  biometricId: string;
+  studentEmail: string;
+  loginPassword?: string | null;
+  studentPhone: string;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string;
+  verificationStatus: 'verified' | 'pending_verification' | 'rejected';
+  verifiedBy?: string;
+  verifiedAt?: string;
+  rejectionReason?: string;
+  allotmentDate: string;
+  checkoutDate?: string;
+  checkoutStatus: 'active' | 'vacated';
+}
+
+export type DisciplinaryCardStatus = 'none' | 'normal_warning' | 'yellow_card' | 'red_card_blacklist';
+
+export interface TokenHistoryEntry {
+  id: string;
+  studentId: string;
+  date: string;
+  reason: string;
+  tokensReceived: number;
+  warningCardStatus: DisciplinaryCardStatus;
+  inActiveSemester?: boolean;
+}
+
+export interface StudentTokenSummary {
+  currentMonth: string;
+  currentMonthTokens: number;
+  currentSemester?: string;
+  currentSemesterStart?: string;
+  currentSemesterEnd?: string;
+  currentSemesterDurationDays?: number;
+  currentSemesterTokens?: number;
+  lifetimeTokens: number;
+  disciplinaryStatus: DisciplinaryCardStatus;
+  isBlacklisted: boolean;
+  history: TokenHistoryEntry[];
+}
+
+export interface SemesterSettings {
+  id?: number | null;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  isCustom?: boolean;
+}
+
+export interface InstitutionalHoliday {
+  id: string;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  reason: string;
+  isPast: boolean;
+  isCurrentOrUpcoming: boolean;
+  createdBy: string;
+}
+
+export type AttendanceStatus = 'present' | 'late' | 'approved_leave' | 'absent';
+
+export interface AttendanceRecord {
+  id: string;
+  studentId: string;
+  enrollmentNo: string;
+  studentName: string;
+  hostelId: string;
+  block: string;
+  roomNumber: string;
+  date: string;
+  status: AttendanceStatus;
+  punchTime?: string;
+  biometricDeviceId?: string;
+  isDefaulter: boolean;
+  evaluatedAt?: string;
+  correctedBy?: string;
+  correctedAt?: string;
+  correctionReason?: string;
+  remarks?: string;
+}
+
+export interface LeaveRecord {
+  id: string;
+  studentId: string;
+  enrollmentNo: string;
+  studentName: string;
+  hostelId: string;
+  hostel?: string;
+  hostelCode?: string;
+  block: string;
+  roomNumber: string;
+  startDate: string;
+  endDate: string;
+  daysCount?: number;
+  reason: string;
+  gatePassNo: string;
+  status?: 'Pending' | 'Approved' | 'Rejected';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: string | null;
+  parentConsentVerified: boolean;
+  enteredByResidentialWardenId: string;
+  residentialWardenName: string;
+  createdAt: string;
+  notes?: string;
+}
+
+export interface NotificationLog {
+  id: string;
+  date?: string;
+  studentId: string;
+  studentName: string;
+  enrollmentNo: string;
+  hostelId: string;
+  tier: number;
+  recipientRole: string;
+  recipientName: string;
+  recipientEmail: string;
+  channel?: string;
+  status: 'queued' | 'sent' | 'delivered' | 'failed';
+  failureReason?: string;
+  timestamp: string;
+  message?: string;
+  retryCount?: number;
+}
+
+export interface ScheduledJobLog {
+  id: string;
+  jobName: string;
+  scheduledTime: string;
+  executedAt: string;
+  completedAt: string;
+  status: 'completed' | 'failed' | 'in_progress';
+  dateEvaluated: string;
+  totalStudents: number;
+  presentCount: number;
+  lateCount: number;
+  leaveCount: number;
+  defaultersCount: number;
+  notificationsQueued: number;
+  errorMessage?: string;
+}
+
+export interface BiometricDevice {
+  id: string;
+  deviceId: string;
+  name: string;
+  deviceName?: string;
+  deviceSerial?: string;
+  modelNo?: string;
+  hostelId: string;
+  hostelName?: string;
+  hostelCode?: string;
+  location: string;
+  ipAddress?: string;
+  firmware?: string;
+  totalLogsStoredLocally?: number;
+  lastSync?: string | null;
+  lastSyncAt: string;
+  status: 'online_synced' | 'stale_pending_import' | 'error' | 'offline' | 'standby';
+  deviceStatus?: string;
+  isOnline?: boolean;
+  studentCount?: number;
+  authorizedTechnician?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  performedByUserId: string;
+  performedByUserName: string;
+  performedByUserRole: string;
+  targetEntity: string;
+  targetId: string;
+  details: string;
+}
+
+export interface SecurityTestCaseResult {
+  id: string;
+  title: string;
+  description: string;
+  targetRole: string;
+  expectedStatus: number;
+  actualStatus: number;
+  passed: boolean;
+  remediation: string;
+  testId?: string;
+  name?: string;
+  targetEndpoint?: string;
+  attackerRole?: string;
+  securityProof?: string;
+}
+
+export interface WarningTicket {
+  id: string;
+  studentId: string;
+  studentName: string;
+  enrollmentNo: string;
+  hostelId: string;
+  hostelName: string;
+  block: string;
+  roomNumber: string;
+  course: string;
+  parentName: string;
+  parentPhone: string;
+  parentEmail: string;
+  latePunchesCount: number;
+  missedCheckInsCount: number;
+  totalViolations: number;
+  severity: 'strike_1' | 'strike_2' | 'flagged_for_admin_review';
+  status: 'active' | 'under_review' | 'resolved';
+  issuedAt: string;
+  latestViolationDate: string;
+  reason: string;
+  adminNotes?: string;
+}
